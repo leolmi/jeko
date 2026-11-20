@@ -55,7 +55,7 @@ export interface AgentRequest {
   gates: { policies: Policy[]; mode: RunMode };
   /** Da chiamare quando claude chiede il permesso per uno strumento. */
   authorize: (tool: string, input: unknown) => Promise<boolean>;
-  /** Domanda di claude all'utente; null se l'utente non risponde. */
+  /** Domanda di claude all'utente; null se l'utente non risponde. Assente in headless. */
   askUser?: (q: AgentQuestion) => Promise<string | null>;
   /** Avanzamento del turno: testo di claude o strumento usato. */
   onActivity?: (a: { kind: 'text' | 'tool'; tool?: string; text: string }) => void;
@@ -260,7 +260,10 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
           const { actions, command } = classifyTool(tool, input);
           return authorize(step.id, actions, command);
         },
-        askUser: (q) => host.ask({ stepId: step.id, required: false, ...q }),
+        // In headless la run si ferma solo ai gate `always`: claude decide da sé.
+        ...(mode !== 'headless' && {
+          askUser: (q: AgentQuestion) => host.ask({ stepId: step.id, required: false, ...q }),
+        }),
         onActivity: (a) => emit({ type: 'agent.activity', stepId: step.id, ...a }),
       });
       if (res.sessionId) state.sessionId = res.sessionId;

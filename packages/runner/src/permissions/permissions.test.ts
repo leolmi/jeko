@@ -263,6 +263,20 @@ describe('AskUserQuestion', () => {
         updatedInput: { ...one, answers: { 'Quale database?': 'SQLite' } },
       });
       turn.dispose();
+
+      // Senza askUser (headless) la domanda non arriva all'utente, nemmeno via authorize.
+      const headless: AgentRequest = { ...req };
+      delete headless.askUser;
+      const quiet = bridge(
+        { ...headless, authorize: async () => true },
+        mkdtempSync(join(tmpdir(), 'jeko-ask-')),
+      );
+      const quietToken = JSON.parse(readFileSync(quiet.input.mcpConfig!, 'utf8')).mcpServers.jeko
+        .env[ENV.token];
+      expect(
+        await requestDecision({ pipe: ep.path, token: quietToken }, 'AskUserQuestion', one),
+      ).toMatchObject({ behavior: 'deny' });
+      quiet.dispose();
     } finally {
       await ep.stop();
     }

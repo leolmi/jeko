@@ -75,6 +75,34 @@ const example = wf(
   readFileSync(new URL('../../../shared/workflows/nuovo-progetto.yaml', import.meta.url), 'utf8'),
 );
 
+describe('domande di claude (AskUserQuestion) nelle tre modalità', () => {
+  const w = wf(`
+name: domande
+version: 1
+kind: develop
+steps:
+  - { id: lavoro, type: agent, instructions: lavora }
+`);
+  it.each([
+    ['headless', false],
+    ['checkpoint', true],
+    ['interactive', true],
+  ] as const)('%s: domanda in chat = %s', async (mode, asks) => {
+    let answer: string | null | undefined;
+    const f = fakeHost({
+      answers: ['blu'],
+      agent: async (req) => {
+        answer = await req.askUser?.({ question: 'Colore?', options: [{ label: 'blu' }] });
+        return { ok: true, output: 'fatto' };
+      },
+    });
+    const res = await run(w, f, mode);
+    expect(res.status).toBe('done');
+    expect(f.asked).toEqual(asks ? ['lavoro'] : []);
+    expect(answer).toBe(asks ? 'blu' : undefined);
+  });
+});
+
 describe('motore', () => {
   it('esegue nuovo-progetto con gli input già ricavati', async () => {
     const files: Record<string, string> = {};

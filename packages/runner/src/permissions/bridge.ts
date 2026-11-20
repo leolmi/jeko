@@ -55,6 +55,9 @@ export function parseQuestions(input: Record<string, unknown>): AgentQuestion[] 
   });
 }
 
+const NO_QUESTIONS =
+  "in questa modalità non si fanno domande all'utente: scegli tu l'opzione più ragionevole e prosegui";
+
 /**
  * AskUserQuestion: ogni domanda diventa una richiesta `ask` nella chat; le risposte tornano a
  * claude nell'input dello strumento (`answers`, domanda → risposta).
@@ -90,10 +93,11 @@ export function createPermissionBridge(opts: BridgeOptions): PermissionBridge {
 
   return (req, dir, existing) => {
     const { token, dispose } = opts.endpoint.register(
-      async (tool, input) =>
-        tool === ASK_TOOL && req.askUser
-          ? answerQuestions(input, req.askUser)
-          : { approved: await req.authorize(tool, input) },
+      async (tool, input) => {
+        if (tool !== ASK_TOOL) return { approved: await req.authorize(tool, input) };
+        if (!req.askUser) return { approved: false, note: NO_QUESTIONS };
+        return answerQuestions(input, req.askUser);
+      },
       ...(existing !== undefined ? [existing] : []),
     );
     const mcpConfig = join(dir, 'mcp.json');
