@@ -31,6 +31,8 @@ export class Setup {
   readonly status = signal<SetupStatus | null>(null);
   /** L'ultimo tentativo di contattare il server è fallito. */
   readonly offline = signal(false);
+  /** Primo avvio riaperto dall'app: si può chiudere senza rifarlo tutto. */
+  readonly reopened = signal(false);
 
   async load(): Promise<SetupStatus | null> {
     try {
@@ -71,6 +73,14 @@ export class Setup {
 
   async complete(): Promise<void> {
     await firstValueFrom(this.http.post('/api/setup/complete', {}));
+    this.reopened.set(false);
     this.status.update((s) => s && { ...s, completed: true });
+  }
+
+  /** Riapre il primo avvio (verifiche, runner, installer). */
+  async reopen(): Promise<void> {
+    await firstValueFrom(this.http.delete('/api/setup/complete'));
+    this.reopened.set(true);
+    this.status.update((s) => s && { ...s, completed: false });
   }
 }

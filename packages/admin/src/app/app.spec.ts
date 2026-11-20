@@ -12,6 +12,8 @@ const status = (completed: boolean): SetupStatus => ({
   runner: { connected: false, checks: null, token: false },
 });
 
+let stable: () => Promise<unknown>;
+
 async function render(s: SetupStatus | null) {
   const setup = {
     status: signal(s),
@@ -19,6 +21,10 @@ async function render(s: SetupStatus | null) {
     load: () => new Promise<null>(() => undefined),
     recheck: async () => undefined,
     complete: async () => undefined,
+    reopened: signal(false),
+    reopen: async () => {
+      setup.status.update((x) => x && { ...x, completed: false });
+    },
   };
   await TestBed.configureTestingModule({
     imports: [App],
@@ -39,6 +45,7 @@ async function render(s: SetupStatus | null) {
     ],
   }).compileComponents();
   const fixture = TestBed.createComponent(App);
+  stable = () => fixture.whenStable();
   await new Promise((r) => setTimeout(r, 650));
   await fixture.whenStable();
   return fixture.nativeElement as HTMLElement;
@@ -58,5 +65,13 @@ describe('App', () => {
   it('mostra l’app a configurazione fatta', async () => {
     const el = await render(status(true));
     expect(el.querySelector('header')?.textContent).toContain('jeko');
+  });
+
+  it("riapre il primo avvio dall'intestazione", async () => {
+    const el = await render(status(true));
+    el.querySelector<HTMLButtonElement>('header > button')!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    await stable();
+    expect(el.querySelector('jk-wizard')).not.toBeNull();
   });
 });

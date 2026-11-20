@@ -8,6 +8,7 @@ import { Setup } from './core/setup';
 import { Theme } from './core/theme';
 import { Splash } from './setup/splash';
 import { Wizard } from './setup/wizard';
+import { Icon } from './ui/icon';
 import { Prefs } from './ui/prefs';
 
 /** Splash minimo, per non far lampeggiare la schermata di caricamento. */
@@ -15,7 +16,7 @@ const SPLASH_MS = 600;
 
 @Component({
   selector: 'jk-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Splash, Wizard, Prefs],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Splash, Wizard, Prefs, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @switch (phase()) {
@@ -63,6 +64,15 @@ const SPLASH_MS = 600;
               <span class="hidden sm:inline">{{ connection() }}</span>
             </span>
             <jk-prefs />
+            <button
+              type="button"
+              class="jk-btn-ghost -mr-1 px-2"
+              [title]="i18n.t('setup.reopen')"
+              [attr.aria-label]="i18n.t('setup.reopen')"
+              (click)="reopen()"
+            >
+              <jk-icon name="history" [size]="18" />
+            </button>
           </header>
           <main class="min-h-0 flex-1">
             <router-outlet />
@@ -103,6 +113,10 @@ export class App {
     this.rt.start();
     setTimeout(() => this.minDelay.set(false), SPLASH_MS);
     void this.boot();
+  }
+
+  protected reopen(): void {
+    void this.setup.reopen().catch(() => undefined);
   }
 
   /** Riprova finché il server non risponde. */

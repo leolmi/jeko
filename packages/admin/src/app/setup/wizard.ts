@@ -26,7 +26,21 @@ const RUNNER_CMD = 'npm run dev:runner';
     <div class="w-full max-w-xl">
       <div class="flex items-center justify-between">
         <span class="font-mono text-lg font-semibold tracking-tight">jeko</span>
-        <span class="text-xs text-faint">{{ i18n.t('setup.title') }}</span>
+        <span class="flex items-center gap-3">
+          <span class="text-xs text-faint">{{ i18n.t('setup.title') }}</span>
+          @if (reopened()) {
+            <button
+              type="button"
+              class="jk-btn-ghost px-2"
+              [title]="i18n.t('setup.close')"
+              [attr.aria-label]="i18n.t('setup.close')"
+              [disabled]="finishing()"
+              (click)="finish()"
+            >
+              <jk-icon name="close" [size]="18" />
+            </button>
+          }
+        </span>
       </div>
 
       <ol class="mt-8 flex items-center gap-2" [attr.aria-label]="i18n.t('setup.title')">
@@ -221,6 +235,7 @@ export class Wizard {
   private readonly setup = inject(Setup);
 
   protected readonly steps = STEPS;
+  protected readonly reopened = this.setup.reopened;
   protected readonly runnerCmd = RUNNER_CMD;
   protected readonly installerCmd = INSTALLER_CMD;
   protected readonly downloading = signal(false);
