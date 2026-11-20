@@ -1,0 +1,64 @@
+name: nuovo-progetto
+kind: create
+version: 1
+description: Crea un nuovo progetto in C:\Leo\sviluppo
+
+inputs:
+  name:
+    prompt: Nome del progetto
+    required: true
+  type:
+    prompt: Tipo di progetto
+    enum: [vuoto, semplice, monorepo]
+  stack:
+    prompt: Stack (es. Angular, React + Vite, Node)
+    when: type != 'vuoto'
+
+vars:
+  slug: '{{ kebab(name) }}'
+  dir: 'C:\Leo\sviluppo\{{ slug }}'
+
+policies:
+  - match: install
+    gate: always
+  - match: [git.commit, git.push]
+    gate: always
+
+steps:
+  - id: check-dir
+    type: check
+    title: La cartella non deve esistere
+    expect: '!exists(dir)'
+    onFail: stop
+
+  - id: scaffold
+    type: agent
+    title: Genera il progetto
+    when: type != 'vuoto'
+    instructions: |
+      Crea un progetto {{ type }} con stack {{ stack }} in {{ dir }},
+      usando il generatore ufficiale e senza inizializzare git.
+
+  - id: git
+    type: check
+    title: Inizializza git
+    exec:
+      - [git, init, -b, main]
+    cwd: '{{ dir }}'
+
+  - id: gitignore
+    type: agent
+    title: .gitignore
+    instructions: Assicurati che {{ dir }}/.gitignore contenga la riga `.idea/`.
+
+  - id: gitignore-ok
+    type: check
+    expect: fileContains(dir + '/.gitignore', '.idea/')
+    onFail:
+      goto: gitignore
+      retries: 2
+
+  - id: commit
+    type: gate
+    level: always
+    message: 'Primo commit di {{ name }}: «Progetto iniziale»?'

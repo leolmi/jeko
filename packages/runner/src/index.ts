@@ -1,0 +1,52 @@
+import { hostname, userInfo } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { RunnerClient } from './client.js';
+import { createNodeHost } from './engine/node-host.js';
+import { defaultDataDir } from './journal.js';
+import { createPermissionBridge } from './permissions/bridge.js';
+import { ApprovalEndpoint, pipePath } from './permissions/endpoint.js';
+
+const VERSION = '0.1.0';
+const dataDir = defaultDataDir();
+
+// Endpoint dei permessi su named pipe: nessuna porta, nemmeno locale. Il nome è fisso
+// (i turni sopravvissuti a un riavvio lo ritrovano) e fa anche da lucchetto: un solo runner.
+const user = userInfo().username.replace(/[^\w.-]/g, '_');
+const endpoint = new ApprovalEndpoint(pipePath(`jeko-runner-${user}`));
+try {
+  await endpoint.start();
+} catch (e) {
+  const busy = (e as NodeJS.ErrnoException).code === 'EADDRINUSE';
+  console.error(busy ? 'Un altro runner di Jeko è già attivo.' : e);
+  process.exit(1);
+}
+const permissions = createPermissionBridge({
+  endpoint,
+  // dist/ nel bundle, src/ in sviluppo: lì stanno mcp e hook.
+  scriptsDir: dirname(fileURLToPath(import.meta.url)),
+});
+
+const client = new RunnerClient({
+  url: process.env['JEKO_SERVER_WS'] ?? 'ws://127.0.0.1:4310/ws/runner',
+  runnerId: process.env['JEKO_RUNNER_ID'] ?? hostname(),
+  version: VERSION,
+  dataDir,
+  makeHost: (io, start, { runDir }) =>
+    createNodeHost({
+      ...io,
+      permissions,
+      turnsDir: join(runDir, 'turns'),
+      ...(start.cwd !== undefined && { cwd: start.cwd }),
+    }),
+});
+
+client.start();
+
+// All'uscita i turni di claude restano vivi: il prossimo runner li riaggancia.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    client.detach();
+    void endpoint.stop().then(() => process.exit(0));
+  });
+}

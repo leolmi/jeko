@@ -1,0 +1,68 @@
+import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
+import { AnswerSchema, Id, RunSummarySchema, StartRunSchema } from '@jeko/shared';
+import { Type } from '@sinclair/typebox';
+import type { RunnerHub } from '../runs/hub.js';
+import type { RunStore } from '../runs/store.js';
+import type { WorkflowStore } from '../workflows/store.js';
+
+const RunParams = Type.Object({ id: Id });
+
+export const runRoutes: FastifyPluginAsyncTypebox<{
+  runs: RunStore;
+  workflows: WorkflowStore;
+  hub: RunnerHub;
+}> = async (app, { runs, workflows, hub }) => {
+  app.get('/api/runs', { schema: { response: { 200: Type.Array(RunSummarySchema) } } }, () =>
+    runs.list(),
+  );
+
+  // Il dettaglio contiene eventi e richieste: già validati in ingresso, nessuno schema di risposta.
+  app.get('/api/runs/:id', { schema: { params: RunParams } }, async (req, reply) => {
+    const run = await runs.detail(req.params.id);
+    return run ?? reply.callNotFound();
+  });
+
+  app.post(
+    '/api/runs',
+    {
+      schema: {
+        body: StartRunSchema,
+        response: { 201: RunSummarySchema, 404: Type.Object({ message: Type.String() }) },
+      },
+    },
+    async (req, reply) => {
+      const { workflow, version, ...rest } = req.body;
+      const def = await workflows.definition(workflow, version);
+      if (!def) return reply.code(404).send({ message: `Workflow '${workflow}' non trovato` });
+      const run = await runs.create({ ...rest, workflow, version: def.version });
+      await hub.start(run.id);
+      return reply.code(201).send((await runs.get(run.id))!);
+    },
+  );
+
+  app.post(
+    '/api/runs/:id/prompts/:promptId',
+    { schema: { params: Type.Object({ id: Id, promptId: Id }), body: AnswerSchema } },
+    async (req, reply) => {
+      const outcome = await hub.answer(req.params.id, req.params.promptId, req.body);
+      switch (outcome) {
+        case 'ok':
+          return reply.code(204).send();
+        case 'not-found':
+          return reply.callNotFound();
+        case 'already-answered':
+          return reply.code(409).send({ message: 'Richiesta già chiusa' });
+        case 'wrong-kind':
+          return reply.code(400).send({ message: 'Tipo di risposta non adatto alla richiesta' });
+      }
+    },
+  );
+
+  app.post('/api/runs/:id/cancel', { schema: { params: RunParams } }, async (req, reply) => {
+    if (!(await runs.get(req.params.id))) return reply.callNotFound();
+    if (!(await hub.cancel(req.params.id))) {
+      return reply.code(409).send({ message: 'La run è già conclusa' });
+    }
+    return reply.code(202).send();
+  });
+};
