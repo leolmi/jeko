@@ -31,6 +31,8 @@ export const PromptSchema = Type.Union([
     message: Type.String(),
     reason: Type.Union([Type.Literal('gate'), Type.Literal('policy')]),
     actions: Type.Optional(Type.Array(PolicyActionSchema)),
+    /** Gate: uscita dell'ultimo passo agent (es. il piano da approvare). */
+    output: Type.Optional(Type.String()),
   }),
   Type.Object({
     kind: Type.Literal('review'),

@@ -147,6 +147,11 @@ import { Icon, type IconName } from '../ui/icon';
           }
 
           @case ('approve') {
+            @if (p.output) {
+              <pre
+                class="mb-3 max-h-96 overflow-auto rounded-lg bg-subtle p-3 font-sans text-sm leading-relaxed whitespace-pre-wrap text-fg"
+                >{{ p.output }}</pre>
+            }
             <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ p.message }}</p>
             @if (p.actions?.length) {
               <div class="mt-2 flex flex-wrap gap-1.5">

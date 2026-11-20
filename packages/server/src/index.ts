@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { buildApp } from './app.js';
 import { defaultDbDir, openDb } from './db/db.js';
 import { migrate } from './db/migrate.js';
+import { parseTemplateFile, TemplateStore } from './projects/templates.js';
 import { WorkflowStore } from './workflows/store.js';
 
 // Postgres incorporato su disco, o quello di DATABASE_URL (es. docker-compose.yml).
@@ -16,6 +17,13 @@ const yamls = readdirSync(builtinDir)
   .filter((f) => f.endsWith('.yaml'))
   .map((f) => readFileSync(join(builtinDir, f), 'utf8'));
 await new WorkflowStore(db).seed(yamls);
+
+// Template di serie per creare i progetti.
+const templatesDir = fileURLToPath(new URL('../../shared/templates/', import.meta.url));
+const templateFiles = readdirSync(templatesDir)
+  .filter((f) => f.endsWith('.md'))
+  .map((f) => parseTemplateFile(readFileSync(join(templatesDir, f), 'utf8')));
+await new TemplateStore(db).seed(templateFiles);
 
 const port = Number(process.env.PORT ?? 4310);
 const app = await buildApp({ db, logger: true, serverUrl: `http://127.0.0.1:${port}` });

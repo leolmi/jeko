@@ -265,6 +265,24 @@ steps:
     expect(f.agentCalls).toEqual([]);
   });
 
+  it("il gate mostra l'uscita dell'ultimo passo agent", async () => {
+    const w = wf(`
+name: t
+kind: develop
+version: 1
+steps:
+  - { id: analisi, type: agent, instructions: pianifica }
+  - { id: controllo, type: check, exec: [[npm, test]] }
+  - { id: piano, type: gate, message: Procedo? }
+`);
+    const outputs: (string | undefined)[] = [];
+    const f = fakeHost({ agent: async () => ({ ok: true, output: 'Il piano' }) });
+    const approve = f.host.approve;
+    f.host.approve = (req) => (outputs.push(req.output), approve(req));
+    expect((await run(w, f)).status).toBe('done');
+    expect(outputs).toEqual(['Il piano']);
+  });
+
   it('in headless i gate interactive non si fermano', async () => {
     const w = wf(`
 name: t

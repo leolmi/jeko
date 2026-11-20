@@ -42,6 +42,8 @@ export interface ApproveRequest {
   message: string;
   reason: 'gate' | 'policy';
   actions?: PolicyAction[];
+  /** Gate: uscita dell'ultimo passo agent prima del gate (es. il piano da approvare). */
+  output?: string;
 }
 
 export interface AgentRequest {
@@ -321,7 +323,13 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
       record(stepId, true, 'saltato (headless)');
       return;
     }
-    const { approved, note } = await host.approve({ stepId, message, reason: 'gate' });
+    const output = lastAgentOutput();
+    const { approved, note } = await host.approve({
+      stepId,
+      message,
+      reason: 'gate',
+      ...(output && { output }),
+    });
     record(stepId, approved, note ?? (approved ? 'approvato' : 'rifiutato'));
     if (!approved) throw new Stop('rejected', note ?? `Gate '${stepId}' rifiutato`);
   }
@@ -375,6 +383,16 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
     }
     if (step.expect && !test(step.expect)) return `condizione falsa: ${step.expect}`;
     return null;
+  }
+
+  /** Uscita dell'ultimo passo agent già eseguito prima del passo corrente. */
+  function lastAgentOutput(): string | undefined {
+    for (let i = state.stepIndex - 1; i >= 0; i--) {
+      const step = wf.steps[i]!;
+      const done = state.steps[step.id];
+      if (step.type === 'agent' && done?.output.trim()) return done.output;
+    }
+    return undefined;
   }
 
   function record(stepId: string, ok: boolean, output: string): void {
