@@ -53,6 +53,7 @@ steps:
 
   - id: gitignore-ok
     type: check
+    title: Verifica .gitignore
     expect: fileContains(dir + '/.gitignore', '.idea/')
     onFail:
       goto: gitignore
@@ -60,5 +61,6 @@ steps:
 
   - id: commit
     type: gate
+    title: Primo commit
     level: always
     message: 'Primo commit di {{ name }}: «Progetto iniziale»?'

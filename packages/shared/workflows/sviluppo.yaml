@@ -23,6 +23,7 @@ steps:
 
   - id: ok-piano
     type: gate
+    title: Approvazione del piano
     message: Procedo con il piano?
 
   - id: sviluppo
@@ -34,5 +35,6 @@ steps:
 
   - id: commit
     type: gate
+    title: Approvazione delle modifiche
     level: always
     message: Le modifiche sono pronte. Le approvi?
