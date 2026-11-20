@@ -14,6 +14,7 @@ import type { RunMode, WorkflowKind, WorkflowRecord } from '@jeko/shared';
 import { I18n } from '../core/i18n';
 import { Realtime } from '../core/realtime';
 import { Runs } from '../core/runs';
+import { completeProjectDir, projectDirHint, Settings } from '../core/settings';
 import { storage } from '../core/storage';
 import { Icon } from '../ui/icon';
 import { Segmented, type SegmentOption } from '../ui/segmented';
@@ -93,8 +94,9 @@ const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
                 name="cwd"
                 autocomplete="off"
                 spellcheck="false"
-                placeholder="C:\\progetti\\…"
+                [placeholder]="cwdHint()"
                 [(ngModel)]="cwd"
+                (keydown.tab)="completeCwd($event)"
               />
             </div>
           </label>
@@ -122,6 +124,7 @@ export class Composer {
   protected readonly rt = inject(Realtime);
   private readonly runs = inject(Runs);
   private readonly router = inject(Router);
+  private readonly settings = inject(Settings);
 
   protected readonly workflows = httpResource<WorkflowRecord[]>(() => '/api/workflows');
 
@@ -158,12 +161,24 @@ export class Composer {
     MODES.map((m) => ({ value: m, label: this.i18n.t(`composer.mode.${m}`) })),
   );
   protected readonly modeHint = computed(() => this.i18n.t(`composer.mode.${this.mode()}.hint`));
+  protected readonly cwdHint = computed(() => projectDirHint(this.settings.value()?.projectsDir));
 
   constructor() {
+    if (!this.settings.value()) void this.settings.load().catch(() => undefined);
     effect(() => {
       storage.set('kind', this.kind());
       storage.set('mode', this.mode());
     });
+  }
+
+  /** Tab inserisce la cartella dei progetti (se il campo è vuoto o ne è l'inizio). */
+  protected completeCwd(e: Event): void {
+    const done = completeProjectDir(this.cwd(), this.settings.value()?.projectsDir);
+    if (done === null) return; // Tab normale: campo successivo
+    e.preventDefault();
+    // Subito anche nel campo: ngModel lo scriverebbe solo al giro successivo.
+    (e.target as HTMLInputElement).value = done;
+    this.cwd.set(done);
   }
 
   protected submit(): void {

@@ -21,5 +21,28 @@ export class Settings {
   }
 }
 
+/** Cartella dei progetti col separatore finale (es. `D:\dev\`); null se non è impostata. */
+export function projectDirPrefix(projectsDir: string | undefined): string | null {
+  const dir = projectsDir?.trim().replace(/[\\/]+$/, '');
+  if (!dir) return null;
+  const sep = dir.includes('/') && !dir.includes('\\') ? '/' : '\\';
+  return `${dir}${sep}`;
+}
+
+/** Esempio di cartella di un progetto: dentro la cartella dei progetti. */
+export function projectDirHint(projectsDir: string | undefined): string {
+  return `${projectDirPrefix(projectsDir) ?? 'C:\\progetti\\'}…`;
+}
+
+/**
+ * Completamento con Tab: la cartella dei progetti, se il campo è vuoto o ne contiene
+ * solo l'inizio; null se non c'è niente da completare.
+ */
+export function completeProjectDir(value: string, projectsDir: string | undefined): string | null {
+  const prefix = projectDirPrefix(projectsDir);
+  if (!prefix || value.length >= prefix.length) return null;
+  return prefix.toLowerCase().startsWith(value.toLowerCase()) ? prefix : null;
+}
+
 /** Le opzioni senza cui Jeko non può lavorare sono impostate. */
 export const settingsReady = (s: UserSettings | null) => !!s?.projectsDir?.trim();
