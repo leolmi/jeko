@@ -44,6 +44,20 @@ describe('server', () => {
     expect(list.json()).toEqual([created.json()]);
   });
 
+  it('gestisce il primo avvio', async () => {
+    const first = (await app.inject('/api/setup')).json();
+    expect(first).toMatchObject({
+      completed: false,
+      server: { database: true, workflows: 0 },
+      runner: { connected: false, checks: null },
+    });
+    expect((await app.inject({ method: 'POST', url: '/api/setup/checks' })).statusCode).toBe(409);
+    expect((await app.inject({ method: 'POST', url: '/api/setup/complete' })).statusCode).toBe(204);
+    expect((await app.inject('/api/setup')).json()).toMatchObject({ completed: true });
+    await app.inject({ method: 'DELETE', url: '/api/setup/complete' });
+    expect((await app.inject('/api/setup')).json()).toMatchObject({ completed: false });
+  });
+
   it('rifiuta un body non valido', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/projects', payload: { name: '' } });
     expect(res.statusCode).toBe(400);

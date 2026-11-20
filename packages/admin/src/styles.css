@@ -4,13 +4,81 @@
 @import '@fontsource/ibm-plex-mono/600.css';
 @import 'tailwindcss';
 
+/* Tema scuro con la classe .dark su <html> (impostata dal servizio Theme). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Lato', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
+/* Colori semantici: le classi (bg-surface, text-muted, border-line…) seguono il tema. */
+@theme inline {
+  --color-bg: var(--jk-bg);
+  --color-surface: var(--jk-surface);
+  --color-subtle: var(--jk-subtle);
+  --color-line: var(--jk-line);
+  --color-fg: var(--jk-fg);
+  --color-muted: var(--jk-muted);
+  --color-faint: var(--jk-faint);
+  --color-accent: var(--jk-accent);
+  --color-accent-fg: var(--jk-accent-fg);
+}
+
+:root {
+  --jk-bg: #fafafa;
+  --jk-surface: #ffffff;
+  --jk-subtle: #f4f4f5;
+  --jk-line: #e4e4e7;
+  --jk-fg: #18181b;
+  --jk-muted: #71717a;
+  --jk-faint: #a1a1aa;
+  --jk-accent: #18181b;
+  --jk-accent-fg: #ffffff;
+  color-scheme: light;
+}
+
+:root.dark {
+  --jk-bg: #0b0b0d;
+  --jk-surface: #151518;
+  --jk-subtle: #222227;
+  --jk-line: #2c2c32;
+  --jk-fg: #f4f4f5;
+  --jk-muted: #a1a1aa;
+  --jk-faint: #6b6b74;
+  --jk-accent: #f4f4f5;
+  --jk-accent-fg: #18181b;
+  color-scheme: dark;
+}
+
 @layer base {
   html {
-    @apply bg-zinc-50 font-sans text-zinc-900 antialiased;
+    @apply bg-bg font-sans text-fg antialiased;
   }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-sky-500;
+  }
+  ::placeholder {
+    @apply text-faint;
+  }
+}
+
+/* Componenti di base fatti in casa (utility, così si possono comporre fra loro). */
+@utility jk-input {
+  @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg transition-colors outline-none focus:border-faint;
+}
+@utility jk-btn {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+}
+@utility jk-btn-primary {
+  @apply jk-btn bg-accent text-accent-fg hover:opacity-90;
+}
+@utility jk-btn-ghost {
+  @apply jk-btn text-muted hover:bg-subtle hover:text-fg;
+}
+@utility jk-btn-outline {
+  @apply jk-btn border border-line text-fg hover:bg-subtle;
+}
+@utility jk-label {
+  @apply text-xs font-medium tracking-wide text-muted uppercase;
 }

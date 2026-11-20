@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import {
   ServerToRunnerSchema,
+  type Check,
   validator,
   type Answer,
   type Prompt,
@@ -24,6 +25,8 @@ export interface ClientOptions {
   /** Cartella dei dati del runner: giornali delle run e turni di claude. */
   dataDir: string;
   reconnectMs?: number;
+  /** Verifiche dell'ambiente, inviate dopo ogni collegamento e su richiesta del server. */
+  diagnose?: () => Promise<Check[]>;
   log?: Pick<Console, 'info' | 'warn' | 'error'>;
 }
 
@@ -116,6 +119,7 @@ export class RunnerClient {
       for (const s of this.sessions.values())
         for (const p of s.pending.values()) this.raw(p.message);
       this.raw({ type: 'ready' });
+      this.sendChecks();
     });
 
     ws.on('message', (data) => this.onMessage(data));
@@ -125,6 +129,17 @@ export class RunnerClient {
       if (!this.stopped)
         this.timer = setTimeout(() => this.connect(), this.opts.reconnectMs ?? 2000);
     });
+  }
+
+  private sendChecks(): void {
+    const diagnose = this.opts.diagnose;
+    if (!diagnose) return;
+    diagnose().then(
+      (checks) => {
+        if (this.open) this.raw({ type: 'checks', checks });
+      },
+      (e: unknown) => this.log.warn('verifiche non riuscite', e),
+    );
   }
 
   private get open(): boolean {
@@ -168,6 +183,8 @@ export class RunnerClient {
         if (s) this.abort(s);
         return;
       }
+      case 'checks.request':
+        return this.sendChecks();
       case 'run.ack': {
         this.journals.get(msg.runId).ack(msg.seq);
         if (!this.sessions.has(msg.runId)) this.journals.dropIfSettled(msg.runId);

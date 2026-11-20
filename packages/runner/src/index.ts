@@ -2,6 +2,7 @@ import { hostname, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RunnerClient } from './client.js';
+import { runDiagnostics } from './diagnostics.js';
 import { createNodeHost } from './engine/node-host.js';
 import { defaultDataDir } from './journal.js';
 import { createPermissionBridge } from './permissions/bridge.js';
@@ -21,17 +22,17 @@ try {
   console.error(busy ? 'Un altro runner di Jeko è già attivo.' : e);
   process.exit(1);
 }
-const permissions = createPermissionBridge({
-  endpoint,
-  // dist/ nel bundle, src/ in sviluppo: lì stanno mcp e hook.
-  scriptsDir: dirname(fileURLToPath(import.meta.url)),
-});
+// dist/ nel bundle, src/ in sviluppo: lì stanno mcp e hook.
+const scriptsDir = dirname(fileURLToPath(import.meta.url));
+const permissions = createPermissionBridge({ endpoint, scriptsDir });
+const claude = [process.env['JEKO_CLAUDE_BIN'] ?? 'claude'];
 
 const client = new RunnerClient({
   url: process.env['JEKO_SERVER_WS'] ?? 'ws://127.0.0.1:4310/ws/runner',
   runnerId: process.env['JEKO_RUNNER_ID'] ?? hostname(),
   version: VERSION,
   dataDir,
+  diagnose: () => runDiagnostics({ claude, dataDir, scriptsDir, permissionsEndpoint: true }),
   makeHost: (io, start, { runDir }) =>
     createNodeHost({
       ...io,

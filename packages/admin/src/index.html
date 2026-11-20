@@ -5,6 +5,14 @@
     <title>Jeko</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      // Tema prima del primo disegno, senza lampi di bianco.
+      try {
+        var t = localStorage.getItem('jeko.theme') || 'system';
+        if (t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches))
+          document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <jk-root></jk-root>

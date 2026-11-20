@@ -31,6 +31,22 @@ export class WorkflowStore {
     return { ok: true, record: toRecord(rows[0]!) };
   }
 
+  /**
+   * Carica i workflow di serie, solo se nel DB non c'è ancora nessuna versione con quel nome:
+   * le versioni salvate dall'utente non vengono mai toccate. Restituisce i nomi aggiunti.
+   */
+  async seed(yamls: string[]): Promise<string[]> {
+    const added: string[] = [];
+    for (const yaml of yamls) {
+      const parsed = parseWorkflow(yaml);
+      if (!parsed.ok) throw new Error(`Workflow di serie non valido: ${parsed.issues[0]?.message}`);
+      if ((await this.versions(parsed.workflow.name)).length) continue;
+      await this.save(yaml);
+      added.push(parsed.workflow.name);
+    }
+    return added;
+  }
+
   /** Ultima versione di ogni workflow. */
   async list(): Promise<WorkflowRecord[]> {
     const { rows } = await this.db.query<Row>(

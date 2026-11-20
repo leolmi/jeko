@@ -51,6 +51,8 @@ const migrations: string[] = [
   // Numero dell'evento nel giornale del runner: un reinvio non crea doppioni.
   `ALTER TABLE run_events ADD COLUMN runner_seq int`,
   `CREATE UNIQUE INDEX run_events_runner_seq ON run_events (run_id, runner_seq)`,
+  // Impostazioni dell'installazione (es. primo avvio completato).
+  `CREATE TABLE settings (key text PRIMARY KEY, value jsonb NOT NULL)`,
 ];
 
 export async function migrate(db: Db): Promise<void> {

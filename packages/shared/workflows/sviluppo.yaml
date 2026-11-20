@@ -1,0 +1,38 @@
+name: sviluppo
+kind: develop
+version: 1
+description: Sviluppa una richiesta su un progetto esistente
+
+policies:
+  - match: install
+    gate: always
+  - match: [git.commit, git.push]
+    gate: always
+  - match: fs.delete
+    gate: interactive
+
+steps:
+  - id: piano
+    type: agent
+    title: Analisi e piano
+    instructions: |
+      Richiesta: {{ request }}
+
+      Leggi il codice coinvolto e scrivi un piano breve (file da toccare, passi, test).
+      Non modificare ancora nessun file.
+
+  - id: ok-piano
+    type: gate
+    message: Procedo con il piano?
+
+  - id: sviluppo
+    type: agent
+    title: Implementazione
+    instructions: |
+      Implementa il piano concordato per la richiesta: {{ request }}
+      Aggiungi o aggiorna i test. Non fare commit.
+
+  - id: commit
+    type: gate
+    level: always
+    message: Le modifiche sono pronte. Le approvi?

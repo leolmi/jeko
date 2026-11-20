@@ -2,41 +2,54 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { HttpClient, httpResource } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import type { Project } from '@jeko/shared';
+import { I18n } from '../core/i18n';
+import { Icon } from '../ui/icon';
 
 @Component({
   selector: 'jk-projects',
-  imports: [FormsModule],
+  imports: [FormsModule, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block h-full overflow-y-auto' },
   template: `
-    <h1 class="mb-4 text-2xl font-bold">Progetti</h1>
+    <div class="mx-auto max-w-3xl px-6 py-10">
+      <h1 class="text-2xl font-bold tracking-tight">{{ i18n.t('projects.title') }}</h1>
 
-    <form class="mb-6 flex gap-2" (ngSubmit)="create()">
-      <input
-        class="flex-1 rounded border border-zinc-300 px-3 py-2"
-        name="name"
-        placeholder="Nome del progetto"
-        aria-label="Nome del progetto"
-        [(ngModel)]="name"
-      />
-      <button class="rounded bg-zinc-900 px-4 py-2 text-white" type="submit">Crea</button>
-    </form>
+      <form class="mt-6 flex gap-2" (ngSubmit)="create()">
+        <input
+          class="jk-input"
+          name="name"
+          autocomplete="off"
+          [placeholder]="i18n.t('projects.name')"
+          [attr.aria-label]="i18n.t('projects.name')"
+          [(ngModel)]="name"
+        />
+        <button class="jk-btn-primary" type="submit" [disabled]="!name().trim()">
+          <jk-icon name="add" [size]="16" />
+          {{ i18n.t('projects.create') }}
+        </button>
+      </form>
 
-    @if (projects.error()) {
-      <p class="text-red-600">Server non raggiungibile.</p>
-    }
-    <ul class="divide-y divide-zinc-200 rounded border border-zinc-200 bg-white">
-      @for (p of projects.value(); track p.id) {
-        <li class="flex justify-between px-4 py-2">
-          <span>{{ p.name }}</span>
-          <span class="font-mono text-xs text-zinc-500">{{ p.createdAt }}</span>
-        </li>
-      } @empty {
-        <li class="px-4 py-2 text-zinc-500">Nessun progetto.</li>
+      @if (projects.error()) {
+        <p class="mt-4 text-sm text-red-600 dark:text-red-400">{{ i18n.t('server.off') }}</p>
       }
-    </ul>
+      <ul
+        class="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface"
+      >
+        @for (p of projects.value(); track p.id) {
+          <li class="flex items-center gap-3 px-4 py-3">
+            <jk-icon name="folder" [size]="18" class="text-faint" />
+            <span class="flex-1 text-sm">{{ p.name }}</span>
+            <span class="text-xs text-faint">{{ i18n.ago(p.createdAt) }}</span>
+          </li>
+        } @empty {
+          <li class="px-4 py-6 text-center text-sm text-faint">{{ i18n.t('projects.empty') }}</li>
+        }
+      </ul>
+    </div>
   `,
 })
 export class Projects {
+  protected readonly i18n = inject(I18n);
   private readonly http = inject(HttpClient);
   protected readonly name = signal('');
   protected readonly projects = httpResource<Project[]>(() => '/api/projects', {

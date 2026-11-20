@@ -54,6 +54,17 @@ export const AnswerSchema = Type.Union([
 ]);
 export type Answer = Static<typeof AnswerSchema>;
 
+// ---------- verifiche dell'ambiente (primo avvio) ----------
+
+/** Esito di una verifica: `error` blocca il primo avvio, `warn` è solo un avviso. */
+export const CheckSchema = Type.Object({
+  id: Type.String({ minLength: 1 }),
+  ok: Type.Boolean(),
+  severity: Type.Union([Type.Literal('error'), Type.Literal('warn')]),
+  detail: Type.Optional(Type.String()),
+});
+export type Check = Static<typeof CheckSchema>;
+
 // ---------- WebSocket runner ↔ server ----------
 
 export const RunnerToServerSchema = Type.Union([
@@ -63,7 +74,11 @@ export const RunnerToServerSchema = Type.Union([
     version: Type.String(),
     /** Run ancora vive nel runner (dopo una riconnessione). */
     activeRuns: Type.Array(Type.String()),
+    /** Verifiche dell'ambiente del runner (claude, git, permessi…). */
+    checks: Type.Optional(Type.Array(CheckSchema)),
   }),
+  /** Verifiche rifatte su richiesta del server. */
+  Type.Object({ type: Type.Literal('checks'), checks: Type.Array(CheckSchema) }),
   /** Evento dal giornale del runner: `seq` cresce per run, senza buchi; il server lo conferma. */
   Type.Object({
     type: Type.Literal('run.event'),
@@ -102,6 +117,8 @@ export const ServerToRunnerSchema = Type.Union([
     answer: AnswerSchema,
   }),
   Type.Object({ type: Type.Literal('run.cancel'), runId: Type.String() }),
+  /** Rifai le verifiche dell'ambiente e rimandale. */
+  Type.Object({ type: Type.Literal('checks.request') }),
   /** Eventi salvati fino a `seq` compreso: il runner può toglierli dal giornale. */
   Type.Object({
     type: Type.Literal('run.ack'),
@@ -189,6 +206,19 @@ export const RunEventRecordSchema = Type.Object({
 export type RunEventRecord = Static<typeof RunEventRecordSchema>;
 
 export type RunDetail = RunSummary & { events: RunEventRecord[]; prompts: PromptRecord[] };
+
+/** Stato del primo avvio: server, runner e verifiche dell'ambiente. */
+export interface SetupStatus {
+  completed: boolean;
+  server: { version: string; database: boolean; workflows: number };
+  runner: {
+    connected: boolean;
+    runnerId?: string;
+    version?: string;
+    checks: Check[] | null;
+    checkedAt?: string;
+  };
+}
 
 // ---------- WebSocket admin (solo server → admin) ----------
 

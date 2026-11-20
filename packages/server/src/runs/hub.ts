@@ -6,6 +6,7 @@ import {
   validator,
   type AdminMessage,
   type Answer,
+  type Check,
   type RunEvent,
   type RunnerToServer,
   type RunRowStatus,
@@ -23,7 +24,14 @@ export type AnswerOutcome = 'ok' | 'not-found' | 'already-answered' | 'wrong-kin
  * e con le pagine admin aperte. Il runner non apre porte: è sempre lui a collegarsi.
  */
 export class RunnerHub {
-  private runner: { socket: WebSocket; runnerId: string; activeRuns: string[] } | null = null;
+  private runner: {
+    socket: WebSocket;
+    runnerId: string;
+    version: string;
+    activeRuns: string[];
+  } | null = null;
+  /** Ultime verifiche dell'ambiente ricevute dal runner collegato. */
+  private checks: { list: Check[]; at: string } | null = null;
   private readonly admins = new Set<WebSocket>();
 
   constructor(
@@ -34,6 +42,21 @@ export class RunnerHub {
 
   get connected(): boolean {
     return this.runner !== null;
+  }
+
+  /** Runner collegato e sue verifiche, per il primo avvio. */
+  get runnerInfo() {
+    return {
+      connected: this.runner !== null,
+      ...(this.runner && { runnerId: this.runner.runnerId, version: this.runner.version }),
+      checks: this.checks?.list ?? null,
+      ...(this.checks && { checkedAt: this.checks.at }),
+    };
+  }
+
+  /** Chiede al runner di rifare le verifiche; false se non è collegato. */
+  requestChecks(): boolean {
+    return this.sendRunner({ type: 'checks.request' });
   }
 
   // ---------- connessioni ----------
@@ -51,6 +74,7 @@ export class RunnerHub {
     socket.on('close', () => {
       if (this.runner?.socket !== socket) return;
       this.runner = null;
+      this.checks = null;
       this.broadcast({ type: 'runner', connected: false });
     });
   }
@@ -128,12 +152,21 @@ export class RunnerHub {
         return this.onEvent(msg.seq, msg.event);
       case 'run.prompt':
         return this.onPrompt(msg);
+      case 'checks':
+        this.checks = { list: msg.checks, at: new Date().toISOString() };
+        return;
     }
   }
 
   private async onHello(socket: WebSocket, msg: Extract<RunnerToServer, { type: 'hello' }>) {
     if (this.runner && this.runner.socket !== socket) this.runner.socket.close(4000, 'Sostituito');
-    this.runner = { socket, runnerId: msg.runnerId, activeRuns: msg.activeRuns };
+    this.runner = {
+      socket,
+      runnerId: msg.runnerId,
+      version: msg.version,
+      activeRuns: msg.activeRuns,
+    };
+    this.checks = msg.checks ? { list: msg.checks, at: new Date().toISOString() } : null;
     this.log.info({ runnerId: msg.runnerId, version: msg.version }, 'runner collegato');
     this.broadcast({ type: 'runner', connected: true, runnerId: msg.runnerId });
   }

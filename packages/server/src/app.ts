@@ -6,6 +6,7 @@ import { CreateProjectSchema, HealthSchema, ProjectSchema, type Project } from '
 import { Type } from '@sinclair/typebox';
 import type { Db } from './db/db.js';
 import { runRoutes } from './routes/runs.js';
+import { setupRoutes } from './routes/setup.js';
 import { workflowRoutes } from './routes/workflows.js';
 import { RunnerHub } from './runs/hub.js';
 import { RunStore } from './runs/store.js';
@@ -62,6 +63,7 @@ export async function buildApp({ db, logger = false }: AppOptions): Promise<Fast
 
   await app.register(workflowRoutes, { workflows });
   await app.register(runRoutes, { runs, workflows, hub });
+  await app.register(setupRoutes, { db, hub, version: VERSION });
 
   app.get('/ws/runner', { websocket: true }, (socket) => hub.attachRunner(socket));
   app.get('/ws/admin', { websocket: true }, (socket) => hub.attachAdmin(socket));
