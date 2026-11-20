@@ -46,6 +46,16 @@ describe('turno di claude staccato', () => {
     expect(invocations()).toHaveLength(1);
   });
 
+  it("segnala l'attività di claude una volta sola", async () => {
+    const seen: unknown[] = [];
+    await turn({ onActivity: (a) => seen.push(a) });
+    await turn({ onActivity: (a) => seen.push(a) });
+    expect(seen).toEqual([
+      { kind: 'text', text: 'Al lavoro' },
+      { kind: 'tool', tool: 'Bash', text: 'npm test' },
+    ]);
+  });
+
   it('riprende la sessione della run con --resume', async () => {
     const res = await turn({ sessionId: 'sess-1' });
     expect(res.sessionId).toBe('sess-1');

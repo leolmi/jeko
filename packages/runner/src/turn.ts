@@ -2,7 +2,14 @@ import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { claudeArgs, parseStream, type TurnInput, type TurnOutput } from './claude.js';
+import {
+  claudeArgs,
+  parseActivity,
+  parseStream,
+  type Activity,
+  type TurnInput,
+  type TurnOutput,
+} from './claude.js';
 import { writeAtomic } from './journal.js';
 import { killTree, processAlive, sameProcess } from './process.js';
 import { spawnArgv } from './spawn.js';
@@ -27,6 +34,8 @@ export interface DurableTurnOptions {
   /** Collega il turno ai permessi di Jeko; `token` c'è quando si riaggancia un turno. */
   permissions?: ((dir: string, token?: string) => TurnPermissions) | undefined;
   signal?: AbortSignal | undefined;
+  /** Avanzamento del turno (testo e strumenti), letto dall'uscita mentre claude lavora. */
+  onActivity?: ((a: Activity) => void) | undefined;
   pollMs?: number;
   /** Avvii al massimo: il primo più le riprese dopo un'interruzione. */
   maxAttempts?: number;
@@ -44,6 +53,8 @@ interface TurnMeta {
   resumed: boolean;
   token?: string;
   attempts: Attempt[];
+  /** Uscita già trasformata in attività: avvio e byte letti (per non ripeterle dopo un riavvio). */
+  seen?: { n: number; bytes: number };
   result?: TurnOutput;
 }
 
@@ -95,12 +106,14 @@ export async function durableTurn(o: DurableTurnOptions): Promise<TurnOutput> {
   save(o.dir, meta);
   const maxAttempts = o.maxAttempts ?? 2;
   let checkedIdentity = false;
+  const pump = (n: number) => pumpActivity(o, meta, n);
 
   try {
     for (;;) {
       if (o.signal?.aborted) return { ok: false, output: 'Turno annullato' };
       const last = meta.attempts.at(-1);
       if (last) {
+        pump(last.n);
         const out = parseStream(read(files(o.dir, last.n).out));
         if (out) {
           meta.result = { ...out, sessionId: out.sessionId ?? meta.sessionId };
@@ -113,7 +126,7 @@ export async function durableTurn(o: DurableTurnOptions): Promise<TurnOutput> {
           (checkedIdentity ? processAlive(last.pid) : sameProcess(last.pid, last.startedAt));
         checkedIdentity = true;
         if (alive) {
-          await waitPid(last.pid!, o);
+          await waitPid(last.pid!, o, () => pump(last.n));
           continue;
         }
         if (meta.attempts.length >= maxAttempts) {
@@ -133,7 +146,7 @@ export async function durableTurn(o: DurableTurnOptions): Promise<TurnOutput> {
       });
       save(o.dir, meta);
       checkedIdentity = true;
-      await waitChild(child, o);
+      await waitChild(child, o, () => pump(n));
     }
   } finally {
     perms?.dispose();
@@ -175,23 +188,27 @@ function spawnTurn(
 }
 
 /** Attende la fine del processo avviato qui; annullando la run lo chiude. */
-function waitChild(child: ChildProcess, o: DurableTurnOptions): Promise<void> {
+function waitChild(child: ChildProcess, o: DurableTurnOptions, tick: () => void): Promise<void> {
   return new Promise((resolve) => {
     if (child.exitCode !== null || child.pid === undefined) return resolve();
     const onAbort = () => child.pid !== undefined && killTree(child.pid);
-    o.signal?.addEventListener('abort', onAbort, { once: true });
-    child.once('close', () => {
+    const timer = setInterval(tick, o.pollMs ?? 500);
+    const done = () => {
+      clearInterval(timer);
       o.signal?.removeEventListener('abort', onAbort);
       resolve();
-    });
-    child.once('error', () => resolve());
+    };
+    o.signal?.addEventListener('abort', onAbort, { once: true });
+    child.once('close', done);
+    child.once('error', done);
   });
 }
 
 /** Attende la fine di un processo riagganciato (non figlio di questo runner). */
-function waitPid(pid: number, o: DurableTurnOptions): Promise<void> {
+function waitPid(pid: number, o: DurableTurnOptions, tick: () => void): Promise<void> {
   return new Promise((resolve) => {
     const timer = setInterval(() => {
+      tick();
       if (o.signal?.aborted) killTree(pid);
       if (!processAlive(pid)) {
         clearInterval(timer);
@@ -199,4 +216,20 @@ function waitPid(pid: number, o: DurableTurnOptions): Promise<void> {
       }
     }, o.pollMs ?? 500);
   });
+}
+
+/** Legge le righe nuove e complete dell'uscita di un avvio e ne segnala le attività. */
+function pumpActivity(o: DurableTurnOptions, meta: TurnMeta, n: number): void {
+  if (!o.onActivity) return;
+  const file = files(o.dir, n).out;
+  if (!existsSync(file)) return;
+  const start = meta.seen?.n === n ? meta.seen.bytes : 0;
+  const buf = readFileSync(file).subarray(start);
+  const end = buf.lastIndexOf(0x0a);
+  if (end < 0) return;
+  for (const line of buf.subarray(0, end).toString('utf8').split('\n')) {
+    for (const a of parseActivity(line)) o.onActivity(a);
+  }
+  meta.seen = { n, bytes: start + end + 1 };
+  save(o.dir, meta);
 }

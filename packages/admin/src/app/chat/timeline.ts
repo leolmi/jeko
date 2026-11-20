@@ -6,6 +6,14 @@ import {
   type RunStatus,
 } from '@jeko/shared';
 
+/** Cosa ha fatto claude durante un passo agent. */
+export interface Activity {
+  key: string;
+  kind: 'text' | 'tool';
+  tool?: string;
+  text: string;
+}
+
 export type TimelineItem =
   | { kind: 'request'; key: string; text: string; at: string }
   | {
@@ -14,6 +22,7 @@ export type TimelineItem =
       stepId: string;
       state: 'running' | 'ok' | 'failed' | 'skipped';
       output?: string;
+      activity: Activity[];
       at: string;
     }
   | {
@@ -32,7 +41,7 @@ type StepItem = Extract<TimelineItem, { kind: 'step' }>;
 
 /**
  * Racconto di una run in ordine di tempo: la richiesta, i passi (avvio e fine nella stessa
- * voce), i permessi, le richieste all'utente e la conclusione. Gli eventi `state` non si vedono.
+ * voce, con l'attività di claude), i permessi, le richieste all'utente e la conclusione. Gli eventi `state` non si vedono.
  */
 export function buildTimeline(run: RunDetail): TimelineItem[] {
   const items: TimelineItem[] = [
@@ -57,6 +66,7 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
               key,
               stepId: event.stepId,
               state: 'running',
+              activity: [],
               at,
             };
             open.set(event.stepId, item);
@@ -76,13 +86,29 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
                 stepId: event.stepId,
                 state: event.ok ? 'ok' : 'failed',
                 ...(event.output && { output: event.output }),
+                activity: [],
                 at,
               });
             }
             return;
           }
           case 'step.skipped':
-            items.push({ kind: 'step', key, stepId: event.stepId, state: 'skipped', at });
+            items.push({
+              kind: 'step',
+              key,
+              stepId: event.stepId,
+              state: 'skipped',
+              activity: [],
+              at,
+            });
+            return;
+          case 'agent.activity':
+            open.get(event.stepId)?.activity.push({
+              key,
+              kind: event.kind,
+              ...(event.tool !== undefined && { tool: event.tool }),
+              text: event.text,
+            });
             return;
           case 'policy.gate':
             items.push({

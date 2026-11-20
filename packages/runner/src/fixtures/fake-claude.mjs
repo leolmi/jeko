@@ -16,6 +16,15 @@ const session = args[args.indexOf(flag) + 1];
 const out = (m) => process.stdout.write(`${JSON.stringify(m)}\n`);
 
 out({ type: 'system', subtype: 'init', session_id: session });
+out({
+  type: 'assistant',
+  message: {
+    content: [
+      { type: 'text', text: 'Al lavoro' },
+      { type: 'tool_use', name: 'Bash', input: { command: 'npm test' } },
+    ],
+  },
+});
 if (process.env.FAKE_DIE === '1' && runs === 0) process.exit(1);
 await new Promise((r) => setTimeout(r, Number(process.env.FAKE_SLEEP ?? 0)));
 out({ type: 'result', result: `eco: ${stdin}`, is_error: false, session_id: session });

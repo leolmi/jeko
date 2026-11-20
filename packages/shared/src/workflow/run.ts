@@ -70,6 +70,15 @@ export const RunEventSchema = Type.Union([
     command: Type.String(),
     approved: Type.Boolean(),
   }),
+  /** Avanzamento di un passo agent: testo di claude o strumento usato (con un riassunto). */
+  Type.Object({
+    ...runId,
+    type: Type.Literal('agent.activity'),
+    stepId: Type.String(),
+    kind: Type.Union([Type.Literal('text'), Type.Literal('tool')]),
+    tool: Type.Optional(Type.String()),
+    text: Type.String(),
+  }),
   Type.Object({ ...runId, type: Type.Literal('state'), state: RunStateSchema }),
   Type.Object({
     ...runId,

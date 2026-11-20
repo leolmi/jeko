@@ -43,6 +43,7 @@ export function createNodeHost(opts: NodeHostOptions): Host {
         sessionId: req.sessionId,
         allowedTools: req.tools,
         signal: req.signal,
+        onActivity: req.onActivity,
         ...(permissions && {
           permissions: (dir: string, token?: string) => permissions(req, dir, token),
         }),

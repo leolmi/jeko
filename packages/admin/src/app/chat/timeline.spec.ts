@@ -71,6 +71,38 @@ describe('buildTimeline', () => {
     expect(items[3]).toMatchObject({ stepId: 'commit', state: 'ok' });
   });
 
+  it("aggancia l'attività di claude al passo in corso", () => {
+    const activity = (seq: number, kind: 'text' | 'tool', text: string, tool?: string) => ({
+      seq,
+      at: T(2),
+      event: {
+        runId: 'r',
+        type: 'agent.activity' as const,
+        stepId: 'lavoro',
+        kind,
+        text,
+        ...(tool && { tool }),
+      },
+    });
+    const items = buildTimeline({
+      ...run,
+      events: [
+        ...run.events.slice(0, 2),
+        activity(20, 'text', 'Leggo'),
+        activity(21, 'tool', 'ls', 'Bash'),
+      ],
+      prompts: [],
+    });
+    expect(items.map((i) => i.kind)).toEqual(['request', 'step']);
+    expect(items[1]).toMatchObject({
+      state: 'running',
+      activity: [
+        { kind: 'text', text: 'Leggo' },
+        { kind: 'tool', tool: 'Bash', text: 'ls' },
+      ],
+    });
+  });
+
   it('lascia in corso un passo non ancora finito', () => {
     const items = buildTimeline({ ...run, events: run.events.slice(0, 2), prompts: [] });
     expect(items.at(-1)).toMatchObject({ kind: 'step', state: 'running' });

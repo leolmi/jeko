@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claudeArgs, parseStream } from './claude.js';
+import { claudeArgs, parseActivity, parseStream, toolDetail } from './claude.js';
 
 describe('claude', () => {
   it('costruisce gli argomenti del turno', () => {
@@ -40,5 +40,26 @@ describe('claude', () => {
       ok: false,
       output: 'no',
     });
+  });
+
+  it("ricava l'attività dai messaggi assistant", () => {
+    const line = JSON.stringify({
+      type: 'assistant',
+      message: {
+        content: [
+          { type: 'text', text: '  Leggo i file \n' },
+          { type: 'tool_use', name: 'Read', input: { file_path: 'src/a.ts' } },
+          { type: 'thinking', thinking: 'x' },
+        ],
+      },
+    });
+    expect(parseActivity(line)).toEqual([
+      { kind: 'text', text: 'Leggo i file' },
+      { kind: 'tool', tool: 'Read', text: 'src/a.ts' },
+    ]);
+    expect(parseActivity('{"type":"user","message":{"content":[]}}')).toEqual([]);
+    expect(parseActivity('{"type":"assi')).toEqual([]);
+    expect(toolDetail({ command: 'npm test\nnpm run lint' })).toBe('npm test');
+    expect(toolDetail({ todos: [] })).toBe('');
   });
 });

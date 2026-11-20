@@ -12,6 +12,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FINAL_STATUSES, type Answer, type RunDetail } from '@jeko/shared';
 import { I18n, type I18nKey } from '../core/i18n';
 import { Realtime } from '../core/realtime';
@@ -23,7 +24,7 @@ import { buildTimeline } from './timeline';
 /** Filo di una run: la richiesta, l'avanzamento e le domande a cui rispondere. */
 @Component({
   selector: 'jk-thread',
-  imports: [Icon, Status, PromptCard],
+  imports: [NgTemplateOutlet, Icon, Status, PromptCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex h-full flex-col' },
   template: `
@@ -89,6 +90,31 @@ import { buildTimeline } from './timeline';
                       }
                       <span class="ml-auto text-xs text-faint">{{ i18n.time(item.at) }}</span>
                     </div>
+                    @if (item.state === 'running' && item.activity.length > 0) {
+                      <ul class="mt-1.5 ml-7 flex flex-col gap-1">
+                        @for (a of item.activity.slice(-3); track a.key) {
+                          <li>
+                            <ng-container *ngTemplateOutlet="act; context: { $implicit: a }" />
+                          </li>
+                        }
+                      </ul>
+                    }
+                    @if (item.activity.length > (item.state === 'running' ? 3 : 0)) {
+                      <details class="mt-1 ml-7">
+                        <summary
+                          class="cursor-pointer text-xs text-muted select-none hover:text-fg"
+                        >
+                          {{ i18n.t('thread.activity') }} ({{ item.activity.length }})
+                        </summary>
+                        <ul class="mt-1.5 flex max-h-80 flex-col gap-1 overflow-auto">
+                          @for (a of item.activity; track a.key) {
+                            <li>
+                              <ng-container *ngTemplateOutlet="act; context: { $implicit: a }" />
+                            </li>
+                          }
+                        </ul>
+                      </details>
+                    }
                     @if (item.output && item.output.length > 0) {
                       <details class="mt-1 ml-7">
                         <summary
@@ -149,6 +175,20 @@ import { buildTimeline } from './timeline';
         </ol>
       </div>
     }
+
+    <ng-template #act let-a>
+      @if (a.kind === 'tool') {
+        <div class="flex min-w-0 items-center gap-2 text-xs text-muted">
+          <jk-icon name="code" [size]="14" class="shrink-0 text-faint" />
+          <span class="shrink-0 font-mono text-fg">{{ a.tool }}</span>
+          <span class="truncate font-mono">{{ a.text }}</span>
+        </div>
+      } @else {
+        <p class="line-clamp-3 text-xs leading-relaxed whitespace-pre-wrap text-muted">
+          {{ a.text }}
+        </p>
+      }
+    </ng-template>
   `,
 })
 export class Thread {

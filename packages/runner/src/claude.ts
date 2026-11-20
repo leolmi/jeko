@@ -53,3 +53,43 @@ export function parseStream(text: string): TurnOutput | null {
   }
   return result;
 }
+
+/** Cosa sta facendo claude in un turno: testo scritto o strumento usato. */
+export type Activity =
+  { kind: 'text'; text: string } | { kind: 'tool'; tool: string; text: string };
+
+const MAX_TEXT = 2000;
+const MAX_DETAIL = 200;
+
+const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
+
+/** Riassunto di una riga dell'input di uno strumento (comando, file, schema…). */
+export function toolDetail(input: unknown): string {
+  if (!input || typeof input !== 'object') return '';
+  const o = input as Record<string, unknown>;
+  for (const k of ['command', 'file_path', 'path', 'pattern', 'url', 'query', 'description']) {
+    if (typeof o[k] === 'string' && o[k]) return clip(String(o[k]).split('\n')[0]!, MAX_DETAIL);
+  }
+  const first = Object.values(o).find((v) => typeof v === 'string' && v);
+  return typeof first === 'string' ? clip(first.split('\n')[0]!, MAX_DETAIL) : '';
+}
+
+/** Attività contenute in una riga di stream-json (solo i messaggi `assistant`). */
+export function parseActivity(line: string): Activity[] {
+  let msg: { type?: unknown; message?: { content?: unknown } };
+  try {
+    msg = JSON.parse(line) as typeof msg;
+  } catch {
+    return [];
+  }
+  if (msg.type !== 'assistant' || !Array.isArray(msg.message?.content)) return [];
+  const out: Activity[] = [];
+  for (const block of msg.message.content as Record<string, unknown>[]) {
+    if (block['type'] === 'text' && typeof block['text'] === 'string' && block['text'].trim()) {
+      out.push({ kind: 'text', text: clip(block['text'].trim(), MAX_TEXT) });
+    } else if (block['type'] === 'tool_use' && typeof block['name'] === 'string') {
+      out.push({ kind: 'tool', tool: block['name'], text: toolDetail(block['input']) });
+    }
+  }
+  return out;
+}
