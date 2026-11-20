@@ -170,10 +170,11 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
     while (state.stepIndex < wf.steps.length) {
       if (opts.signal?.aborted) throw new Stop('cancelled', 'Run annullata');
       const step = wf.steps[state.stepIndex]!;
-      emit({ type: 'step.started', stepId: step.id, index: state.stepIndex });
+      const title = step.title !== undefined && { title: step.title };
+      emit({ type: 'step.started', stepId: step.id, index: state.stepIndex, ...title });
 
       if (step.when && !test(step.when)) {
-        emit({ type: 'step.skipped', stepId: step.id });
+        emit({ type: 'step.skipped', stepId: step.id, ...title });
         state.stepIndex++;
         continue;
       }

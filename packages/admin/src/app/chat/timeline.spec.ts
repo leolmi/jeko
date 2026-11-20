@@ -19,14 +19,22 @@ const run: RunDetail = {
       at: T(1),
       event: { runId: 'r', type: 'run.started', workflow: 'demo', version: 1, mode: 'checkpoint' },
     },
-    { seq: 2, at: T(2), event: { runId: 'r', type: 'step.started', stepId: 'lavoro', index: 0 } },
+    {
+      seq: 2,
+      at: T(2),
+      event: { runId: 'r', type: 'step.started', stepId: 'lavoro', index: 0, title: 'Lavoro' },
+    },
     {
       seq: 3,
       at: T(3),
       event: { runId: 'r', type: 'step.finished', stepId: 'lavoro', ok: true, output: 'fatto' },
     },
     { seq: 4, at: T(3), event: { runId: 'r', type: 'step.skipped', stepId: 'extra' } },
-    { seq: 5, at: T(4), event: { runId: 'r', type: 'step.started', stepId: 'commit', index: 2 } },
+    {
+      seq: 5,
+      at: T(4),
+      event: { runId: 'r', type: 'step.started', stepId: 'commit', index: 2, title: 'Commit' },
+    },
     {
       seq: 6,
       at: T(6),
@@ -66,7 +74,13 @@ describe('buildTimeline', () => {
       'prompt',
       'finished',
     ]);
-    expect(items[1]).toMatchObject({ stepId: 'lavoro', state: 'ok', output: 'fatto' });
+    expect(items[1]).toMatchObject({
+      stepId: 'lavoro',
+      title: 'Lavoro',
+      state: 'ok',
+      output: 'fatto',
+    });
+    expect(items[4]).toMatchObject({ kind: 'prompt', stepTitle: 'Commit' });
     expect(items[2]).toMatchObject({ stepId: 'extra', state: 'skipped' });
     expect(items[3]).toMatchObject({ stepId: 'commit', state: 'ok' });
   });

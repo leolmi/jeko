@@ -145,7 +145,15 @@ describe('motore', () => {
     expect(out.status).toBe('done');
     expect(f.asked).toEqual(['input:name', 'input:type']);
     expect(out.state.values['stack']).toBeNull();
-    expect(f.events).toContainEqual({ runId: 'r1', type: 'step.skipped', stepId: 'scaffold' });
+    expect(f.events).toContainEqual({
+      runId: 'r1',
+      type: 'step.skipped',
+      stepId: 'scaffold',
+      title: 'Genera il progetto',
+    });
+    expect(f.events).toContainEqual(
+      expect.objectContaining({ type: 'step.started', stepId: 'git', title: 'Inizializza git' }),
+    );
   });
 
   it('richiede di nuovo un valore fuori enum', async () => {

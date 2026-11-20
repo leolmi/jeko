@@ -53,8 +53,15 @@ export const RunEventSchema = Type.Union([
     type: Type.Literal('step.started'),
     stepId: Type.String(),
     index: Type.Integer(),
+    /** Titolo del passo nel workflow, se c'è: è ciò che si mostra nel filo. */
+    title: Type.Optional(Type.String()),
   }),
-  Type.Object({ ...runId, type: Type.Literal('step.skipped'), stepId: Type.String() }),
+  Type.Object({
+    ...runId,
+    type: Type.Literal('step.skipped'),
+    stepId: Type.String(),
+    title: Type.Optional(Type.String()),
+  }),
   Type.Object({
     ...runId,
     type: Type.Literal('step.finished'),

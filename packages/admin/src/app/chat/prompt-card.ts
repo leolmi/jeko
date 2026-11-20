@@ -27,7 +27,11 @@ import { Icon, type IconName } from '../ui/icon';
       <div class="flex items-center gap-2 px-4 pt-3 text-xs font-medium text-muted">
         <jk-icon [name]="head().icon" [size]="16" [class]="pending ? 'text-amber-500' : ''" />
         <span>{{ p.kind === 'ask' && p.header ? p.header : i18n.t(head().label) }}</span>
-        <span class="font-mono text-faint">· {{ p.stepId }}</span>
+        @if (stepTitle(); as t) {
+          <span class="text-faint">· {{ t }}</span>
+        } @else {
+          <span class="font-mono text-faint">· {{ p.stepId }}</span>
+        }
       </div>
 
       <div class="px-4 pt-1.5 pb-4">
@@ -242,6 +246,8 @@ import { Icon, type IconName } from '../ui/icon';
 export class PromptCard {
   protected readonly i18n = inject(I18n);
   readonly record = input.required<PromptRecord>();
+  /** Titolo del passo a cui appartiene la richiesta, se il workflow lo dà. */
+  readonly stepTitle = input<string | undefined>(undefined);
   readonly busy = input(false);
   readonly error = input(false);
   readonly answer = output<Answer>();

@@ -20,6 +20,7 @@ export type TimelineItem =
       kind: 'step';
       key: string;
       stepId: string;
+      title?: string;
       state: 'running' | 'ok' | 'failed' | 'skipped';
       output?: string;
       activity: Activity[];
@@ -34,7 +35,7 @@ export type TimelineItem =
       approved: boolean;
       at: string;
     }
-  | { kind: 'prompt'; key: string; record: PromptRecord; at: string }
+  | { kind: 'prompt'; key: string; record: PromptRecord; stepTitle?: string; at: string }
   | { kind: 'finished'; key: string; status: RunStatus; error?: string; at: string };
 
 type StepItem = Extract<TimelineItem, { kind: 'step' }>;
@@ -49,6 +50,16 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
   ];
   /** Voce del passo ancora aperto, per stepId. */
   const open = new Map<string, StepItem>();
+  /** Titoli dei passi visti negli eventi, per le richieste all'utente. */
+  const titles = new Map<string, string>();
+  for (const { event } of run.events) {
+    if ((event.type === 'step.started' || event.type === 'step.skipped') && event.title)
+      titles.set(event.stepId, event.title);
+  }
+  const title = (stepId: string) => {
+    const t = titles.get(stepId);
+    return t !== undefined ? { title: t } : {};
+  };
 
   type Entry = { at: string; order: number; add: () => void };
   const entries: Entry[] = [];
@@ -65,6 +76,7 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
               kind: 'step',
               key,
               stepId: event.stepId,
+              ...title(event.stepId),
               state: 'running',
               activity: [],
               at,
@@ -84,6 +96,7 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
                 kind: 'step',
                 key,
                 stepId: event.stepId,
+                ...title(event.stepId),
                 state: event.ok ? 'ok' : 'failed',
                 ...(event.output && { output: event.output }),
                 activity: [],
@@ -97,6 +110,7 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
               kind: 'step',
               key,
               stepId: event.stepId,
+              ...title(event.stepId),
               state: 'skipped',
               activity: [],
               at,
@@ -146,7 +160,16 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
     entries.push({
       at: record.createdAt,
       order: 1,
-      add: () => items.push({ kind: 'prompt', key: record.id, record, at: record.createdAt }),
+      add: () => {
+        const t = titles.get(record.prompt.stepId);
+        items.push({
+          kind: 'prompt',
+          key: record.id,
+          record,
+          ...(t !== undefined && { stepTitle: t }),
+          at: record.createdAt,
+        });
+      },
     });
   }
 

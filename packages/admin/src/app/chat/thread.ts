@@ -81,10 +81,13 @@ import { buildTimeline } from './timeline';
                         }
                       }
                       <span
-                        class="font-mono"
                         [class]="item.state === 'skipped' ? 'text-faint line-through' : 'text-fg'"
-                        >{{ item.stepId }}</span
+                        [class.font-mono]="!item.title"
+                        >{{ item.title ?? item.stepId }}</span
                       >
+                      @if (item.title) {
+                        <span class="font-mono text-xs text-faint">{{ item.stepId }}</span>
+                      }
                       @if (item.state === 'running') {
                         <span class="text-xs text-muted">{{ i18n.t('thread.step.running') }}…</span>
                       }
@@ -152,6 +155,7 @@ import { buildTimeline } from './timeline';
                 @case ('prompt') {
                   <jk-prompt-card
                     [record]="item.record"
+                    [stepTitle]="item.stepTitle"
                     [busy]="sending() === item.record.id"
                     [error]="failed() === item.record.id"
                     (answer)="answer(item.record.id, $event)"
