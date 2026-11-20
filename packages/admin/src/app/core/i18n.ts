@@ -160,7 +160,7 @@ const it = {
   'check.server.api.fix': 'Avvia il server con npm run dev:server.',
   'check.server.database.title': 'Database',
   'check.server.database.fix':
-    'Avvia il database con docker compose up -d (o controlla DATABASE_URL).',
+    'Controlla che la cartella del database (JEKO_DB_DIR) sia scrivibile e non aperta da un altro server, o DATABASE_URL.',
   'check.server.workflows.title': 'Workflow disponibili',
   'check.server.workflows.fix': 'Nessun workflow: riavvia il server per caricare quelli di serie.',
   'check.node.title': 'Node.js 22 o successivo',
@@ -339,7 +339,7 @@ const en: Record<I18nKey, string> = {
   'check.server.api.fix': 'Start the server with npm run dev:server.',
   'check.server.database.title': 'Database',
   'check.server.database.fix':
-    'Start the database with docker compose up -d (or check DATABASE_URL).',
+    'Check that the database folder (JEKO_DB_DIR) is writable and not open in another server, or DATABASE_URL.',
   'check.server.workflows.title': 'Available workflows',
   'check.server.workflows.fix': 'No workflows: restart the server to load the built-in ones.',
   'check.node.title': 'Node.js 22 or later',

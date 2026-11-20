@@ -1,5 +1,6 @@
-# Database di Jeko. Avvio: docker compose up -d   (oppure: podman compose up -d)
-# Solo in locale (127.0.0.1): il server di Jeko gira fuori dal container e si collega qui.
+# Postgres opzionale: di default il server usa quello incorporato (PGlite).
+# Avvio: docker compose up -d   (oppure: podman compose up -d)
+# Solo in locale (127.0.0.1); il server lo usa con DATABASE_URL=postgres://jeko:jeko@127.0.0.1:5432/jeko
 name: jeko
 
 services:

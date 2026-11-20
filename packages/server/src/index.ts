@@ -2,12 +2,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildApp } from './app.js';
-import { createPgDb } from './db/db.js';
+import { defaultDbDir, openDb } from './db/db.js';
 import { migrate } from './db/migrate.js';
 import { WorkflowStore } from './workflows/store.js';
 
-// Di default il Postgres di docker-compose.yml.
-const db = createPgDb(process.env.DATABASE_URL ?? 'postgres://jeko:jeko@127.0.0.1:5432/jeko');
+// Postgres incorporato su disco, o quello di DATABASE_URL (es. docker-compose.yml).
+const db = await openDb();
 await migrate(db);
 
 // Workflow di serie (da src/ o dist/ la cartella è la stessa).
@@ -20,3 +20,11 @@ await new WorkflowStore(db).seed(yamls);
 const port = Number(process.env.PORT ?? 4310);
 const app = await buildApp({ db, logger: true, serverUrl: `http://127.0.0.1:${port}` });
 await app.listen({ host: '127.0.0.1', port });
+app.log.info(`Database: ${process.env.DATABASE_URL ? 'DATABASE_URL' : defaultDbDir()}`);
+
+// Chiusura ordinata: il database incorporato va chiuso prima di uscire.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    void app.close().finally(() => process.exit(0));
+  });
+}
