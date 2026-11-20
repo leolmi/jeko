@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { I18n, type I18nKey } from '../core/i18n';
-import { blocking, serverChecks, Setup } from '../core/setup';
+import { blocking, INSTALLER_CMD, serverChecks, Setup } from '../core/setup';
 import { Icon } from '../ui/icon';
 import { Prefs } from '../ui/prefs';
 import { CheckList } from './check-list';
@@ -80,16 +80,54 @@ const RUNNER_CMD = 'npm run dev:runner';
           @case ('runner') {
             <h1 class="text-2xl font-bold tracking-tight">{{ i18n.t('setup.runner.title') }}</h1>
             <p class="mt-2 text-sm leading-relaxed text-muted">{{ i18n.t('setup.runner.body') }}</p>
-            <p class="mt-6 text-xs text-muted">{{ i18n.t('setup.runner.how') }}</p>
+            <h2 class="mt-6 text-sm font-medium">{{ i18n.t('setup.runner.install') }}</h2>
+            <p class="mt-1 text-xs leading-relaxed text-muted">
+              {{ i18n.t('setup.runner.installBody') }}
+            </p>
+            <button
+              type="button"
+              class="jk-btn-outline mt-3"
+              [disabled]="downloading()"
+              (click)="download()"
+            >
+              <jk-icon name="arrow_forward" [size]="16" class="rotate-90" />
+              {{ i18n.t('setup.runner.download') }}
+            </button>
+            @if (downloadFailed()) {
+              <p class="mt-2 text-xs text-red-600 dark:text-red-400">
+                {{ i18n.t('setup.runner.downloadError') }}
+              </p>
+            }
+            @if (downloaded()) {
+              <p class="mt-4 text-xs text-muted">{{ i18n.t('setup.runner.run') }}</p>
+              <div
+                class="mt-1.5 flex items-center gap-2 rounded-lg border border-line bg-surface py-1.5 pr-1.5 pl-3"
+              >
+                <code class="flex-1 font-mono text-xs break-all">{{ installerCmd }}</code>
+                <button type="button" class="jk-btn-ghost shrink-0" (click)="copy(installerCmd)">
+                  <jk-icon
+                    [name]="copied() === installerCmd ? 'check' : 'content_copy'"
+                    [size]="16"
+                  />
+                  {{ i18n.t(copied() === installerCmd ? 'setup.copied' : 'setup.copy') }}
+                </button>
+              </div>
+            }
+
+            <h2 class="mt-6 text-sm font-medium">{{ i18n.t('setup.runner.dev') }}</h2>
+            <p class="mt-1 text-xs text-muted">{{ i18n.t('setup.runner.how') }}</p>
             <div
               class="mt-1.5 flex items-center gap-2 rounded-lg border border-line bg-surface py-1.5 pr-1.5 pl-3"
             >
               <code class="flex-1 font-mono text-sm">{{ runnerCmd }}</code>
-              <button type="button" class="jk-btn-ghost" (click)="copy()">
-                <jk-icon [name]="copied() ? 'check' : 'content_copy'" [size]="16" />
-                {{ i18n.t(copied() ? 'setup.copied' : 'setup.copy') }}
+              <button type="button" class="jk-btn-ghost shrink-0" (click)="copy(runnerCmd)">
+                <jk-icon [name]="copied() === runnerCmd ? 'check' : 'content_copy'" [size]="16" />
+                {{ i18n.t(copied() === runnerCmd ? 'setup.copied' : 'setup.copy') }}
               </button>
             </div>
+            @if (runner().token) {
+              <p class="mt-1.5 text-xs text-faint">{{ i18n.t('setup.runner.devToken') }}</p>
+            }
             <div class="mt-6 flex items-center gap-2.5 text-sm" aria-live="polite">
               @if (runner().connected) {
                 <jk-icon name="check_circle" [size]="20" class="text-emerald-500" />
@@ -184,9 +222,14 @@ export class Wizard {
 
   protected readonly steps = STEPS;
   protected readonly runnerCmd = RUNNER_CMD;
+  protected readonly installerCmd = INSTALLER_CMD;
+  protected readonly downloading = signal(false);
+  protected readonly downloaded = signal(false);
+  protected readonly downloadFailed = signal(false);
   protected readonly index = signal(0);
   protected readonly step = computed(() => STEPS[this.index()]!);
-  protected readonly copied = signal(false);
+  /** Testo appena copiato (per la spunta sul pulsante giusto). */
+  protected readonly copied = signal<string | null>(null);
   protected readonly rechecking = signal(false);
   protected readonly finishing = signal(false);
 
@@ -195,7 +238,7 @@ export class Wizard {
     return s ? serverChecks(s) : [];
   });
   protected readonly runner = computed(
-    () => this.setup.status()?.runner ?? { connected: false, checks: null },
+    () => this.setup.status()?.runner ?? { connected: false, checks: null, token: false },
   );
 
   /** Il passo corrente impedisce di andare avanti. */
@@ -238,13 +281,26 @@ export class Wizard {
     this.index.update((i) => Math.min(STEPS.length - 1, Math.max(0, i + delta)));
   }
 
-  protected async copy(): Promise<void> {
+  protected async copy(text: string): Promise<void> {
     try {
-      await navigator.clipboard.writeText(RUNNER_CMD);
-      this.copied.set(true);
-      setTimeout(() => this.copied.set(false), 1500);
+      await navigator.clipboard.writeText(text);
+      this.copied.set(text);
+      setTimeout(() => this.copied.set(null), 1500);
     } catch {
       /* appunti non disponibili */
+    }
+  }
+
+  protected async download(): Promise<void> {
+    this.downloading.set(true);
+    this.downloadFailed.set(false);
+    try {
+      await this.setup.downloadInstaller();
+      this.downloaded.set(true);
+    } catch {
+      this.downloadFailed.set(true);
+    } finally {
+      this.downloading.set(false);
     }
   }
 

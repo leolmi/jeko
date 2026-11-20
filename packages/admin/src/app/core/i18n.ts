@@ -120,6 +120,15 @@ const it = {
   'setup.runner.title': 'Collega il runner',
   'setup.runner.body':
     'Il runner gira sul tuo PC e lancia claude. Si collega lui al server: nessuna porta da aprire.',
+  'setup.runner.install': 'Installa il runner',
+  'setup.runner.installBody':
+    "L'installer copia il runner nel tuo profilo, lo avvia e lo fa ripartire a ogni accesso. Contiene un token nuovo: quello di un installer precedente smette di valere.",
+  'setup.runner.download': 'Scarica installer',
+  'setup.runner.downloadError': "Non è stato possibile creare l'installer.",
+  'setup.runner.run': 'Poi, in PowerShell:',
+  'setup.runner.dev': 'Oppure, in sviluppo',
+  'setup.runner.devToken':
+    "Il runner di sviluppo usa il token scritto dall'installer (o JEKO_RUNNER_TOKEN).",
   'setup.runner.how': 'In un terminale, dalla cartella di Jeko:',
   'setup.runner.waiting': 'In attesa del runner…',
   'setup.runner.connected': 'Collegato: {id}',
@@ -274,6 +283,15 @@ const en: Record<I18nKey, string> = {
   'setup.runner.title': 'Connect the runner',
   'setup.runner.body':
     'The runner runs on your PC and launches claude. It connects to the server itself: no ports to open.',
+  'setup.runner.install': 'Install the runner',
+  'setup.runner.installBody':
+    'The installer copies the runner into your profile, starts it and restarts it at every sign-in. It carries a new token: the one from any earlier installer stops working.',
+  'setup.runner.download': 'Download installer',
+  'setup.runner.downloadError': 'Could not create the installer.',
+  'setup.runner.run': 'Then, in PowerShell:',
+  'setup.runner.dev': 'Or, during development',
+  'setup.runner.devToken':
+    'The development runner uses the token written by the installer (or JEKO_RUNNER_TOKEN).',
   'setup.runner.how': 'In a terminal, from the Jeko folder:',
   'setup.runner.waiting': 'Waiting for the runner…',
   'setup.runner.connected': 'Connected: {id}',

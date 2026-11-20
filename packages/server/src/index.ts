@@ -16,5 +16,6 @@ const yamls = readdirSync(builtinDir)
   .map((f) => readFileSync(join(builtinDir, f), 'utf8'));
 await new WorkflowStore(db).seed(yamls);
 
-const app = await buildApp({ db, logger: true });
-await app.listen({ host: '127.0.0.1', port: Number(process.env.PORT ?? 4310) });
+const port = Number(process.env.PORT ?? 4310);
+const app = await buildApp({ db, logger: true, serverUrl: `http://127.0.0.1:${port}` });
+await app.listen({ host: '127.0.0.1', port });

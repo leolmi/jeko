@@ -9,7 +9,7 @@ import { Setup } from './core/setup';
 const status = (completed: boolean): SetupStatus => ({
   completed,
   server: { version: '0.1.0', database: true, workflows: 2 },
-  runner: { connected: false, checks: null },
+  runner: { connected: false, checks: null, token: false },
 });
 
 async function render(s: SetupStatus | null) {

@@ -17,6 +17,10 @@ export function serverChecks(s: SetupStatus): Check[] {
   ];
 }
 
+export const INSTALLER_FILE = 'jeko-runner-install.ps1';
+/** Comando per eseguire l'installer scaricato (PowerShell, dalla cartella Download). */
+export const INSTALLER_CMD = `powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\\Downloads\\${INSTALLER_FILE}"`;
+
 /** Si può proseguire se nessuna verifica bloccante è fallita. */
 export const blocking = (checks: readonly Check[]) =>
   checks.some((c) => !c.ok && c.severity === 'error');
@@ -46,6 +50,23 @@ export class Setup {
     } catch {
       /* runner non collegato: lo dice già lo stato */
     }
+  }
+
+  /**
+   * Scarica l'installer del runner. Ogni installer ha un token nuovo: quello precedente
+   * smette di valere alla prossima connessione del runner.
+   */
+  async downloadInstaller(): Promise<void> {
+    const blob = await firstValueFrom(
+      this.http.post('/api/runner/installer', {}, { responseType: 'blob' }),
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = INSTALLER_FILE;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.status.update((s) => s && { ...s, runner: { ...s.runner, token: true } });
   }
 
   async complete(): Promise<void> {

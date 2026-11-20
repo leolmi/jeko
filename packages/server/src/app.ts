@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
@@ -5,16 +6,22 @@ import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { CreateProjectSchema, HealthSchema, ProjectSchema, type Project } from '@jeko/shared';
 import { Type } from '@sinclair/typebox';
 import type { Db } from './db/db.js';
+import { runnerRoutes } from './routes/runner.js';
 import { runRoutes } from './routes/runs.js';
 import { setupRoutes } from './routes/setup.js';
 import { workflowRoutes } from './routes/workflows.js';
 import { RunnerHub } from './runs/hub.js';
 import { RunStore } from './runs/store.js';
+import { bearer, RunnerTokens } from './runner/token.js';
 import { WorkflowStore } from './workflows/store.js';
 
 export interface AppOptions {
   db: Db;
   logger?: boolean;
+  /** Bundle del runner per l'installer (di default `packages/runner/dist`). */
+  runnerDist?: string;
+  /** Indirizzo del server per il runner installato. */
+  serverUrl?: string;
 }
 
 const VERSION = '0.1.0';
@@ -22,7 +29,12 @@ const VERSION = '0.1.0';
 const PROJECT_COLUMNS = `id, name,
   to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt"`;
 
-export async function buildApp({ db, logger = false }: AppOptions): Promise<FastifyInstance> {
+export async function buildApp({
+  db,
+  logger = false,
+  runnerDist = fileURLToPath(new URL('../../runner/dist/', import.meta.url)),
+  serverUrl = 'http://127.0.0.1:4310',
+}: AppOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger }).withTypeProvider<TypeBoxTypeProvider>();
 
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
@@ -31,6 +43,7 @@ export async function buildApp({ db, logger = false }: AppOptions): Promise<Fast
   const workflows = new WorkflowStore(db);
   const runs = new RunStore(db);
   const hub = new RunnerHub(runs, workflows, app.log);
+  const tokens = new RunnerTokens(db);
 
   app.get('/api/health', { schema: { response: { 200: HealthSchema } } }, async () => ({
     status: 'ok' as const,
@@ -63,9 +76,24 @@ export async function buildApp({ db, logger = false }: AppOptions): Promise<Fast
 
   await app.register(workflowRoutes, { workflows });
   await app.register(runRoutes, { runs, workflows, hub });
-  await app.register(setupRoutes, { db, hub, version: VERSION });
+  await app.register(setupRoutes, { db, hub, tokens, version: VERSION });
+  await app.register(runnerRoutes, { tokens, runnerDist, serverUrl });
 
-  app.get('/ws/runner', { websocket: true }, (socket) => hub.attachRunner(socket));
+  // Il runner si presenta con il suo token. Un browser (che manda sempre Origin) non entra mai:
+  // una pagina web aperta sul PC non può fingersi runner.
+  app.get(
+    '/ws/runner',
+    {
+      websocket: true,
+      preValidation: async (req, reply) => {
+        const ok =
+          req.headers.origin === undefined &&
+          (await tokens.verify(bearer(req.headers.authorization)));
+        if (!ok) return reply.code(401).send({ message: 'Token del runner non valido' });
+      },
+    },
+    (socket) => hub.attachRunner(socket),
+  );
   app.get('/ws/admin', { websocket: true }, (socket) => hub.attachAdmin(socket));
 
   app.addHook('onClose', () => db.close());

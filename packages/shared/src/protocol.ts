@@ -228,6 +228,8 @@ export interface SetupStatus {
     version?: string;
     checks: Check[] | null;
     checkedAt?: string;
+    /** C'è un token del runner (creato scaricando l'installer): da lì in poi è obbligatorio. */
+    token: boolean;
   };
 }
 

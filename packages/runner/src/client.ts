@@ -19,6 +19,8 @@ export type HostFactory = (io: RemoteIo, start: RunStart, ctx: { runDir: string 
 
 export interface ClientOptions {
   url: string;
+  /** Token del runner, inviato come `Authorization: Bearer`. */
+  token?: string;
   runnerId: string;
   version: string;
   makeHost: HostFactory;
@@ -99,8 +101,19 @@ export class RunnerClient {
   // ---------- connessione ----------
 
   private connect(): void {
-    const ws = new WebSocket(this.opts.url);
+    const ws = new WebSocket(this.opts.url, {
+      ...(this.opts.token && { headers: { authorization: `Bearer ${this.opts.token}` } }),
+    });
     this.ws = ws;
+
+    ws.on('unexpected-response', (_req, res) => {
+      if (res.statusCode === 401) {
+        this.log.error(
+          'il server rifiuta il token del runner: scarica un nuovo installer dalla web-app',
+        );
+      } else this.log.warn(`il server ha risposto ${res.statusCode}`);
+      ws.terminate();
+    });
 
     ws.on('open', () => {
       this.log.info(`runner collegato a ${this.opts.url}`);

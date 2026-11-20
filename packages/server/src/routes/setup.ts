@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import type { SetupStatus } from '@jeko/shared';
 import type { Db } from '../db/db.js';
+import type { RunnerTokens } from '../runner/token.js';
 import type { RunnerHub } from '../runs/hub.js';
 
 const COMPLETED = 'setup.completed';
@@ -9,13 +10,16 @@ const COMPLETED = 'setup.completed';
 export const setupRoutes: FastifyPluginAsyncTypebox<{
   db: Db;
   hub: RunnerHub;
+  tokens: RunnerTokens;
   version: string;
-}> = async (app, { db, hub, version }) => {
+}> = async (app, { db, hub, tokens, version }) => {
   app.get('/api/setup', async (): Promise<SetupStatus> => {
     let database = true;
     let workflows = 0;
     let completed = false;
+    let token = false;
     try {
+      token = await tokens.configured();
       const w = await db.query<{ n: number }>(
         `SELECT count(DISTINCT name)::int AS n FROM workflows`,
       );
@@ -27,7 +31,11 @@ export const setupRoutes: FastifyPluginAsyncTypebox<{
     } catch {
       database = false;
     }
-    return { completed, server: { version, database, workflows }, runner: hub.runnerInfo };
+    return {
+      completed,
+      server: { version, database, workflows },
+      runner: { ...hub.runnerInfo, token },
+    };
   });
 
   app.post('/api/setup/checks', async (_req, reply) => {

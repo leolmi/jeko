@@ -2,6 +2,7 @@ import { hostname, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RunnerClient } from './client.js';
+import { loadConfig } from './config.js';
 import { runDiagnostics } from './diagnostics.js';
 import { createNodeHost } from './engine/node-host.js';
 import { defaultDataDir } from './journal.js';
@@ -10,6 +11,7 @@ import { ApprovalEndpoint, pipePath } from './permissions/endpoint.js';
 
 const VERSION = '0.1.0';
 const dataDir = defaultDataDir();
+const config = loadConfig(dataDir);
 
 // Endpoint dei permessi su named pipe: nessuna porta, nemmeno locale. Il nome è fisso
 // (i turni sopravvissuti a un riavvio lo ritrovano) e fa anche da lucchetto: un solo runner.
@@ -28,7 +30,8 @@ const permissions = createPermissionBridge({ endpoint, scriptsDir });
 const claude = [process.env['JEKO_CLAUDE_BIN'] ?? 'claude'];
 
 const client = new RunnerClient({
-  url: process.env['JEKO_SERVER_WS'] ?? 'ws://127.0.0.1:4310/ws/runner',
+  url: config.server,
+  ...(config.token && { token: config.token }),
   runnerId: process.env['JEKO_RUNNER_ID'] ?? hostname(),
   version: VERSION,
   dataDir,
