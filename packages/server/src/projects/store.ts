@@ -40,6 +40,11 @@ export class ProjectStore {
     return rows[0] ?? null;
   }
 
+  /** Il workflow non c'è più: i progetti che lo seguivano tornano al predefinito. */
+  async forgetWorkflow(name: string): Promise<void> {
+    await this.db.query(`UPDATE projects SET workflow = NULL WHERE workflow = $1`, [name]);
+  }
+
   async remove(id: string): Promise<boolean> {
     const { rows } = await this.db.query(`DELETE FROM projects WHERE id = $1 RETURNING id`, [id]);
     return rows.length > 0;

@@ -67,6 +67,10 @@ const migrations: string[] = [
   // tra i workflow, quindi il riferimento ai workflow non vale più per tutte le run.
   `ALTER TABLE runs ADD COLUMN definition jsonb`,
   `ALTER TABLE runs DROP CONSTRAINT IF EXISTS runs_workflow_name_workflow_version_fkey`,
+  // Ogni run ha la sua definizione: un workflow eliminato non ferma le run partite con lui.
+  `UPDATE runs r SET definition = jsonb_set(w.definition, '{version}', to_jsonb(w.version))
+   FROM workflows w
+   WHERE r.definition IS NULL AND w.name = r.workflow_name AND w.version = r.workflow_version`,
 ];
 
 export async function migrate(db: Db): Promise<void> {

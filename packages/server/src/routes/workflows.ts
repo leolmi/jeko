@@ -9,6 +9,7 @@ import {
   type WorkflowCheck,
 } from '@jeko/shared';
 import { Type } from '@sinclair/typebox';
+import type { ProjectStore } from '../projects/store.js';
 import type { RunnerHub } from '../runs/hub.js';
 import { assistWorkflow } from '../workflows/assist.js';
 import type { WorkflowStore } from '../workflows/store.js';
@@ -18,8 +19,9 @@ const Message = Type.Object({ message: Type.String() });
 
 export const workflowRoutes: FastifyPluginAsyncTypebox<{
   workflows: WorkflowStore;
+  projects: ProjectStore;
   hub: RunnerHub;
-}> = async (app, { workflows, hub }) => {
+}> = async (app, { workflows, projects, hub }) => {
   app.get(
     '/api/workflows',
     { schema: { response: { 200: Type.Array(WorkflowRecordSchema) } } },
@@ -37,6 +39,17 @@ export const workflowRoutes: FastifyPluginAsyncTypebox<{
     async (req, reply) => {
       const versions = await workflows.versions(req.params.name);
       return versions.length ? versions : reply.callNotFound();
+    },
+  );
+
+  // Elimina tutte le versioni; le run già partite hanno la loro copia della definizione.
+  app.delete(
+    '/api/workflows/:name',
+    { schema: { params: Type.Object({ name: Type.String() }) } },
+    async (req, reply) => {
+      if (!(await workflows.remove(req.params.name))) return reply.callNotFound();
+      await projects.forgetWorkflow(req.params.name);
+      return reply.code(204).send();
     },
   );
 

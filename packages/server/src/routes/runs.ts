@@ -42,7 +42,12 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
       const def = workflow ? await workflows.definition(workflow, version) : null;
       if (!workflow || def?.workflow.kind !== 'develop')
         return reply.code(404).send({ message: `Workflow '${workflow ?? ''}' non trovato` });
-      const run = await runs.create({ ...rest, workflow, version: def.version });
+      const run = await runs.create({
+        ...rest,
+        workflow,
+        version: def.version,
+        definition: def.workflow,
+      });
       await hub.start();
       return reply.code(201).send((await runs.get(run.id))!);
     },

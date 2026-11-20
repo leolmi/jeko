@@ -247,6 +247,18 @@ describe('run server ↔ runner', () => {
     expect(await status(second.id)).toBe('waiting');
   });
 
+  it('una run in coda parte anche se il suo workflow è stato eliminato', async () => {
+    const { body } = await api<RunSummary>('POST', '/api/runs', {
+      workflow: 'demo',
+      request: 'saluta',
+      mode: 'checkpoint',
+    });
+    expect((await api('DELETE', '/api/workflows/demo')).status).toBe(204);
+    startRunner();
+    await pendingPrompt(body.id);
+    expect((await detail(body.id)).status).toBe('waiting');
+  });
+
   it('un progetto creato da un template si aggiunge da solo', async () => {
     // Cartella nuova: non esiste finché non la crea claude; poi .gitignore e .jeko/ ci sono.
     functions = {

@@ -2,6 +2,9 @@ import { parseWorkflow, type Issue, type Workflow, type WorkflowRecord } from '@
 import type { Db } from '../db/db.js';
 import { iso, json } from '../db/sql.js';
 
+/** Workflow di serie già caricati una volta: se l'utente li elimina, non tornano. */
+const SEEDED = 'workflows.seeded';
+
 const COLUMNS = `name, version, kind, description, yaml, ${iso('created_at')} AS "createdAt"`;
 
 type Row = Omit<WorkflowRecord, 'description'> & { description: string | null };
@@ -32,19 +35,42 @@ export class WorkflowStore {
   }
 
   /**
-   * Carica i workflow di serie, solo se nel DB non c'è ancora nessuna versione con quel nome:
-   * le versioni salvate dall'utente non vengono mai toccate. Restituisce i nomi aggiunti.
+   * Carica i workflow di serie una volta sola: non quelli che hanno già una versione (le
+   * versioni dell'utente non si toccano) né quelli già caricati e poi eliminati.
+   * Restituisce i nomi aggiunti.
    */
   async seed(yamls: string[]): Promise<string[]> {
+    const { rows } = await this.db.query<{ value: string[] }>(
+      `SELECT value FROM settings WHERE key = $1`,
+      [SEEDED],
+    );
+    const seeded = new Set(rows[0]?.value ?? []);
     const added: string[] = [];
     for (const yaml of yamls) {
       const parsed = parseWorkflow(yaml);
       if (!parsed.ok) throw new Error(`Workflow di serie non valido: ${parsed.issues[0]?.message}`);
-      if ((await this.versions(parsed.workflow.name)).length) continue;
+      const { name } = parsed.workflow;
+      if (seeded.has(name)) continue;
+      seeded.add(name);
+      if ((await this.versions(name)).length) continue;
       await this.save(yaml);
-      added.push(parsed.workflow.name);
+      added.push(name);
     }
+    await this.db.query(
+      `INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [SEEDED, json([...seeded].sort())],
+    );
     return added;
+  }
+
+  /** Elimina il workflow con tutte le sue versioni; false se non c'era. */
+  async remove(name: string): Promise<boolean> {
+    const { rows } = await this.db.query(
+      `DELETE FROM workflows WHERE name = $1 AND kind = 'develop' RETURNING version`,
+      [name],
+    );
+    return rows.length > 0;
   }
 
   /** Ultima versione di ogni workflow di sviluppo (quelli di creazione di prima restano nascosti). */

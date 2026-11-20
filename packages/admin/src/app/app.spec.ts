@@ -67,11 +67,12 @@ describe('App', () => {
     expect(el.querySelector('header')?.textContent).toContain('jeko');
   });
 
-  it("riapre il primo avvio dall'intestazione", async () => {
+  it('passa tra progetti e workflow dall’intestazione', async () => {
     const el = await render(status(true));
-    el.querySelector<HTMLButtonElement>('header > button')!.click();
-    await new Promise((r) => setTimeout(r, 0));
     await stable();
-    expect(el.querySelector('jk-wizard')).not.toBeNull();
+    const nav = [...el.querySelectorAll<HTMLAnchorElement>('header nav a')];
+    expect(nav.map((a) => a.getAttribute('href'))).toEqual(['/', '/workflow']);
+    // Il primo avvio si rifà dalle Opzioni, non più dall'intestazione.
+    expect(el.querySelector('header > button')).toBeNull();
   });
 });

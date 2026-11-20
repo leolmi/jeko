@@ -51,12 +51,12 @@ import { Status } from '../ui/status';
             }
             <button
               type="button"
-              class="jk-btn-ghost px-1.5 py-1"
+              class="jk-btn-danger py-1"
               [title]="i18n.t('tasks.remove')"
               [attr.aria-label]="i18n.t('tasks.remove')"
               (click)="remove(p.id, p.name)"
             >
-              <jk-icon name="close" [size]="16" />
+              <jk-icon name="delete" [size]="18" />
             </button>
           </span>
         </div>

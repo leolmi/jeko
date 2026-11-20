@@ -21,6 +21,7 @@ import {
 } from '@jeko/shared';
 import { firstValueFrom } from 'rxjs';
 import { I18n, type I18nKey } from '../core/i18n';
+import { Projects } from '../core/projects';
 import { Realtime } from '../core/realtime';
 import { storage } from '../core/storage';
 import { Icon } from '../ui/icon';
@@ -187,6 +188,18 @@ const CHECK_DELAY_MS = 300;
                   {{ i18n.t('wf.discard') }}
                 </button>
               }
+              @if (key() !== NEW && latest()) {
+                <button
+                  type="button"
+                  class="jk-btn-danger"
+                  [disabled]="saving()"
+                  [title]="i18n.t('wf.delete')"
+                  [attr.aria-label]="i18n.t('wf.delete')"
+                  (click)="remove()"
+                >
+                  <jk-icon name="delete" [size]="18" />
+                </button>
+              }
               <button
                 type="button"
                 class="jk-btn-primary"
@@ -200,6 +213,11 @@ const CHECK_DELAY_MS = 300;
           </div>
           @if (saveError()) {
             <p class="mt-2 text-xs text-red-600 dark:text-red-400">{{ i18n.t('wf.saveError') }}</p>
+          }
+          @if (deleteError()) {
+            <p class="mt-2 text-xs text-red-600 dark:text-red-400">
+              {{ i18n.t('wf.delete.error') }}
+            </p>
           }
 
           <div class="mt-3 grid min-h-0 flex-1 gap-4 lg:grid-cols-2">
@@ -285,6 +303,7 @@ export class WorkflowsPage {
   protected readonly i18n = inject(I18n);
   protected readonly rt = inject(Realtime);
   private readonly http = inject(HttpClient);
+  private readonly projects = inject(Projects);
   protected readonly NEW = NEW;
 
   private readonly list = httpResource<WorkflowRecord[]>(() => '/api/workflows', {
@@ -326,6 +345,7 @@ export class WorkflowsPage {
   });
   protected readonly saving = signal(false);
   protected readonly saveError = signal(false);
+  protected readonly deleteError = signal(false);
   protected readonly editor = viewChild(YamlEditor);
   private readonly diffBox = viewChild<ElementRef<HTMLElement>>('diffBox');
 
@@ -405,6 +425,31 @@ export class WorkflowsPage {
   protected select(key: string): void {
     this.key.set(key);
     this.saveError.set(false);
+    this.deleteError.set(false);
+  }
+
+  /** Elimina il workflow con tutte le versioni; i progetti che lo seguivano usano il predefinito. */
+  protected async remove(): Promise<void> {
+    const name = this.key();
+    const used = this.projects.list().filter((p) => p.workflow === name).length;
+    const ask = this.i18n.t(used ? 'wf.delete.confirmUsed' : 'wf.delete.confirm', {
+      name,
+      n: used,
+    });
+    if (this.saving() || !globalThis.confirm(ask)) return;
+    this.saving.set(true);
+    this.deleteError.set(false);
+    try {
+      await firstValueFrom(this.http.delete(`/api/workflows/${encodeURIComponent(name)}`));
+      this.dropDraft(name);
+      this.key.set(this.records().find((r) => r.name !== name)?.name ?? NEW);
+      this.list.reload();
+      this.projects.reload();
+    } catch {
+      this.deleteError.set(true);
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   protected setText(yaml: string): void {

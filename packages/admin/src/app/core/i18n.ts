@@ -143,6 +143,12 @@ const it = {
   'wf.dirty': 'Modifiche non salvate',
   'wf.discard': 'Annulla modifiche',
   'wf.save': 'Salva nuova versione',
+  'wf.delete': 'Elimina il workflow',
+  'wf.delete.confirm':
+    'Eliminare «{name}» con tutte le sue versioni? I task già partiti finiscono comunque.',
+  'wf.delete.confirmUsed':
+    'Eliminare «{name}» con tutte le sue versioni? I {n} progetti che lo seguono useranno il predefinito; i task già partiti finiscono comunque.',
+  'wf.delete.error': 'Eliminazione non riuscita.',
   'wf.saveError': 'Non è stato possibile salvare il workflow.',
   'wf.yaml': 'YAML del workflow',
   'wf.line': 'riga {n}',
@@ -208,6 +214,9 @@ const it = {
   'setup.step.options': 'Opzioni',
   'setup.step.done': 'Fine',
   'setup.reopen': 'Rifai il primo avvio',
+  'setup.reopen.hint':
+    'Riapre il wizard iniziale per ricontrollare ambiente e runner. Progetti, task, workflow e opzioni restano.',
+  'setup.reopen.confirm': 'Rifare il primo avvio? Si torna al wizard; i dati restano.',
   'setup.close': 'Chiudi il primo avvio',
   'setup.next': 'Avanti',
   'setup.back': 'Indietro',
@@ -413,6 +422,11 @@ const en: Record<I18nKey, string> = {
   'wf.dirty': 'Unsaved changes',
   'wf.discard': 'Discard changes',
   'wf.save': 'Save new version',
+  'wf.delete': 'Delete the workflow',
+  'wf.delete.confirm': 'Delete “{name}” and all its versions? Tasks already started still finish.',
+  'wf.delete.confirmUsed':
+    'Delete “{name}” and all its versions? The {n} projects that follow it will use the default; tasks already started still finish.',
+  'wf.delete.error': 'Could not delete.',
   'wf.saveError': 'Could not save the workflow.',
   'wf.yaml': 'Workflow YAML',
   'wf.line': 'line {n}',
@@ -477,6 +491,9 @@ const en: Record<I18nKey, string> = {
   'setup.step.options': 'Options',
   'setup.step.done': 'Done',
   'setup.reopen': 'Run first-time setup again',
+  'setup.reopen.hint':
+    'Reopens the initial wizard to check the environment and the runner again. Projects, tasks, workflows and options stay.',
+  'setup.reopen.confirm': 'Run first-time setup again? You go back to the wizard; your data stays.',
   'setup.close': 'Close setup',
   'setup.next': 'Next',
   'setup.back': 'Back',

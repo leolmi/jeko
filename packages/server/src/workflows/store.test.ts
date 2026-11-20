@@ -30,6 +30,14 @@ describe('workflow di serie', () => {
     expect(new Set((await s.list()).map((w) => w.kind))).toEqual(new Set(['develop']));
   });
 
+  it('eliminati, non tornano al riavvio', async () => {
+    const s = await store();
+    await s.seed(builtin);
+    expect(await s.remove('sviluppo')).toBe(true);
+    expect(await s.seed(builtin)).toEqual([]);
+    expect((await s.list()).map((w) => w.name)).not.toContain('sviluppo');
+  });
+
   it('non toccano le versioni salvate dall’utente', async () => {
     const s = await store();
     const mine = builtin.find((y) => y.startsWith('name: sviluppo\n'))!.replace('Sviluppa', 'Mio');

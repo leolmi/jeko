@@ -62,8 +62,15 @@ import { Icon } from '../ui/icon';
       }
       <span class="ml-auto flex gap-2">
         @if (selected()) {
-          <button type="button" class="jk-btn-outline" [disabled]="busy()" (click)="remove()">
-            {{ i18n.t('tpl.delete') }}
+          <button
+            type="button"
+            class="jk-btn-danger"
+            [disabled]="busy()"
+            [title]="i18n.t('tpl.delete')"
+            [attr.aria-label]="i18n.t('tpl.delete')"
+            (click)="remove()"
+          >
+            <jk-icon name="delete" [size]="18" />
           </button>
         }
         <button

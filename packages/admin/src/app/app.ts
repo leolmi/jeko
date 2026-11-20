@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
 import { I18n } from './core/i18n';
 import { Realtime } from './core/realtime';
 import { Setup } from './core/setup';
@@ -34,6 +36,21 @@ const SPLASH_MS = 600;
               <span class="font-mono text-lg font-semibold tracking-tight">jeko</span>
               <span class="hidden text-xs text-faint sm:inline">{{ i18n.t('app.tagline') }}</span>
             </a>
+            <nav class="flex gap-1 text-sm">
+              <a
+                routerLink="/"
+                class="rounded-md px-2.5 py-1 text-muted transition-colors hover:text-fg"
+                [class.bg-subtle]="section() === 'projects'"
+                [class.!text-fg]="section() === 'projects'"
+                >{{ i18n.t('nav.projects') }}</a
+              >
+              <a
+                routerLink="/workflow"
+                class="rounded-md px-2.5 py-1 text-muted transition-colors hover:text-fg"
+                routerLinkActive="bg-subtle !text-fg"
+                >{{ i18n.t('nav.workflows') }}</a
+              >
+            </nav>
             <span class="ml-auto flex items-center gap-2 text-xs text-muted" aria-live="polite">
               <span
                 class="size-2 rounded-full"
@@ -49,32 +66,14 @@ const SPLASH_MS = 600;
             </span>
             <jk-prefs />
             <a
-              routerLink="/workflow"
-              class="jk-btn-ghost px-2"
-              routerLinkActive="bg-subtle !text-fg"
-              [title]="i18n.t('nav.workflows')"
-              [attr.aria-label]="i18n.t('nav.workflows')"
-            >
-              <jk-icon name="account_tree" [size]="18" />
-            </a>
-            <a
               routerLink="/opzioni"
-              class="jk-btn-ghost px-2"
+              class="jk-btn-ghost -mr-1 px-2"
               routerLinkActive="bg-subtle !text-fg"
               [title]="i18n.t('settings.title')"
               [attr.aria-label]="i18n.t('settings.title')"
             >
               <jk-icon name="settings" [size]="18" />
             </a>
-            <button
-              type="button"
-              class="jk-btn-ghost -mr-1 px-2"
-              [title]="i18n.t('setup.reopen')"
-              [attr.aria-label]="i18n.t('setup.reopen')"
-              (click)="reopen()"
-            >
-              <jk-icon name="history" [size]="18" />
-            </button>
           </header>
           <main class="min-h-0 flex-1">
             <router-outlet />
@@ -94,6 +93,17 @@ export class App {
     if (!s || this.minDelay()) return 'splash';
     return s.completed ? 'ready' : 'setup';
   });
+  private readonly url = toSignal(
+    inject(Router).events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map((e) => e.urlAfterRedirects),
+    ),
+    { initialValue: inject(Router).url },
+  );
+  /** Sezione attiva: la pagina dei progetti (task, chat, nuovo progetto) o quella dei workflow. */
+  protected readonly section = computed(() =>
+    /^\/(workflow|opzioni)(\/|$|\?)/.test(this.url()) ? 'other' : 'projects',
+  );
   protected readonly connection = computed(() =>
     this.i18n.t(
       !this.rt.online() ? 'server.off' : this.rt.runner().connected ? 'runner.on' : 'runner.off',
@@ -105,10 +115,6 @@ export class App {
     this.rt.start();
     setTimeout(() => this.minDelay.set(false), SPLASH_MS);
     void this.boot();
-  }
-
-  protected reopen(): void {
-    void this.setup.reopen().catch(() => undefined);
   }
 
   /** Riprova finché il server non risponde. */

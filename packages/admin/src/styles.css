@@ -76,6 +76,10 @@
 @utility jk-btn-ghost {
   @apply jk-btn text-muted hover:bg-subtle hover:text-fg;
 }
+/* Eliminazioni sensibili (sempre sotto conferma): cestino rosso. */
+@utility jk-btn-danger {
+  @apply jk-btn px-2 text-red-600 hover:bg-red-500/10 dark:text-red-400;
+}
 @utility jk-btn-outline {
   @apply jk-btn border border-line text-fg hover:bg-subtle;
 }

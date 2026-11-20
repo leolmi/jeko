@@ -26,7 +26,7 @@ export interface NewRun {
   mode: RunMode;
   inputs?: Record<string, string> | undefined;
   cwd?: string | undefined;
-  /** Definizione propria (run di creazione); senza, quella salvata `workflow@version`. */
+  /** Definizione con cui la run parte e riparte, anche se il workflow viene eliminato. */
   definition?: Workflow | undefined;
 }
 

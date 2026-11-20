@@ -115,6 +115,16 @@ describe('server', () => {
     expect((await start('c:/dev/p')).workflow).toBe('b-dev');
     expect((await start('C:\\altro')).workflow).toBe('a-dev');
     expect((await patch(null)).json()).toMatchObject({ workflow: null });
+
+    // Eliminato: sparisce con le sue versioni e il progetto torna al predefinito.
+    expect((await patch('b-dev')).statusCode).toBe(200);
+    const del = () => app.inject({ method: 'DELETE', url: '/api/workflows/b-dev' });
+    expect((await del()).statusCode).toBe(204);
+    expect((await del()).statusCode).toBe(404);
+    expect((await app.inject('/api/workflows/b-dev')).statusCode).toBe(404);
+    const [p] = (await app.inject('/api/projects')).json() as { workflow: string | null }[];
+    expect(p!.workflow).toBeNull();
+    expect((await start('c:/dev/p')).workflow).toBe('a-dev');
   });
 
   it('salva i template e crea un progetto che li segue', async () => {
