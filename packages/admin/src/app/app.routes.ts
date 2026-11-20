@@ -10,5 +10,9 @@ export const routes: Routes = [
     ],
   },
   { path: 'progetti', loadComponent: () => import('./projects/projects').then((m) => m.Projects) },
+  {
+    path: 'opzioni',
+    loadComponent: () => import('./settings/settings-page').then((m) => m.SettingsPage),
+  },
   { path: '**', redirectTo: '' },
 ];

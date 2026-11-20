@@ -10,8 +10,6 @@ import { hostFunctions } from './host-functions.js';
 export interface NodeHostOptions {
   /** Cartella di lavoro predefinita (per WF2 la cartella del progetto). */
   cwd?: string;
-  /** Cartella in cui nascono i progetti nuovi. */
-  projectsDir?: string;
   /** Dove stanno i turni di claude della run (nel suo giornale). */
   turnsDir: string;
   /** Comando di claude; di default `JEKO_CLAUDE_BIN` o `claude`. */
@@ -42,7 +40,6 @@ export function createNodeHost(opts: NodeHostOptions): Host {
     approve: opts.approve,
     review: opts.review,
     emit: opts.emit,
-    ...(opts.projectsDir !== undefined && { projectsDir: opts.projectsDir }),
     functions: hostFunctions,
     exec: (argv, cwd) =>
       run(argv, { ...((cwd ?? opts.cwd) !== undefined && { cwd: cwd ?? opts.cwd }) }),

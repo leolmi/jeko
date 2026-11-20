@@ -64,6 +64,15 @@ const SPLASH_MS = 600;
               <span class="hidden sm:inline">{{ connection() }}</span>
             </span>
             <jk-prefs />
+            <a
+              routerLink="/opzioni"
+              class="jk-btn-ghost px-2"
+              routerLinkActive="bg-subtle !text-fg"
+              [title]="i18n.t('settings.title')"
+              [attr.aria-label]="i18n.t('settings.title')"
+            >
+              <jk-icon name="settings" [size]="18" />
+            </a>
             <button
               type="button"
               class="jk-btn-ghost -mr-1 px-2"
@@ -95,7 +104,8 @@ export class App {
     { initialValue: '/' },
   );
   /** "Chat" è attiva ovunque tranne che in Progetti. */
-  protected readonly onProjects = computed(() => this.url().startsWith('/progetti'));
+  /** Su una pagina che non è la chat (Progetti, Opzioni). */
+  protected readonly onProjects = computed(() => /^\/(progetti|opzioni)/.test(this.url()));
 
   protected readonly phase = computed(() => {
     const s = this.setup.status();

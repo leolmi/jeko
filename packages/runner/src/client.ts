@@ -252,6 +252,7 @@ export class RunnerClient {
         signal: session.controller.signal,
         ...(start.inputs && { inputs: start.inputs }),
         ...(start.state && { state: start.state }),
+        ...(start.settings && { settings: start.settings }),
       },
       this.opts.makeHost(io, start, { runDir: this.journals.runDir(start.runId) }),
     )

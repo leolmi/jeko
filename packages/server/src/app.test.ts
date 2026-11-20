@@ -44,6 +44,16 @@ describe('server', () => {
     expect(list.json()).toEqual([created.json()]);
   });
 
+  it("salva e rilegge le opzioni dell'utente", async () => {
+    expect((await app.inject('/api/settings')).json()).toEqual({});
+    const put = (payload: object) => app.inject({ method: 'PUT', url: '/api/settings', payload });
+    expect((await put({ projectsDir: 'progetti' })).json()).toEqual({ projectsDir: 'progetti' });
+    expect((await app.inject('/api/settings')).json()).toEqual({ projectsDir: 'progetti' });
+    expect((await put({ projectsDir: '' })).statusCode).toBe(400);
+    // I campi sconosciuti si scartano (Fastify, removeAdditional).
+    expect((await put({ projectsDir: 'p', altro: 1 })).json()).toEqual({ projectsDir: 'p' });
+  });
+
   it('gestisce il primo avvio', async () => {
     const first = (await app.inject('/api/setup')).json();
     expect(first).toMatchObject({

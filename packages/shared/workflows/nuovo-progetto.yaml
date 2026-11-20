@@ -16,7 +16,7 @@ inputs:
 
 vars:
   slug: '{{ kebab(name) }}'
-  # Cartella dei progetti: config.json del runner (projectsDir) o JEKO_PROJECTS_DIR.
+  # Cartella dei progetti: opzioni dell'utente nella web-app.
   dir: '{{ jeko.projectsDir }}/{{ slug }}'
 
 policies:
@@ -26,6 +26,12 @@ policies:
     gate: always
 
 steps:
+  - id: projects-dir
+    type: check
+    title: Cartella dei progetti impostata nelle opzioni
+    expect: jeko.projectsDir
+    onFail: stop
+
   - id: check-dir
     type: check
     title: La cartella non deve esistere

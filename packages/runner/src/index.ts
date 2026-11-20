@@ -41,7 +41,6 @@ const client = new RunnerClient({
       ...io,
       permissions,
       turnsDir: join(runDir, 'turns'),
-      projectsDir: config.projectsDir,
       ...(start.cwd !== undefined && { cwd: start.cwd }),
     }),
 });

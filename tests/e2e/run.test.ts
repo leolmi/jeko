@@ -221,6 +221,9 @@ describe('run server ↔ runner', () => {
   });
 
   it('ignora gli eventi reinviati e li conferma comunque', async () => {
+    // Le opzioni dell'utente arrivano al runner con la run.
+    const saved = await api('PUT', '/api/settings', { projectsDir: 'progetti' });
+    expect(saved).toMatchObject({ status: 200, body: { projectsDir: 'progetti' } });
     const { body } = await api<RunSummary>('POST', '/api/runs', {
       workflow: 'demo',
       request: 'x',
@@ -229,17 +232,18 @@ describe('run server ↔ runner', () => {
     });
     const ws = new WebSocket(`${base.replace('http', 'ws')}/ws/runner`);
     const acks: number[] = [];
-    let started = false;
+    let started: unknown = null;
     ws.on('message', (d) => {
       const m = JSON.parse(String(d)) as { type: string; seq?: number };
       if (m.type === 'run.ack') acks.push(m.seq!);
-      if (m.type === 'run.start') started = true;
+      if (m.type === 'run.start') started = m;
     });
     await new Promise((r) => ws.once('open', r));
     const send = (m: object) => ws.send(JSON.stringify(m));
     send({ type: 'hello', runnerId: 'finto', version: '0', activeRuns: [] });
     send({ type: 'ready' });
     await until(async () => started);
+    expect(started).toMatchObject({ settings: { projectsDir: 'progetti' } });
 
     const event = { runId: body.id, type: 'step.skipped', stepId: 'lavoro' };
     send({ type: 'run.event', seq: 1, event });

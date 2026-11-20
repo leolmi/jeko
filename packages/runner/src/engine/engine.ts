@@ -13,6 +13,7 @@ import {
   type RunState,
   type RunStatus,
   type Step,
+  type UserSettings,
   type Workflow,
 } from '@jeko/shared';
 import { classifyCommand, classifyTool, gateLevel, gateStops } from './policy.js';
@@ -82,8 +83,6 @@ export interface Host {
   review(req: { stepId: string; output: string }): Promise<Review>;
   agent(req: AgentRequest): Promise<AgentResult>;
   exec(argv: string[], cwd?: string): Promise<ExecResult>;
-  /** Cartella in cui nascono i progetti nuovi (`jeko.projectsDir` nei workflow). */
-  projectsDir?: string;
   /** Comandi del progetto (`.jeko/commands.yaml`) per i check con `commands`. */
   projectCommands?(cwd?: string): Promise<Record<string, string[]>>;
   functions: Functions;
@@ -99,6 +98,8 @@ export interface RunOptions {
   inputs?: Record<string, string>;
   /** Per riprendere una run interrotta. */
   state?: RunState;
+  /** Opzioni dell'utente (dal server): `projectsDir` diventa `jeko.projectsDir`. */
+  settings?: UserSettings;
   /** Annulla la run: si ferma prima del passo successivo o mentre attende l'utente. */
   signal?: AbortSignal;
 }
@@ -140,7 +141,7 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
         mode,
         runId,
         lastFailure: state.lastFailure ?? null,
-        projectsDir: host.projectsDir ?? null,
+        projectsDir: opts.settings?.projectsDir ?? null,
       },
     },
     functions: host.functions,

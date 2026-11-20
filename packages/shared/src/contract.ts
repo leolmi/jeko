@@ -25,3 +25,16 @@ export const HealthSchema = Type.Object({
   runner: Type.Boolean(),
 });
 export type Health = Static<typeof HealthSchema>;
+
+/**
+ * Opzioni dell'utente, salvate sul server e modificabili dalla web-app; il runner le riceve
+ * con ogni run. La prima volta si impostano nel wizard.
+ */
+export const UserSettingsSchema = Type.Object(
+  {
+    /** Cartella in cui nascono i progetti nuovi (`jeko.projectsDir` nei workflow). */
+    projectsDir: Type.Optional(Type.String({ minLength: 1, maxLength: 260 })),
+  },
+  { additionalProperties: false },
+);
+export type UserSettings = Static<typeof UserSettingsSchema>;

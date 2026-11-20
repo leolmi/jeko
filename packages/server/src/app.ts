@@ -8,11 +8,13 @@ import { Type } from '@sinclair/typebox';
 import type { Db } from './db/db.js';
 import { runnerRoutes } from './routes/runner.js';
 import { runRoutes } from './routes/runs.js';
+import { settingsRoutes } from './routes/settings.js';
 import { setupRoutes } from './routes/setup.js';
 import { workflowRoutes } from './routes/workflows.js';
 import { RunnerHub } from './runs/hub.js';
 import { RunStore } from './runs/store.js';
 import { bearer, RunnerTokens } from './runner/token.js';
+import { UserSettingsStore } from './settings/store.js';
 import { WorkflowStore } from './workflows/store.js';
 
 export interface AppOptions {
@@ -42,7 +44,8 @@ export async function buildApp({
 
   const workflows = new WorkflowStore(db);
   const runs = new RunStore(db);
-  const hub = new RunnerHub(runs, workflows, app.log);
+  const settings = new UserSettingsStore(db);
+  const hub = new RunnerHub(runs, workflows, settings, app.log);
   const tokens = new RunnerTokens(db);
 
   app.get('/api/health', { schema: { response: { 200: HealthSchema } } }, async () => ({
@@ -78,6 +81,7 @@ export async function buildApp({
   await app.register(runRoutes, { runs, workflows, hub });
   await app.register(setupRoutes, { db, hub, tokens, version: VERSION });
   await app.register(runnerRoutes, { tokens, runnerDist, serverUrl });
+  await app.register(settingsRoutes, { settings });
 
   // Il runner si presenta con il suo token. Un browser (che manda sempre Origin) non entra mai:
   // una pagina web aperta sul PC non può fingersi runner.

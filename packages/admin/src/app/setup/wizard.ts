@@ -7,19 +7,21 @@ import {
   signal,
 } from '@angular/core';
 import { I18n, type I18nKey } from '../core/i18n';
+import { Settings, settingsReady } from '../core/settings';
 import { blocking, INSTALLER_CMD, serverChecks, Setup } from '../core/setup';
 import { Icon } from '../ui/icon';
 import { Prefs } from '../ui/prefs';
+import { UserSettings } from '../ui/user-settings';
 import { CheckList } from './check-list';
 
-type StepId = 'welcome' | 'server' | 'runner' | 'env' | 'done';
-const STEPS: StepId[] = ['welcome', 'server', 'runner', 'env', 'done'];
+type StepId = 'welcome' | 'server' | 'runner' | 'env' | 'options' | 'done';
+const STEPS: StepId[] = ['welcome', 'server', 'runner', 'env', 'options', 'done'];
 const RUNNER_CMD = 'npm run dev:runner';
 
-/** Primo avvio a passi: preferenze, server, runner, ambiente del runner. */
+/** Primo avvio a passi: preferenze, server, runner, ambiente del runner, opzioni dell'utente. */
 @Component({
   selector: 'jk-wizard',
-  imports: [Icon, Prefs, CheckList],
+  imports: [Icon, Prefs, CheckList, UserSettings],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex min-h-screen flex-col items-center bg-bg px-6 py-12' },
   template: `
@@ -186,6 +188,13 @@ const RUNNER_CMD = 'npm run dev:runner';
               }
             </div>
           }
+          @case ('options') {
+            <h1 class="text-2xl font-bold tracking-tight">{{ i18n.t('setup.options.title') }}</h1>
+            <p class="mt-2 text-sm leading-relaxed text-muted">
+              {{ i18n.t('setup.options.body') }}
+            </p>
+            <div class="mt-6"><jk-user-settings /></div>
+          }
           @case ('done') {
             <div class="flex size-12 items-center justify-center rounded-full bg-emerald-500/10">
               <jk-icon name="check" [size]="28" class="text-emerald-500" />
@@ -209,7 +218,9 @@ const RUNNER_CMD = 'npm run dev:runner';
             blocked() ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'
           "
         >
-          @if (blocked() && step() !== 'runner') {
+          @if (blocked() && step() === 'options') {
+            {{ i18n.t('setup.options.blocked') }}
+          } @else if (blocked() && step() !== 'runner') {
             {{ i18n.t('setup.blocked') }}
           } @else if (warned()) {
             {{ i18n.t('setup.warnings') }}
@@ -233,6 +244,7 @@ const RUNNER_CMD = 'npm run dev:runner';
 export class Wizard {
   protected readonly i18n = inject(I18n);
   private readonly setup = inject(Setup);
+  private readonly settings = inject(Settings);
 
   protected readonly steps = STEPS;
   protected readonly reopened = this.setup.reopened;
@@ -267,6 +279,8 @@ export class Wizard {
         const checks = this.runner().checks;
         return !checks || blocking(checks);
       }
+      case 'options':
+        return !settingsReady(this.settings.value());
       default:
         return false;
     }

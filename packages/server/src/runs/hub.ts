@@ -12,6 +12,7 @@ import {
   type RunRowStatus,
   type ServerToRunner,
 } from '@jeko/shared';
+import type { UserSettingsStore } from '../settings/store.js';
 import type { WorkflowStore } from '../workflows/store.js';
 import type { RunLaunch, RunStore } from './store.js';
 
@@ -37,6 +38,7 @@ export class RunnerHub {
   constructor(
     private readonly runs: RunStore,
     private readonly workflows: WorkflowStore,
+    private readonly settings: UserSettingsStore,
     private readonly log: FastifyBaseLogger,
   ) {}
 
@@ -223,6 +225,7 @@ export class RunnerHub {
       await this.setStatus(run.id, 'failed', `Workflow ${run.workflow}@${run.version} non trovato`);
       return;
     }
+    const settings = await this.settings.get();
     const sent = this.sendRunner({
       type: 'run.start',
       runId: run.id,
@@ -232,6 +235,7 @@ export class RunnerHub {
       ...(run.inputs && { inputs: run.inputs }),
       ...(run.cwd && { cwd: run.cwd }),
       ...(run.state && { state: run.state }),
+      settings,
     });
     if (sent) await this.setStatus(run.id, 'running');
   }

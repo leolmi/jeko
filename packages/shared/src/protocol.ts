@@ -1,5 +1,5 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { Id, Timestamp } from './contract.js';
+import { Id, Timestamp, UserSettingsSchema } from './contract.js';
 import { RunEventSchema, RunModeSchema, RunStateSchema } from './workflow/run.js';
 import { PolicyActionSchema, WorkflowKindSchema, WorkflowSchema } from './workflow/schema.js';
 
@@ -116,6 +116,8 @@ export const RunStartSchema = Type.Object({
   inputs: Type.Optional(Type.Record(Type.String(), Type.String())),
   cwd: Type.Optional(Type.String()),
   state: Type.Optional(RunStateSchema),
+  /** Opzioni dell'utente al momento dell'avvio. */
+  settings: Type.Optional(UserSettingsSchema),
 });
 export type RunStart = Static<typeof RunStartSchema>;
 

@@ -61,14 +61,20 @@ function fakeHost(opts: {
         typeof p === 'string' && typeof t === 'string' && (opts.files?.[p] ?? '').includes(t),
     },
     emit: (e) => f.events.push(e),
-    projectsDir: 'progetti',
   };
   return f;
 }
 
 const run = (w: Workflow, f: Fake, mode: RunMode = 'checkpoint', inputs?: Record<string, string>) =>
   runWorkflow(
-    { runId: 'r1', workflow: w, request: 'crea Jeko', mode, ...(inputs && { inputs }) },
+    {
+      runId: 'r1',
+      workflow: w,
+      request: 'crea Jeko',
+      mode,
+      settings: { projectsDir: 'progetti' },
+      ...(inputs && { inputs }),
+    },
     f.host,
   );
 
@@ -209,6 +215,23 @@ steps:
     expect(out.status).toBe('failed');
     expect(out.error).toContain("Controllo 'check-dir' fallito");
     expect(f.agentCalls).toEqual([]);
+  });
+
+  it('si ferma se nelle opzioni manca la cartella dei progetti', async () => {
+    const f = fakeHost({});
+    const out = await runWorkflow(
+      {
+        runId: 'r1',
+        workflow: example,
+        request: 'crea Jeko',
+        mode: 'headless',
+        inputs: { name: 'Jeko', type: 'vuoto' },
+      },
+      f.host,
+    );
+    expect(out.status).toBe('failed');
+    expect(out.error).toContain("Controllo 'projects-dir' fallito");
+    expect(f.execCalls).toEqual([]);
   });
 
   it('un gate rifiutato chiude la run come rejected', async () => {

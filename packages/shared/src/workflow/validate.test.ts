@@ -21,6 +21,7 @@ describe('workflow', () => {
     const r = parseWorkflow(example);
     expect(messages(r)).toEqual([]);
     expect(r.ok && r.workflow.steps.map((s) => s.id)).toEqual([
+      'projects-dir',
       'check-dir',
       'scaffold',
       'git',
