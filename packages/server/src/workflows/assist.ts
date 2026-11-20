@@ -1,6 +1,7 @@
 import {
   builtins,
   CONTEXT_VARS,
+  EFFORTS,
   formatIssue,
   HOST_FUNCTIONS,
   parseWorkflow,
@@ -17,8 +18,11 @@ const GUIDE = `Sei l'assistente di Jeko per i workflow. Un workflow è un file Y
 con cui Jeko porta avanti una richiesta su un progetto. Modifichi il workflow come chiede l'utente.
 
 Regole del formato (lo schema JSON completo è sotto):
+- "kind" è sempre develop (i progetti nuovi si creano dai template, non con un workflow);
 - tipi di passo: agent (istruzioni a claude), check (comandi o espressione da verificare),
   gate (approvazione dell'utente), ask (domanda all'utente salvata in una variabile);
+- un passo agent può fissare "effort" (${EFFORTS.join(', ')}) per ragionare di più, es. sul piano,
+  e "model" (es. opus, sonnet); senza, valgono quelli predefiniti di claude;
 - i testi possono contenere {{ espressione }}; nelle espressioni ci sono: ${CONTEXT_VARS.join(', ')},
   gli input e le vars per nome, steps.<id>.ok e steps.<id>.output;
 - funzioni: ${[...Object.keys(builtins), ...HOST_FUNCTIONS].join(', ')};

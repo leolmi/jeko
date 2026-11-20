@@ -47,17 +47,24 @@ export class WorkflowStore {
     return added;
   }
 
-  /** Ultima versione di ogni workflow. */
+  /** Ultima versione di ogni workflow di sviluppo (quelli di creazione di prima restano nascosti). */
   async list(): Promise<WorkflowRecord[]> {
     const { rows } = await this.db.query<Row>(
-      `SELECT DISTINCT ON (name) ${COLUMNS} FROM workflows ORDER BY name, version DESC`,
+      `SELECT DISTINCT ON (name) ${COLUMNS} FROM workflows WHERE kind = 'develop'
+       ORDER BY name, version DESC`,
     );
     return rows.map(toRecord);
   }
 
+  /** Workflow predefinito di un tipo: il primo per nome. */
+  async defaultOf(kind: Workflow['kind']): Promise<string | null> {
+    return (await this.list()).find((w) => w.kind === kind)?.name ?? null;
+  }
+
   async versions(name: string): Promise<WorkflowRecord[]> {
     const { rows } = await this.db.query<Row>(
-      `SELECT ${COLUMNS} FROM workflows WHERE name = $1 ORDER BY version DESC`,
+      `SELECT ${COLUMNS} FROM workflows WHERE name = $1 AND kind = 'develop'
+       ORDER BY version DESC`,
       [name],
     );
     return rows.map(toRecord);

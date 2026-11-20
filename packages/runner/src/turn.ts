@@ -31,6 +31,9 @@ export interface DurableTurnOptions {
   /** Sessione dei turni precedenti della run, da riprendere. */
   sessionId?: string | undefined;
   allowedTools?: string[] | undefined;
+  /** Ragionamento e modello del passo (`--effort`, `--model`). */
+  effort?: string | undefined;
+  model?: string | undefined;
   /** Collega il turno ai permessi di Jeko; `token` c'è quando si riaggancia un turno. */
   permissions?: ((dir: string, token?: string) => TurnPermissions) | undefined;
   signal?: AbortSignal | undefined;
@@ -168,6 +171,8 @@ function spawnTurn(
       sessionId: meta.sessionId,
       resume,
       allowedTools: o.allowedTools,
+      effort: o.effort,
+      model: o.model,
       ...perms?.input,
     });
     const child = spawnArgv([...o.command, ...args], {

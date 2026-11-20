@@ -1,5 +1,7 @@
+import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import type { WorkflowRecord } from '@jeko/shared';
 import { I18n } from '../core/i18n';
 import { Projects } from '../core/projects';
 import { Icon } from '../ui/icon';
@@ -18,6 +20,22 @@ import { Status } from '../ui/status';
           <h2 class="truncate text-xl font-semibold tracking-tight">{{ p.name }}</h2>
           <span class="truncate font-mono text-xs text-faint">{{ p.path }}</span>
           <span class="ml-auto flex shrink-0 items-center gap-3">
+            <a
+              class="flex items-center gap-1 text-xs text-faint hover:text-fg"
+              [title]="i18n.t('tasks.workflow.hint')"
+              [routerLink]="['/progetti', p.id]"
+            >
+              <jk-icon name="account_tree" [size]="14" />
+              <span class="font-mono">{{ p.workflow ?? develop()[0]?.name ?? '—' }}</span>
+            </a>
+            <a
+              class="jk-btn-ghost px-1.5 py-1"
+              [title]="i18n.t('project.settings')"
+              [attr.aria-label]="i18n.t('project.settings')"
+              [routerLink]="['/progetti', p.id]"
+            >
+              <jk-icon name="settings" [size]="16" />
+            </a>
             @if (p.closed.length) {
               <button
                 type="button"
@@ -84,6 +102,10 @@ export class Tasks {
     return this.showClosed() ? [...p.open, ...p.closed] : p.open;
   });
 
+  private readonly workflows = httpResource<WorkflowRecord[]>(() => '/api/workflows');
+  protected readonly develop = computed(() =>
+    (this.workflows.hasValue() ? this.workflows.value() : []).filter((w) => w.kind === 'develop'),
+  );
   protected remove(id: string, name: string): void {
     if (!globalThis.confirm(this.i18n.t('tasks.remove.confirm', { name }))) return;
     void this.projects.remove(id).catch(() => undefined);

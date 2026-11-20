@@ -1,0 +1,110 @@
+name: sviluppo-completo
+kind: develop
+version: 1
+description: Fix e implementazioni, dalla verifica della richiesta fino al rilascio
+
+policies:
+  - match: install
+    gate: always
+  - match: [git.commit, git.push]
+    gate: always
+  - match: [git.branch, fs.delete]
+    gate: interactive
+
+steps:
+  - id: richiesta
+    type: agent
+    title: Verifica della richiesta
+    effort: medium
+    instructions: |
+      Richiesta: {{ request }}
+
+      Leggi il progetto quanto basta per capire la richiesta. Se mancano informazioni
+      essenziali, chiedile all'utente, una domanda alla volta. Non modificare nessun file.
+      La tua risposta finale deve iniziare con una riga sola, `TIPO: fix` se è la correzione
+      di un bug, altrimenti `TIPO: implementazione`, seguita da un riassunto breve di cosa fare.
+
+  - id: git
+    type: agent
+    title: Branch e stato di git
+    effort: low
+    instructions: |
+      Controlla il branch attuale e lo stato di git. Se ci sono modifiche non committate,
+      o se sei sul branch principale e la richiesta merita un branch suo, dillo all'utente
+      e chiedi come procedere. Non fare commit.
+
+  - id: e2e-bug
+    type: agent
+    title: Test e2e che riproduce il bug
+    when: "startsWith(lower(trim(steps.richiesta.output)), 'tipo: fix')"
+    instructions: |
+      Scrivi un test e2e che riproduce il bug descritto: {{ request }}
+      Il test deve fallire adesso, per il motivo del bug. Eseguilo e verificalo.
+      Non correggere ancora il bug e non fare commit.
+
+  - id: piano
+    type: agent
+    title: Piano di lavoro
+    effort: high
+    instructions: |
+      Richiesta: {{ request }}
+
+      Scrivi un piano di lavoro breve: file da toccare, passi, test da aggiungere o aggiornare.
+      Non modificare ancora nessun file.
+
+  - id: ok-piano
+    type: gate
+    title: Approvazione del piano
+    message: Procedo con il piano?
+
+  - id: lavoro
+    type: agent
+    title: Esecuzione del lavoro
+    instructions: |
+      Esegui il piano concordato per la richiesta: {{ request }}
+      Aggiungi o aggiorna i test. Non fare commit.
+
+  - id: verifica
+    type: check
+    title: Controlli del progetto
+    commands: [typecheck, lint, test]
+    onFail:
+      goto: lavoro
+      retries: 2
+
+  - id: review
+    type: agent
+    title: Code review
+    effort: high
+    instructions: |
+      Fai una code review delle modifiche (git diff): correttezza, casi limite, test, semplicità.
+      Correggi tu i problemi che trovi. Non fare commit.
+
+  - id: e2e
+    type: check
+    title: Test e2e verdi
+    commands: [e2e]
+    onFail:
+      goto: lavoro
+      retries: 3
+
+  - id: conoscenza
+    type: agent
+    title: Aggiornamento di .jeko/
+    instructions: |
+      Aggiorna la conoscenza del progetto in .jeko/ con quello che hai imparato in questa richiesta
+      (project.md, commands.yaml, una nota breve in notes/ se serve). Se non c'è niente di nuovo
+      non toccare nulla. Scrivi solo in .jeko/ e non fare commit.
+
+  - id: chiusura
+    type: agent
+    title: Bump della versione, commit e push
+    instructions: |
+      Chiudi il lavoro: aumenta la versione del progetto (patch per un fix, minor per
+      un'implementazione), fai il commit di tutte le modifiche con un messaggio chiaro
+      e fai il push del branch.
+
+  - id: rilascio
+    type: check
+    title: Rilascio
+    commands: [release]

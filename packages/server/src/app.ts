@@ -6,11 +6,13 @@ import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { HealthSchema } from '@jeko/shared';
 import type { Db } from './db/db.js';
 import { ProjectStore } from './projects/store.js';
+import { TemplateStore } from './projects/templates.js';
 import { projectRoutes } from './routes/projects.js';
 import { runnerRoutes } from './routes/runner.js';
 import { runRoutes } from './routes/runs.js';
 import { settingsRoutes } from './routes/settings.js';
 import { setupRoutes } from './routes/setup.js';
+import { templateRoutes } from './routes/templates.js';
 import { workflowRoutes } from './routes/workflows.js';
 import { RunnerHub } from './runs/hub.js';
 import { RunStore } from './runs/store.js';
@@ -44,6 +46,7 @@ export async function buildApp({
   const runs = new RunStore(db);
   const settings = new UserSettingsStore(db);
   const projects = new ProjectStore(db);
+  const templates = new TemplateStore(db);
   const hub = new RunnerHub(runs, workflows, settings, projects, app.log);
   const tokens = new RunnerTokens(db);
 
@@ -53,9 +56,10 @@ export async function buildApp({
     runner: hub.connected,
   }));
 
-  await app.register(projectRoutes, { projects, hub });
+  await app.register(projectRoutes, { projects, workflows, hub });
+  await app.register(templateRoutes, { templates, runs, hub });
   await app.register(workflowRoutes, { workflows, hub });
-  await app.register(runRoutes, { runs, workflows, hub });
+  await app.register(runRoutes, { runs, workflows, projects, hub });
   await app.register(setupRoutes, { db, hub, tokens, version: VERSION });
   await app.register(runnerRoutes, { tokens, runnerDist, serverUrl });
   await app.register(settingsRoutes, { settings });

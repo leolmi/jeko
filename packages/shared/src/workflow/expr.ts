@@ -344,6 +344,31 @@ export function parseTemplate(src: string): TemplatePart[] {
   return parts;
 }
 
+/**
+ * Le `vars` in un ordine in cui ognuna viene dopo quelle che usa. L'ordine scritto nello YAML
+ * non basta: un oggetto salvato come jsonb torna con le chiavi riordinate (es. `dir` prima di
+ * `slug`). La validazione esclude i cicli; se ce ne fosse uno, il resto segue l'ordine dato.
+ */
+export function orderedVars(vars: Readonly<Record<string, string>>): [string, string][] {
+  const pending = new Map(Object.entries(vars));
+  const uses = new Map<string, Set<string>>();
+  for (const [name, tpl] of pending) {
+    const refs = new Set<string>();
+    for (const p of parseTemplate(tpl)) {
+      if ('expr' in p) for (const v of references(p.expr).vars) if (v !== name) refs.add(v);
+    }
+    uses.set(name, refs);
+  }
+  const out: [string, string][] = [];
+  while (pending.size) {
+    const ready = [...pending].find(([n]) => [...uses.get(n)!].every((v) => !pending.has(v)));
+    const [name, tpl] = ready ?? [...pending][0]!;
+    out.push([name, tpl]);
+    pending.delete(name);
+  }
+  return out;
+}
+
 export function renderTemplate(src: string, ctx: EvalContext): string {
   return parseTemplate(src)
     .map((p) => ('text' in p ? p.text : str(evaluate(p.expr, ctx))))

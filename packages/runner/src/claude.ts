@@ -6,6 +6,9 @@ export interface TurnInput {
   resume: boolean;
   /** Strumenti ammessi senza chiedere (es. "Read", "Bash(npm test:*)"). */
   allowedTools?: string[] | undefined;
+  /** Ragionamento (`--effort`) e modello (`--model`) del turno. */
+  effort?: string | undefined;
+  model?: string | undefined;
   /** Percorso di un file di configurazione MCP da passare a claude. */
   mcpConfig?: string | undefined;
   /** Strumento MCP a cui claude chiede i permessi (es. "mcp__jeko__approve"). */
@@ -27,6 +30,8 @@ export function claudeArgs(input: Omit<TurnInput, 'prompt' | 'cwd' | 'env'>): st
   const args = ['-p', '--output-format', 'stream-json', '--verbose'];
   args.push(input.resume ? '--resume' : '--session-id', input.sessionId);
   if (input.allowedTools?.length) args.push('--allowedTools', input.allowedTools.join(','));
+  if (input.effort) args.push('--effort', input.effort);
+  if (input.model) args.push('--model', input.model);
   if (input.mcpConfig) args.push('--mcp-config', input.mcpConfig);
   if (input.permissionPromptTool) args.push('--permission-prompt-tool', input.permissionPromptTool);
   if (input.settings) args.push('--settings', input.settings);

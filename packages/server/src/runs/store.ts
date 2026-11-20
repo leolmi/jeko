@@ -9,6 +9,7 @@ import type {
   RunRowStatus,
   RunState,
   RunSummary,
+  Workflow,
 } from '@jeko/shared';
 import type { Db } from '../db/db.js';
 import { iso, json } from '../db/sql.js';
@@ -25,6 +26,8 @@ export interface NewRun {
   mode: RunMode;
   inputs?: Record<string, string> | undefined;
   cwd?: string | undefined;
+  /** Definizione propria (run di creazione); senza, quella salvata `workflow@version`. */
+  definition?: Workflow | undefined;
 }
 
 /** Dati per (ri)avviare una run sul runner. */
@@ -38,6 +41,7 @@ export interface RunLaunch {
   inputs: Record<string, string> | null;
   cwd: string | null;
   state: RunState | null;
+  definition: Workflow | null;
 }
 
 export class RunStore {
@@ -45,9 +49,18 @@ export class RunStore {
 
   async create(run: NewRun): Promise<RunSummary> {
     const { rows } = await this.db.query<RunSummary>(
-      `INSERT INTO runs (workflow_name, workflow_version, request, mode, inputs, cwd, status)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'queued') RETURNING ${RUN_COLUMNS}`,
-      [run.workflow, run.version, run.request, run.mode, json(run.inputs), run.cwd ?? null],
+      `INSERT INTO runs (workflow_name, workflow_version, request, mode, inputs, cwd, definition,
+                         status)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb, 'queued') RETURNING ${RUN_COLUMNS}`,
+      [
+        run.workflow,
+        run.version,
+        run.request,
+        run.mode,
+        json(run.inputs),
+        run.cwd ?? null,
+        json(run.definition),
+      ],
     );
     return rows[0]!;
   }
@@ -87,10 +100,19 @@ export class RunStore {
   async launchable(): Promise<RunLaunch[]> {
     const { rows } = await this.db.query<RunLaunch>(
       `SELECT id, workflow_name AS workflow, workflow_version AS version, request, mode, status,
-              inputs, cwd, state
+              inputs, cwd, state, definition
        FROM runs WHERE status IN ('queued', 'running', 'waiting') ORDER BY created_at`,
     );
     return rows;
+  }
+
+  /** Definizione propria della run, se ne ha una (run di creazione). */
+  async definition(id: string): Promise<Workflow | null> {
+    const { rows } = await this.db.query<{ definition: Workflow | null }>(
+      `SELECT definition FROM runs WHERE id = $1`,
+      [id],
+    );
+    return rows[0]?.definition ?? null;
   }
 
   /** Valori della run (input e variabili) dall'ultimo stato salvato. */

@@ -25,15 +25,14 @@ async function store(): Promise<WorkflowStore> {
 describe('workflow di serie', () => {
   it('sono validi e si caricano una volta sola', async () => {
     const s = await store();
-    expect((await s.seed(builtin)).sort()).toEqual(['nuovo-progetto', 'sviluppo']);
+    expect(await s.seed(builtin)).toHaveLength(builtin.length);
     expect(await s.seed(builtin)).toEqual([]);
-    const kinds = (await s.list()).map((w) => w.kind).sort();
-    expect(kinds).toEqual(['create', 'develop']);
+    expect(new Set((await s.list()).map((w) => w.kind))).toEqual(new Set(['develop']));
   });
 
   it('non toccano le versioni salvate dall’utente', async () => {
     const s = await store();
-    const mine = builtin.find((y) => y.includes('name: sviluppo'))!.replace('Sviluppa', 'Mio');
+    const mine = builtin.find((y) => y.startsWith('name: sviluppo\n'))!.replace('Sviluppa', 'Mio');
     await s.save(mine);
     await s.seed(builtin);
     const versions = await s.versions('sviluppo');

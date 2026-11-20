@@ -1,16 +1,13 @@
-import { httpResource } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
   effect,
   inject,
-  linkedSignal,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import type { RunMode, WorkflowRecord } from '@jeko/shared';
+import type { RunMode } from '@jeko/shared';
 import { I18n } from '../core/i18n';
 import { Projects } from '../core/projects';
 import { Realtime } from '../core/realtime';
@@ -27,7 +24,7 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
  */
 @Component({
   selector: 'jk-task-composer',
-  imports: [FormsModule, Icon, Segmented],
+  imports: [Icon, Segmented],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex flex-col bg-surface px-6 py-3' },
   template: `
@@ -48,17 +45,6 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
       ></textarea>
       <div class="flex flex-wrap items-center gap-3 px-3 pt-1 pb-2.5">
         <jk-segmented [label]="i18n.t('composer.mode')" [options]="modes()" [(value)]="mode" />
-        @if (develop().length > 1) {
-          <select
-            class="jk-input w-auto py-1 text-sm"
-            [attr.aria-label]="i18n.t('composer.workflow')"
-            [(ngModel)]="workflow"
-          >
-            @for (w of develop(); track w.name) {
-              <option [value]="w.name">{{ w.name }}</option>
-            }
-          </select>
-        }
         <span class="hidden min-w-0 flex-1 truncate text-xs text-faint lg:inline">
           @if (error()) {
             <span class="text-red-600 dark:text-red-400">{{ i18n.t('composer.error') }}</span>
@@ -90,12 +76,6 @@ export class TaskComposer {
   private readonly runs = inject(Runs);
   private readonly router = inject(Router);
 
-  private readonly workflows = httpResource<WorkflowRecord[]>(() => '/api/workflows');
-  protected readonly develop = computed(() =>
-    (this.workflows.hasValue() ? this.workflows.value() : []).filter((w) => w.kind === 'develop'),
-  );
-  protected readonly workflow = linkedSignal(() => this.develop()[0]?.name ?? '');
-
   protected readonly project = this.projects.active;
   protected readonly draft = computed(() => {
     const p = this.project();
@@ -116,7 +96,7 @@ export class TaskComposer {
   protected readonly sending = signal(false);
   protected readonly error = signal(false);
   protected readonly valid = computed(
-    () => !!this.project()?.path && !!this.workflow() && this.draft().trim().length > 0,
+    () => !!this.project()?.path && this.draft().trim().length > 0,
   );
 
   constructor() {
@@ -135,7 +115,6 @@ export class TaskComposer {
     this.error.set(false);
     this.runs
       .start({
-        workflow: this.workflow(),
         request: this.draft().trim(),
         mode: this.mode(),
         cwd: p.path,

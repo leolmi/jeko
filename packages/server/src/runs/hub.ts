@@ -276,8 +276,10 @@ export class RunnerHub {
    * il workflow ha l'input `name` e la variabile `dir` (la cartella creata).
    */
   private async addCreatedProject(runId: string, workflow: string, version: number) {
-    const def = await this.workflows.definition(workflow, version);
-    if (def?.workflow.kind !== 'create') return;
+    const def =
+      (await this.runs.definition(runId)) ??
+      (await this.workflows.definition(workflow, version))?.workflow;
+    if (def?.kind !== 'create') return;
     const { name, dir } = await this.runs.values(runId);
     if (typeof name !== 'string' || typeof dir !== 'string' || !name.trim() || !dir.trim()) return;
     // `dir` unisce la cartella dei progetti (es. `C:\dev`) e lo slug con `/`: un solo separatore.
@@ -319,7 +321,9 @@ export class RunnerHub {
   }
 
   private async launch(run: RunLaunch): Promise<'sent' | 'failed' | 'offline'> {
-    const def = await this.workflows.definition(run.workflow, run.version);
+    const def = run.definition
+      ? { workflow: run.definition }
+      : await this.workflows.definition(run.workflow, run.version);
     if (!def) {
       await this.setStatus(run.id, 'failed', `Workflow ${run.workflow}@${run.version} non trovato`);
       return 'failed';

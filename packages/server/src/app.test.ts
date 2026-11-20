@@ -74,6 +74,88 @@ describe('server', () => {
     expect((await app.inject('/api/setup')).json()).toMatchObject({ completed: false });
   });
 
+  it('i task di un progetto seguono il suo workflow', async () => {
+    const save = (name: string, kind = 'develop') =>
+      app.inject({
+        method: 'POST',
+        url: '/api/workflows',
+        payload: {
+          yaml: `name: ${name}\nkind: ${kind}\nversion: 1\nsteps:\n  - id: a\n    type: check\n    expect: 'true'\n`,
+        },
+      });
+    for (const n of ['b-dev', 'a-dev']) expect((await save(n)).statusCode).toBe(201);
+    // I progetti nascono dai template: niente workflow di creazione.
+    expect((await save('crea', 'create')).statusCode).toBe(422);
+
+    const project = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/projects',
+        payload: { name: 'P', path: 'C:\\dev\\p' },
+      })
+    ).json() as { id: string; workflow: string | null };
+    expect(project.workflow).toBeNull();
+
+    const patch = (workflow: string | null) =>
+      app.inject({ method: 'PATCH', url: `/api/projects/${project.id}`, payload: { workflow } });
+    const start = async (cwd: string) =>
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/runs',
+          payload: { request: 'x', mode: 'headless', cwd },
+        })
+      ).json() as { workflow: string };
+
+    // Senza scelta: il predefinito (il primo per nome).
+    expect((await start('c:/dev/p')).workflow).toBe('a-dev');
+    expect((await patch('crea')).statusCode).toBe(422);
+    expect((await patch('nessuno')).statusCode).toBe(422);
+    expect((await patch('b-dev')).json()).toMatchObject({ workflow: 'b-dev' });
+    expect((await start('c:/dev/p')).workflow).toBe('b-dev');
+    expect((await start('C:\\altro')).workflow).toBe('a-dev');
+    expect((await patch(null)).json()).toMatchObject({ workflow: null });
+  });
+
+  it('salva i template e crea un progetto che li segue', async () => {
+    const put = (name: string, prompt: string) =>
+      app.inject({
+        method: 'PUT',
+        url: `/api/templates/${encodeURIComponent(name)}`,
+        payload: { prompt },
+      });
+    expect((await put('Angular', 'Usa Angular in {{ dir }}')).json()).toMatchObject({
+      name: 'Angular',
+      prompt: 'Usa Angular in {{ dir }}',
+    });
+    expect((await put('Angular', 'Usa Angular {{ name }}')).statusCode).toBe(200);
+    // Segnaposto sconosciuto: si dice subito, non a metà della run.
+    const bad = await put('Rotto', 'Usa {{ boh }}');
+    expect(bad.statusCode).toBe(422);
+    expect(bad.json()).toMatchObject({ issues: [{ message: expect.stringContaining('boh') }] });
+    expect((await app.inject('/api/templates')).json()).toMatchObject([
+      { name: 'Angular', prompt: 'Usa Angular {{ name }}' },
+    ]);
+
+    const create = (payload: object) =>
+      app.inject({ method: 'POST', url: '/api/projects/create', payload });
+    const missing = await create({
+      name: 'P',
+      request: 'x',
+      template: 'Nessuno',
+      mode: 'headless',
+    });
+    expect(missing.statusCode).toBe(404);
+    const run = await create({ name: 'P', request: 'x', template: 'Angular', mode: 'headless' });
+    expect(run.statusCode).toBe(201);
+    expect(run.json()).toMatchObject({ workflow: 'nuovo-progetto', status: 'queued', cwd: null });
+    expect((await create({ name: 'Q', request: 'y', mode: 'headless' })).statusCode).toBe(201);
+
+    const del = () => app.inject({ method: 'DELETE', url: '/api/templates/Angular' });
+    expect((await del()).statusCode).toBe(204);
+    expect((await del()).statusCode).toBe(404);
+  });
+
   it('rifiuta un body non valido', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/projects', payload: { name: '' } });
     expect(res.statusCode).toBe(400);

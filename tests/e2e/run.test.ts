@@ -54,6 +54,8 @@ describe('run server ↔ runner', () => {
   let others: RunnerClient[];
   let dataDir: string;
   let agentCalls: AgentRequest[];
+  /** Funzioni dei workflow (exists, fileContains…) del finto host. */
+  let functions: Host['functions'];
 
   const api = async <T>(method: string, url: string, body?: unknown) => {
     const res = await app.inject({
@@ -86,7 +88,9 @@ describe('run server ↔ runner', () => {
       },
       makeHost: (io): Host => ({
         ...io,
-        functions: {},
+        get functions() {
+          return functions;
+        },
         exec: async () => ({ code: 0, stdout: '', stderr: '' }),
         agent: async (req) => {
           agentCalls.push(req);
@@ -99,6 +103,7 @@ describe('run server ↔ runner', () => {
 
   beforeEach(async () => {
     agentCalls = [];
+    functions = {};
     others = [];
     dataDir = mkdtempSync(join(tmpdir(), 'jeko-e2e-'));
     const db = pgliteDb();
@@ -242,33 +247,31 @@ describe('run server ↔ runner', () => {
     expect(await status(second.id)).toBe('waiting');
   });
 
-  it('un workflow di creazione concluso aggiunge il progetto', async () => {
-    const yaml = `
-name: crea
-kind: create
-version: 1
-inputs:
-  name: { prompt: Nome, required: true }
-vars:
-  dir: '{{ jeko.projectsDir }}/{{ name }}'
-steps:
-  - { id: lavoro, type: agent, instructions: 'Crea {{ dir }}' }
-`;
-    expect((await api('POST', '/api/workflows', { yaml })).status).toBe(201);
+  it('un progetto creato da un template si aggiunge da solo', async () => {
+    // Cartella nuova: non esiste finché non la crea claude; poi .gitignore e .jeko/ ci sono.
+    functions = {
+      exists: (p) => String(p).endsWith('project.md'),
+      fileContains: () => true,
+    };
+    const tpl = await api('PUT', '/api/templates/Angular', {
+      prompt: 'Usa Angular per {{ name }}',
+    });
+    expect(tpl.status).toBe(200);
     await api('PUT', '/api/settings', { projectsDir: 'C:\\progetti' });
     startRunner();
-    const { body } = await api<RunSummary>('POST', '/api/runs', {
-      workflow: 'crea',
-      request: 'x',
+    const { body } = await api<RunSummary>('POST', '/api/projects/create', {
+      name: 'Mio Nuovo',
+      request: 'un gestionale',
+      template: 'Angular',
       mode: 'headless',
-      inputs: { name: 'Nuovo' },
     });
     await until(async () => (await detail(body.id)).status === 'done');
     const projects = await until(async () => {
       const list = (await api<Project[]>('GET', '/api/projects')).body;
       return list.length > 0 && list;
     });
-    expect(projects).toMatchObject([{ name: 'Nuovo', path: 'C:\\progetti\\Nuovo' }]);
+    expect(projects).toMatchObject([{ name: 'Mio Nuovo', path: 'C:\\progetti\\mio-nuovo' }]);
+    expect(agentCalls[0]!.instructions).toContain('Usa Angular per Mio Nuovo');
   });
 
   it('verifica uno YAML senza salvarlo', async () => {

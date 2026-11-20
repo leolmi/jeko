@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import type { RunSummary, StartRun } from '@jeko/shared';
+import type { CreateProjectRun, RunSummary, StartRun } from '@jeko/shared';
 import { tap, type Observable } from 'rxjs';
 import { Realtime } from './realtime';
 
@@ -40,10 +40,17 @@ export class Runs {
   }
 
   start(body: StartRun): Observable<RunSummary> {
-    return this.http
-      .post<RunSummary>('/api/runs', body)
-      .pipe(
-        tap((run) => this.list.update((runs) => [run, ...runs.filter((r) => r.id !== run.id)])),
-      );
+    return this.add(this.http.post<RunSummary>('/api/runs', body));
+  }
+
+  /** Nuovo progetto creato da Jeko, da un template o dalla sola richiesta. */
+  createProject(body: CreateProjectRun): Observable<RunSummary> {
+    return this.add(this.http.post<RunSummary>('/api/projects/create', body));
+  }
+
+  private add(req: Observable<RunSummary>): Observable<RunSummary> {
+    return req.pipe(
+      tap((run) => this.list.update((runs) => [run, ...runs.filter((r) => r.id !== run.id)])),
+    );
   }
 }

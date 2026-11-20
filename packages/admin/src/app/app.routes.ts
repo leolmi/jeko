@@ -8,6 +8,10 @@ export const routes: Routes = [
       { path: '', loadComponent: () => import('./workspace/tasks').then((m) => m.Tasks) },
       { path: 'runs/:id', loadComponent: () => import('./chat/thread').then((m) => m.Thread) },
       {
+        path: 'progetti/:id',
+        loadComponent: () => import('./workspace/project-settings').then((m) => m.ProjectSettings),
+      },
+      {
         path: 'nuovo',
         loadComponent: () => import('./workspace/new-project').then((m) => m.NewProject),
       },

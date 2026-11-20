@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
 import {
   evalExpr,
+  orderedVars,
   renderTemplate,
   truthy,
   type CheckStep,
+  type Effort,
   type Functions,
   type GateLevel,
   type Policy,
@@ -47,6 +49,8 @@ export interface AgentRequest {
   instructions: string;
   cwd?: string;
   tools?: string[];
+  effort?: Effort;
+  model?: string;
   sessionId?: string;
   /** Identifica il turno anche dopo un riavvio del runner: un turno finito non si riesegue. */
   turnKey: string;
@@ -173,7 +177,7 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
   try {
     if (!resumed) {
       await collectInputs();
-      for (const [name, tpl] of Object.entries(wf.vars ?? {})) state.values[name] = render(tpl);
+      for (const [name, tpl] of orderedVars(wf.vars ?? {})) state.values[name] = render(tpl);
       emit({ type: 'state', state });
     }
 
@@ -265,6 +269,8 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
         ...(opts.signal && { signal: opts.signal }),
         ...(cwd !== undefined && { cwd }),
         ...(step.tools && { tools: step.tools }),
+        ...(step.effort && { effort: step.effort }),
+        ...(step.model && { model: step.model }),
         ...(state.sessionId !== undefined && { sessionId: state.sessionId }),
         gates: { policies: wf.policies ?? [], mode },
         authorize: async (tool, input) => {

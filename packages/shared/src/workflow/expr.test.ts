@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { evalExpr, ExprError, kebab, parseExpr, references, renderTemplate } from './expr.js';
+import {
+  evalExpr,
+  ExprError,
+  kebab,
+  orderedVars,
+  parseExpr,
+  references,
+  renderTemplate,
+} from './expr.js';
 
 const vars = {
   type: 'semplice',
@@ -54,5 +62,15 @@ describe('espressioni', () => {
 
   it('kebab', () => {
     expect(kebab('  Perché è così?  ')).toBe('perche-e-cosi');
+  });
+
+  it('ordina le vars secondo le dipendenze, non secondo le chiavi', () => {
+    // Come torna da jsonb: chiavi più corte prima.
+    const order = orderedVars({
+      dir: '{{ root }}/{{ slug }}',
+      root: 'C:',
+      slug: '{{ kebab(name) }}',
+    });
+    expect(order.map(([n]) => n)).toEqual(['root', 'slug', 'dir']);
   });
 });

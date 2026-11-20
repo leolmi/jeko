@@ -1,5 +1,10 @@
-import { readFileSync } from 'node:fs';
-import { parseWorkflow, type RunEvent, type RunMode, type Workflow } from '@jeko/shared';
+import {
+  creationWorkflow,
+  parseWorkflow,
+  type RunEvent,
+  type RunMode,
+  type Workflow,
+} from '@jeko/shared';
 import { describe, expect, it } from 'vitest';
 import { runWorkflow, type AgentRequest, type Host, type Review } from './engine.js';
 
@@ -78,9 +83,8 @@ const run = (w: Workflow, f: Fake, mode: RunMode = 'checkpoint', inputs?: Record
     f.host,
   );
 
-const example = wf(
-  readFileSync(new URL('../../../shared/workflows/nuovo-progetto.yaml', import.meta.url), 'utf8'),
-);
+/** Creazione di un progetto da un template. */
+const example = creationWorkflow('Stack: Angular per {{ name }}.');
 
 describe('domande di claude (AskUserQuestion) nelle tre modalità', () => {
   const w = wf(`
@@ -111,7 +115,7 @@ steps:
 });
 
 describe('motore', () => {
-  it('esegue nuovo-progetto con gli input già ricavati', async () => {
+  it('crea un progetto da un template con gli input già ricavati', async () => {
     const files: Record<string, string> = {};
     const f = fakeHost({
       files,
@@ -122,23 +126,18 @@ describe('motore', () => {
         return { ok: true, output: 'ok', sessionId: 's1' };
       },
     });
-    const out = await run(example, f, 'headless', {
-      name: 'Gestione Clienti',
-      type: 'semplice',
-      stack: 'Angular',
-    });
+    const out = await run(example, f, 'headless', { name: 'Gestione Clienti' });
 
     expect(out).toMatchObject({ status: 'done' });
     expect(f.asked).toEqual([]);
     expect(f.agentCalls[0]?.instructions).toContain(
-      'Crea un progetto semplice con stack Angular in progetti/gestione-clienti',
+      'Crea il progetto Gestione Clienti nella cartella progetti/gestione-clienti',
     );
+    expect(f.agentCalls[0]?.instructions).toContain('Stack: Angular per Gestione Clienti.');
     expect(f.agentCalls[1]?.sessionId).toBe('s1');
     expect(f.execCalls).toEqual([
       { argv: ['git', 'init', '-b', 'main'], cwd: 'progetti/gestione-clienti' },
     ]);
-    // Il gate del commit è "always": si ferma anche in headless.
-    expect(f.approvals).toEqual(['gate:commit']);
     expect(f.agentCalls.find((c) => c.stepId === 'conoscenza')?.cwd).toBe(
       'progetti/gestione-clienti',
     );
@@ -169,9 +168,9 @@ steps:
     expect(out.error).toContain('commands.yaml: comando non valido');
   });
 
-  it('chiede gli input mancanti e salta i passi esclusi da when', async () => {
+  it('chiede gli input mancanti', async () => {
     const files: Record<string, string> = {};
-    const f = fakeHost({ answers: ['Prova', 'vuoto'], files });
+    const f = fakeHost({ answers: ['Prova'], files });
     f.host.agent = async (req) => {
       f.agentCalls.push(req);
       files['progetti/prova/.gitignore'] = '.idea/';
@@ -180,23 +179,40 @@ steps:
     };
     const out = await run(example, f);
     expect(out.status).toBe('done');
-    expect(f.asked).toEqual(['input:name', 'input:type']);
-    expect(out.state.values['stack']).toBeNull();
-    expect(f.events).toContainEqual({
-      runId: 'r1',
-      type: 'step.skipped',
-      stepId: 'scaffold',
-      title: 'Genera il progetto',
-    });
+    expect(f.asked).toEqual(['input:name']);
     expect(f.events).toContainEqual(
       expect.objectContaining({ type: 'step.started', stepId: 'git', title: 'Inizializza git' }),
     );
   });
 
+  it("salta i passi esclusi da when, anche in base all'uscita di un passo", async () => {
+    const w = wf(`
+name: t
+kind: develop
+version: 1
+steps:
+  - { id: richiesta, type: agent, instructions: classifica }
+  - id: bug
+    type: agent
+    instructions: riproduci
+    when: "startsWith(lower(trim(steps.richiesta.output)), 'tipo: fix')"
+  - { id: piano, type: agent, instructions: pianifica, effort: high }
+`);
+    for (const [output, steps] of [
+      ['TIPO: fix\\nil bottone non salva', ['richiesta', 'bug', 'piano']],
+      ['TIPO: implementazione\\nnuovo filtro', ['richiesta', 'piano']],
+    ] as const) {
+      const f = fakeHost({ agent: async () => ({ ok: true, output }) });
+      expect((await run(w, f, 'headless')).status).toBe('done');
+      expect(f.agentCalls.map((c) => c.stepId)).toEqual(steps);
+      expect(f.agentCalls.at(-1)?.effort).toBe('high');
+    }
+  });
+
   it('richiede di nuovo un valore fuori enum', async () => {
     const w = wf(`
 name: t
-kind: create
+kind: develop
 version: 1
 inputs:
   colore: { prompt: Colore?, enum: [rosso, blu], required: true }
@@ -211,7 +227,7 @@ steps:
 
   it('si ferma se la cartella esiste già', async () => {
     const f = fakeHost({ files: { 'progetti/jeko': '' } });
-    const out = await run(example, f, 'headless', { name: 'Jeko', type: 'vuoto' });
+    const out = await run(example, f, 'headless', { name: 'Jeko' });
     expect(out.status).toBe('failed');
     expect(out.error).toContain("Controllo 'check-dir' fallito");
     expect(f.agentCalls).toEqual([]);
@@ -225,7 +241,7 @@ steps:
         workflow: example,
         request: 'crea Jeko',
         mode: 'headless',
-        inputs: { name: 'Jeko', type: 'vuoto' },
+        inputs: { name: 'Jeko' },
       },
       f.host,
     );

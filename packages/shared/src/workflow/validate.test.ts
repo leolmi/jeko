@@ -1,11 +1,17 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { formatIssue, parseWorkflow, stringifyWorkflow, type WorkflowResult } from './validate.js';
+import { creationWorkflow, templateIssues } from './creation.js';
+import {
+  formatIssue,
+  parseWorkflow,
+  stringifyWorkflow,
+  validateWorkflow,
+  type WorkflowResult,
+} from './validate.js';
 
-const example = readFileSync(
-  new URL('../../workflows/nuovo-progetto.yaml', import.meta.url),
-  'utf8',
-);
+const builtinDir = new URL('../../workflows/', import.meta.url);
+const builtin = readdirSync(builtinDir).map((f) => readFileSync(new URL(f, builtinDir), 'utf8'));
+const example = readFileSync(new URL('sviluppo.yaml', builtinDir), 'utf8');
 
 const messages = (r: WorkflowResult) => (r.ok ? [] : r.issues.map(formatIssue));
 
@@ -17,19 +23,24 @@ steps:
 `;
 
 describe('workflow', () => {
-  it("accetta l'esempio nuovo-progetto", () => {
-    const r = parseWorkflow(example);
-    expect(messages(r)).toEqual([]);
-    expect(r.ok && r.workflow.steps.map((s) => s.id)).toEqual([
-      'projects-dir',
-      'check-dir',
-      'scaffold',
-      'git',
-      'gitignore',
-      'gitignore-ok',
-      'conoscenza',
-      'conoscenza-ok',
-      'commit',
+  it('accetta i workflow di serie', () => {
+    for (const yaml of builtin) expect(messages(parseWorkflow(yaml))).toEqual([]);
+  });
+
+  it('i workflow scritti sono solo di sviluppo', () => {
+    const r = parseWorkflow(example.replace('kind: develop', 'kind: create'));
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.issues[0]).toMatchObject({ path: ['kind'], line: 2 });
+  });
+
+  it('costruisce il workflow di creazione da un template', () => {
+    expect(messages(validateWorkflow(creationWorkflow()))).toEqual([]);
+    const wf = creationWorkflow('Usa {{ name }} in {{ dir }}');
+    const crea = wf.steps.find((s) => s.id === 'crea');
+    expect(crea?.type === 'agent' && crea.instructions).toContain('Usa {{ name }} in {{ dir }}');
+    expect(templateIssues('Usa {{ name }}')).toEqual([]);
+    expect(templateIssues('Usa {{ boh }}').map((i) => i.message)).toEqual([
+      "variabile non definita 'boh'",
     ]);
   });
 

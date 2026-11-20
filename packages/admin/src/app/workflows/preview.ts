@@ -101,6 +101,12 @@ function detail(s: Step): string {
             <p class="flex items-baseline gap-2 text-sm">
               <span class="font-medium">{{ s.title ?? s.id }}</span>
               <span class="font-mono text-xs text-faint">{{ s.type }} · {{ s.id }}</span>
+              @if (tuneOf(s); as t) {
+                <span
+                  class="rounded bg-sky-500/10 px-1.5 font-mono text-xs text-sky-700 dark:text-sky-400"
+                  >{{ t }}</span
+                >
+              }
             </p>
             @if (s.when) {
               <p class="font-mono text-xs text-violet-600 dark:text-violet-400">
@@ -142,6 +148,10 @@ export class WorkflowPreview {
   }
   protected detailOf(s: Step): string {
     return detail(s);
+  }
+  /** Modello e ragionamento di un passo agent, se il workflow li fissa. */
+  protected tuneOf(s: Step): string {
+    return s.type === 'agent' ? [s.model, s.effort].filter(Boolean).join(' · ') : '';
   }
   protected matchOf(m: string | string[]): string {
     return Array.isArray(m) ? m.join(', ') : m;

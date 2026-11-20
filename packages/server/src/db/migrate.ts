@@ -55,6 +55,18 @@ const migrations: string[] = [
   `CREATE TABLE settings (key text PRIMARY KEY, value jsonb NOT NULL)`,
   // Cartella del progetto: le sue run lavorano lì.
   `ALTER TABLE projects ADD COLUMN path text NOT NULL DEFAULT ''`,
+  // Workflow che guida i task del progetto (sempre l'ultima versione); null = il predefinito.
+  `ALTER TABLE projects ADD COLUMN workflow text`,
+  // Template per creare progetti con l'AI: prompt già pronti, con un nome.
+  `CREATE TABLE project_templates (
+     name text PRIMARY KEY,
+     prompt text NOT NULL,
+     updated_at timestamptz NOT NULL DEFAULT now()
+   )`,
+  // Le run di creazione portano con sé la definizione, costruita dal template: non è salvata
+  // tra i workflow, quindi il riferimento ai workflow non vale più per tutte le run.
+  `ALTER TABLE runs ADD COLUMN definition jsonb`,
+  `ALTER TABLE runs DROP CONSTRAINT IF EXISTS runs_workflow_name_workflow_version_fkey`,
 ];
 
 export async function migrate(db: Db): Promise<void> {

@@ -39,6 +39,8 @@ export class Workspace {
     );
     // Aprendo il filo di un task, il suo progetto diventa quello attivo.
     effect(() => {
+      const pid = /^\/progetti\/([^/?#]+)/.exec(url())?.[1];
+      if (pid && projects.list().some((p) => p.id === pid)) projects.activeId.set(pid);
       const id = /^\/runs\/([^/?#]+)/.exec(url())?.[1];
       const project = id && projects.of(runs.list().find((r) => r.id === id));
       if (project) projects.activeId.set(project.id);

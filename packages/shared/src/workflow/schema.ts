@@ -47,6 +47,11 @@ export const PolicySchema = Type.Object(
 );
 export type Policy = Static<typeof PolicySchema>;
 
+/** Quanto ragiona claude in un passo (`claude --effort`). */
+export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+export const EffortSchema = Type.Union(EFFORTS.map((e) => Type.Literal(e)));
+export type Effort = Static<typeof EffortSchema>;
+
 const stepBase = {
   id: Name,
   title: Type.Optional(Type.String()),
@@ -60,6 +65,12 @@ export const AgentStepSchema = Type.Object(
     instructions: TemplateSchema,
     cwd: Type.Optional(TemplateSchema),
     tools: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { uniqueItems: true })),
+    /** Ragionamento del passo (es. `high` per il piano); senza, quello predefinito di claude. */
+    effort: Type.Optional(EffortSchema),
+    /** Modello del passo (alias come `opus` o nome completo); senza, quello predefinito. */
+    model: Type.Optional(
+      Type.String({ minLength: 1, maxLength: 100, pattern: '^[A-Za-z0-9._\\[\\]-]+$' }),
+    ),
   },
   { additionalProperties: false },
 );

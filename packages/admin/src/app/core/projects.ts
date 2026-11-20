@@ -122,6 +122,14 @@ export class Projects {
     return project;
   }
 
+  /** Workflow che guida i task del progetto; null = il predefinito. */
+  async setWorkflow(id: string, workflow: string | null): Promise<void> {
+    const project = await firstValueFrom(
+      this.http.patch<Project>(`/api/projects/${id}`, { workflow }),
+    );
+    this.list.update((ps) => ps.map((p) => (p.id === id ? project : p)));
+  }
+
   /** Toglie il progetto dall'elenco: la cartella resta com'è. */
   async remove(id: string): Promise<void> {
     await firstValueFrom(this.http.delete(`/api/projects/${id}`));

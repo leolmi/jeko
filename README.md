@@ -49,4 +49,10 @@ Alla radice di ogni progetto gestito da Jeko:
 - `commands.yaml`: `nome: comando` senza shell (es. `test: npm test`), usati dai check con `commands: [typecheck, lint, test]`;
 - `notes/*.md`: cose imparate lavorando.
 
-Il runner la passa a claude nel primo turno di ogni run. `nuovo-progetto` la crea, `sviluppo` la aggiorna prima del gate finale.
+Il runner la passa a claude nel primo turno di ogni run. La creazione di un progetto la prepara, i workflow di sviluppo la aggiornano prima della chiusura.
+
+## Progetti e workflow
+
+- I workflow sono solo di sviluppo (`kind: develop`). Ogni progetto ne fissa uno nelle sue opzioni (⚙ accanto al nome), altrimenti vale il predefinito, cioè il primo per nome. Si usa sempre l'ultima versione.
+- Nei passi `agent`, `effort` (`low`…`max`) e `model` (es. `opus`) diventano `claude --effort/--model`. Esempio: `sviluppo-completo.yaml`.
+- I progetti nuovi li crea l'AI, partendo da un template, cioè un prompt già pronto con un nome, che si gestisce in "Nuovo progetto". Nel prompt valgono `{{ name }}`, `{{ dir }}` e `{{ request }}`. Al termine il progetto entra da solo nell'elenco.

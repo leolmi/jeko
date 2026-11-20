@@ -26,6 +26,8 @@ describe('claude', () => {
       'settings.json',
     ]);
     expect(claudeArgs({ sessionId: 's1', resume: true })).toContain('--resume');
+    const tuned = claudeArgs({ sessionId: 's1', resume: true, effort: 'high', model: 'opus' });
+    expect(tuned.join(' ')).toContain('--effort high --model opus');
   });
 
   it('trova il risultato in uno stream-json, anche con una riga a metà', () => {

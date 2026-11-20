@@ -242,7 +242,8 @@ export const FINAL_STATUSES: readonly RunRowStatus[] = ['done', 'failed', 'rejec
 
 export const StartRunSchema = Type.Object(
   {
-    workflow: Type.String({ minLength: 1 }),
+    /** Senza workflow: quello del progetto della cartella, o il predefinito. */
+    workflow: Type.Optional(Type.String({ minLength: 1 })),
     version: Type.Optional(Type.Integer({ minimum: 1 })),
     request: Type.String({ minLength: 1 }),
     mode: RunModeSchema,
@@ -252,6 +253,18 @@ export const StartRunSchema = Type.Object(
   { additionalProperties: false },
 );
 export type StartRun = Static<typeof StartRunSchema>;
+
+/** Nuovo progetto creato da Jeko: nome, richiesta e, se c'è, il template da seguire. */
+export const CreateProjectRunSchema = Type.Object(
+  {
+    name: Type.String({ minLength: 1, maxLength: 120, pattern: '\\S' }),
+    request: Type.String({ minLength: 1 }),
+    template: Type.Optional(Type.String({ minLength: 1 })),
+    mode: RunModeSchema,
+  },
+  { additionalProperties: false },
+);
+export type CreateProjectRun = Static<typeof CreateProjectRunSchema>;
 
 export const RunSummarySchema = Type.Object({
   id: Id,

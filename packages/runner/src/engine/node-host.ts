@@ -58,6 +58,8 @@ export function createNodeHost(opts: NodeHostOptions): Host {
         cwd,
         sessionId: req.sessionId,
         allowedTools: req.tools,
+        effort: req.effort,
+        model: req.model,
         signal: req.signal,
         onActivity: req.onActivity,
         ...(permissions && {

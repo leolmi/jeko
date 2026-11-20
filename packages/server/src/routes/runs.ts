@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { AnswerSchema, Id, RunSummarySchema, StartRunSchema } from '@jeko/shared';
 import { Type } from '@sinclair/typebox';
+import type { ProjectStore } from '../projects/store.js';
 import type { RunnerHub } from '../runs/hub.js';
 import type { RunStore } from '../runs/store.js';
 import type { WorkflowStore } from '../workflows/store.js';
@@ -10,8 +11,9 @@ const RunParams = Type.Object({ id: Id });
 export const runRoutes: FastifyPluginAsyncTypebox<{
   runs: RunStore;
   workflows: WorkflowStore;
+  projects: ProjectStore;
   hub: RunnerHub;
-}> = async (app, { runs, workflows, hub }) => {
+}> = async (app, { runs, workflows, projects, hub }) => {
   app.get('/api/runs', { schema: { response: { 200: Type.Array(RunSummarySchema) } } }, () =>
     runs.list(),
   );
@@ -31,9 +33,15 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (req, reply) => {
-      const { workflow, version, ...rest } = req.body;
-      const def = await workflows.definition(workflow, version);
-      if (!def) return reply.code(404).send({ message: `Workflow '${workflow}' non trovato` });
+      const { version, ...rest } = req.body;
+      // Senza workflow: quello del progetto della cartella, o il predefinito di sviluppo.
+      const workflow =
+        req.body.workflow ??
+        (await projects.byPath(req.body.cwd))?.workflow ??
+        (await workflows.defaultOf('develop'));
+      const def = workflow ? await workflows.definition(workflow, version) : null;
+      if (!workflow || def?.workflow.kind !== 'develop')
+        return reply.code(404).send({ message: `Workflow '${workflow ?? ''}' non trovato` });
       const run = await runs.create({ ...rest, workflow, version: def.version });
       await hub.start();
       return reply.code(201).send((await runs.get(run.id))!);

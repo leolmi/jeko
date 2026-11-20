@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -9,16 +9,18 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import type { RunMode, WorkflowRecord } from '@jeko/shared';
+import { kebab, type RunMode } from '@jeko/shared';
 import { firstValueFrom } from 'rxjs';
 import { I18n } from '../core/i18n';
 import { Projects } from '../core/projects';
 import { Realtime } from '../core/realtime';
 import { Runs } from '../core/runs';
 import { completeProjectDir, projectDirHint, Settings } from '../core/settings';
+import { Templates } from '../core/templates';
 import { Icon } from '../ui/icon';
 import { Segmented, type SegmentOption } from '../ui/segmented';
 import { MODES } from './composer';
+import { TemplateEditor } from './template-editor';
 
 /** Nome proposto dalla cartella: il suo ultimo pezzo. */
 const nameOf = (path: string) =>
@@ -31,7 +33,7 @@ const nameOf = (path: string) =>
 /** Nuovo progetto: una cartella che c'è già, oppure un progetto da creare con Jeko. */
 @Component({
   selector: 'jk-new-project',
-  imports: [FormsModule, Icon, Segmented],
+  imports: [FormsModule, Icon, Segmented, TemplateEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
   template: `
@@ -91,49 +93,57 @@ const nameOf = (path: string) =>
         </div>
       </form>
 
-      @if (createFlows().length) {
-        <form class="mt-4 rounded-xl border border-line bg-surface p-4" (ngSubmit)="create()">
-          <p class="text-sm font-medium">{{ i18n.t('new.create') }}</p>
-          <p class="mt-0.5 text-xs text-faint">{{ i18n.t('new.create.hint') }}</p>
-          <textarea
-            class="jk-input mt-3 resize-none text-sm leading-relaxed"
-            rows="3"
-            name="request"
-            [attr.aria-label]="i18n.t('composer.request')"
-            [placeholder]="i18n.t('composer.request.create')"
-            [(ngModel)]="request"
-            (keydown.control.enter)="create()"
-          ></textarea>
-          <div class="mt-3 flex flex-wrap items-center gap-3">
-            <jk-segmented [label]="i18n.t('composer.mode')" [options]="modes()" [(value)]="mode" />
-            @if (createFlows().length > 1) {
-              <select
-                class="jk-input w-auto py-1 text-sm"
-                name="workflow"
-                [attr.aria-label]="i18n.t('composer.workflow')"
-                [(ngModel)]="workflow"
+      <form class="mt-4 rounded-xl border border-line bg-surface p-4" (ngSubmit)="create()">
+        <p class="text-sm font-medium">{{ i18n.t('new.create') }}</p>
+        <p class="mt-0.5 text-xs text-faint">{{ i18n.t('new.create.hint') }}</p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr]">
+          <label class="block">
+            <span class="jk-label">{{ i18n.t('new.name') }}</span>
+            <input class="jk-input mt-1" name="newName" autocomplete="off" [(ngModel)]="newName" />
+            @if (newName().trim() && settings.value()?.projectsDir; as dir) {
+              <span class="mt-1 block truncate font-mono text-xs text-faint"
+                >{{ dir }}\\{{ slug(newName()) }}</span
               >
-                @for (w of createFlows(); track w.name) {
-                  <option [value]="w.name">{{ w.name }}</option>
-                }
-              </select>
             }
-            <button
-              class="jk-btn-primary ml-auto"
-              type="submit"
-              [disabled]="!request().trim() || busy()"
-            >
-              <jk-icon name="send" [size]="16" />
-              {{ i18n.t('composer.send') }}
-            </button>
-          </div>
-          @if (createError()) {
-            <p class="mt-2 text-sm text-red-600 dark:text-red-400">
-              {{ i18n.t('composer.error') }}
-            </p>
-          }
-        </form>
-      }
+          </label>
+          <label class="block">
+            <span class="jk-label">{{ i18n.t('tpl.template') }}</span>
+            <select class="jk-input mt-1 text-sm" name="template" [(ngModel)]="template">
+              <option value="">{{ i18n.t('tpl.none') }}</option>
+              @for (t of templates.list(); track t.name) {
+                <option [value]="t.name">{{ t.name }}</option>
+              }
+            </select>
+          </label>
+        </div>
+        <textarea
+          class="jk-input mt-3 resize-none text-sm leading-relaxed"
+          rows="3"
+          name="request"
+          [attr.aria-label]="i18n.t('composer.request')"
+          [placeholder]="i18n.t('composer.request.create')"
+          [(ngModel)]="request"
+          (keydown.control.enter)="create()"
+        ></textarea>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <jk-segmented [label]="i18n.t('composer.mode')" [options]="modes()" [(value)]="mode" />
+          <button class="jk-btn-primary ml-auto" type="submit" [disabled]="!canCreate() || busy()">
+            <jk-icon name="send" [size]="16" />
+            {{ i18n.t('composer.send') }}
+          </button>
+        </div>
+        @if (createError()) {
+          <p class="mt-2 text-sm text-red-600 dark:text-red-400">
+            {{ i18n.t('composer.error') }}
+          </p>
+        }
+      </form>
+
+      <details class="mt-4 rounded-xl border border-line bg-surface p-4">
+        <summary class="cursor-pointer text-sm font-medium">{{ i18n.t('tpl.manage') }}</summary>
+        <p class="mt-1 text-xs text-faint">{{ i18n.t('tpl.manage.hint') }}</p>
+        <jk-template-editor class="mt-3" [(selected)]="editing" />
+      </details>
     </div>
   `,
 })
@@ -142,7 +152,7 @@ export class NewProject {
   private readonly projects = inject(Projects);
   private readonly runs = inject(Runs);
   private readonly router = inject(Router);
-  private readonly settings = inject(Settings);
+  protected readonly settings = inject(Settings);
 
   protected readonly path = signal('');
   protected readonly name = signal('');
@@ -157,12 +167,14 @@ export class NewProject {
   private readonly http = inject(HttpClient);
   protected readonly picking = signal(false);
 
-  private readonly workflows = httpResource<WorkflowRecord[]>(() => '/api/workflows');
-  protected readonly createFlows = computed(() =>
-    (this.workflows.hasValue() ? this.workflows.value() : []).filter((w) => w.kind === 'create'),
-  );
-  protected readonly workflow = linkedSignal(() => this.createFlows()[0]?.name ?? '');
+  protected readonly templates = inject(Templates);
+  protected readonly newName = signal('');
+  protected readonly template = signal('');
+  /** Template aperto nell'editor: segue quello scelto per la creazione. */
+  protected readonly editing = linkedSignal(() => this.template());
+  protected readonly slug = kebab;
   protected readonly request = signal('');
+  protected readonly canCreate = computed(() => !!this.newName().trim() && !!this.request().trim());
   protected readonly mode = signal<RunMode>('checkpoint');
   protected readonly modes = computed((): SegmentOption<RunMode>[] =>
     MODES.map((m) => ({
@@ -231,11 +243,17 @@ export class NewProject {
   }
 
   protected create(): void {
-    const request = this.request().trim();
-    if (!request || !this.workflow() || this.busy()) return;
+    if (!this.canCreate() || this.busy()) return;
     this.busy.set(true);
     this.createError.set(false);
-    this.runs.start({ workflow: this.workflow(), request, mode: this.mode() }).subscribe({
+    const template = this.template();
+    const body = {
+      name: this.newName().trim(),
+      request: this.request().trim(),
+      mode: this.mode(),
+      ...(template && { template }),
+    };
+    this.runs.createProject(body).subscribe({
       next: (run) => {
         this.busy.set(false);
         void this.router.navigate(['/runs', run.id]);

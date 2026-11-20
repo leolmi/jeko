@@ -1,3 +1,4 @@
+export * from './creation.js';
 export * from './expr.js';
 export * from './run.js';
 export * from './schema.js';

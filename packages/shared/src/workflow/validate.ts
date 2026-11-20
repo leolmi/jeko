@@ -245,7 +245,13 @@ export function parseWorkflow(text: string): WorkflowResult {
     };
   }
 
-  const result = validateWorkflow(doc.toJS());
+  let result = validateWorkflow(doc.toJS());
+  // I progetti nuovi nascono dai template: i workflow scritti dall'utente sono di sviluppo.
+  if (result.ok && result.workflow.kind !== 'develop')
+    result = {
+      ok: false,
+      issues: [{ path: ['kind'], message: "solo 'develop': i progetti si creano dai template" }],
+    };
   if (result.ok) return result;
 
   return {
