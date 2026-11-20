@@ -21,7 +21,8 @@ export function installerScript(opts: { serverUrl: string; token: string; at: Da
     '',
     '$node = Get-Command node -ErrorAction SilentlyContinue',
     "if (-not $node) { throw 'Node.js non trovato: installa Node 22 o successivo e riprova.' }",
-    '$major = [int](& $node.Source -p \'process.versions.node.split(".")[0]\')',
+    // Niente `node -p` con virgolette: PowerShell 5.1 le toglie dagli argomenti.
+    "$major = [int]((& $node.Source --version).TrimStart('v').Split('.')[0])",
     'if ($major -lt 22) { throw "Serve Node 22 o successivo (trovato $major)." }',
     '',
     "$Base = Join-Path $env:LOCALAPPDATA 'jeko'",
