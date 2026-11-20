@@ -159,7 +159,8 @@ const it = {
   'check.server.api.title': 'API del server',
   'check.server.api.fix': 'Avvia il server con npm run dev:server.',
   'check.server.database.title': 'Database',
-  'check.server.database.fix': 'Controlla DATABASE_URL e che Postgres sia avviato.',
+  'check.server.database.fix':
+    'Avvia il database con docker compose up -d (o controlla DATABASE_URL).',
   'check.server.workflows.title': 'Workflow disponibili',
   'check.server.workflows.fix': 'Nessun workflow: riavvia il server per caricare quelli di serie.',
   'check.node.title': 'Node.js 22 o successivo',
@@ -337,7 +338,8 @@ const en: Record<I18nKey, string> = {
   'check.server.api.title': 'Server API',
   'check.server.api.fix': 'Start the server with npm run dev:server.',
   'check.server.database.title': 'Database',
-  'check.server.database.fix': 'Check DATABASE_URL and that Postgres is running.',
+  'check.server.database.fix':
+    'Start the database with docker compose up -d (or check DATABASE_URL).',
   'check.server.workflows.title': 'Available workflows',
   'check.server.workflows.fix': 'No workflows: restart the server to load the built-in ones.',
   'check.node.title': 'Node.js 22 or later',

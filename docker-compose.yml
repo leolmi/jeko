@@ -1,0 +1,24 @@
+# Database di Jeko. Avvio: docker compose up -d   (oppure: podman compose up -d)
+# Solo in locale (127.0.0.1): il server di Jeko gira fuori dal container e si collega qui.
+name: jeko
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jeko
+      POSTGRES_USER: jeko
+      POSTGRES_PASSWORD: jeko
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U jeko -d jeko']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db:

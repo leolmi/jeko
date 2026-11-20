@@ -6,7 +6,8 @@ import { createPgDb } from './db/db.js';
 import { migrate } from './db/migrate.js';
 import { WorkflowStore } from './workflows/store.js';
 
-const db = createPgDb(process.env.DATABASE_URL ?? 'postgres://localhost:5432/jeko');
+// Di default il Postgres di docker-compose.yml.
+const db = createPgDb(process.env.DATABASE_URL ?? 'postgres://jeko:jeko@127.0.0.1:5432/jeko');
 await migrate(db);
 
 // Workflow di serie (da src/ o dist/ la cartella è la stessa).
