@@ -98,6 +98,13 @@ export const RunnerToServerSchema = Type.Union([
   }),
   /** Fine del reinvio dopo `hello`: ora il server può (ri)avviare le run. */
   Type.Object({ type: Type.Literal('ready') }),
+  /** Risposta di claude a una richiesta di assistenza (`text`), o l'errore. */
+  Type.Object({
+    type: Type.Literal('assist.result'),
+    requestId: Type.String({ minLength: 1 }),
+    text: Type.Union([Type.String(), Type.Null()]),
+    error: Type.Optional(Type.String()),
+  }),
   /** Cartella scelta col dialogo del PC: `path` null se l'utente ha annullato. */
   Type.Object({
     type: Type.Literal('folder.picked'),
@@ -139,6 +146,12 @@ export const ServerToRunnerSchema = Type.Union([
   Type.Object({ type: Type.Literal('run.cancel'), runId: Type.String() }),
   /** Rifai le verifiche dell'ambiente e rimandale. */
   Type.Object({ type: Type.Literal('checks.request') }),
+  /** Chiedi a claude, senza strumenti né progetto, una risposta testuale al prompt. */
+  Type.Object({
+    type: Type.Literal('assist.request'),
+    requestId: Type.String({ minLength: 1 }),
+    prompt: Type.String({ minLength: 1 }),
+  }),
   /** Apri sul PC il dialogo di scelta di una cartella e rimanda quella scelta. */
   Type.Object({
     type: Type.Literal('folder.pick'),
@@ -164,6 +177,38 @@ export const PickFolderSchema = Type.Object(
   { additionalProperties: false },
 );
 export type PickFolder = Static<typeof PickFolderSchema>;
+
+export const IssueSchema = Type.Object({
+  path: Type.Array(Type.Union([Type.String(), Type.Number()])),
+  message: Type.String(),
+  line: Type.Optional(Type.Integer()),
+  col: Type.Optional(Type.Integer()),
+});
+
+/** Esito della verifica di uno YAML: il workflow letto, o gli errori con la riga. */
+export const WorkflowCheckSchema = Type.Union([
+  Type.Object({ ok: Type.Literal(true), workflow: WorkflowSchema }),
+  Type.Object({ ok: Type.Literal(false), issues: Type.Array(IssueSchema) }),
+]);
+export type WorkflowCheck = Static<typeof WorkflowCheckSchema>;
+
+/** Modifica di un workflow chiesta all'AI: lo YAML attuale e cosa cambiare. */
+export const AssistWorkflowSchema = Type.Object(
+  {
+    yaml: Type.String({ maxLength: 100_000 }),
+    request: Type.String({ minLength: 1, maxLength: 4000 }),
+  },
+  { additionalProperties: false },
+);
+export type AssistWorkflow = Static<typeof AssistWorkflowSchema>;
+
+/** Proposta dell'AI: lo YAML nuovo, un riassunto e gli errori rimasti (vuoti se valido). */
+export const WorkflowProposalSchema = Type.Object({
+  yaml: Type.String(),
+  summary: Type.String(),
+  issues: Type.Array(IssueSchema),
+});
+export type WorkflowProposal = Static<typeof WorkflowProposalSchema>;
 
 // ---------- REST ----------
 

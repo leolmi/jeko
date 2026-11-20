@@ -14,6 +14,10 @@ export const routes: Routes = [
     ],
   },
   {
+    path: 'workflow',
+    loadComponent: () => import('./workflows/workflows-page').then((m) => m.WorkflowsPage),
+  },
+  {
     path: 'opzioni',
     loadComponent: () => import('./settings/settings-page').then((m) => m.SettingsPage),
   },

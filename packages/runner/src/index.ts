@@ -1,6 +1,7 @@
 import { hostname, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { claudeAssistant } from './assist.js';
 import { RunnerClient } from './client.js';
 import { loadConfig } from './config.js';
 import { runDiagnostics } from './diagnostics.js';
@@ -37,6 +38,7 @@ const client = new RunnerClient({
   version: VERSION,
   dataDir,
   pickFolder: systemFolderPicker(),
+  assist: claudeAssistant(claude),
   diagnose: () => runDiagnostics({ claude, dataDir, scriptsDir, permissionsEndpoint: true }),
   makeHost: (io, start, { runDir }) =>
     createNodeHost({

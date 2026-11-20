@@ -12,6 +12,7 @@ import {
   type ServerToRunner,
 } from '@jeko/shared';
 import { runWorkflow, type Host } from './engine/engine.js';
+import type { Assistant } from './assist.js';
 import type { FolderPicker } from './folder-picker.js';
 import { Journals } from './journal.js';
 
@@ -31,6 +32,8 @@ export interface ClientOptions {
   reconnectMs?: number;
   /** Verifiche dell'ambiente, inviate dopo ogni collegamento e su richiesta del server. */
   diagnose?: () => Promise<Check[]>;
+  /** Risposte di claude alle richieste di assistenza; senza, ricevono un errore. */
+  assist?: Assistant | undefined;
   /** Dialogo di scelta cartella del PC; senza, le richieste ricevono un errore. */
   pickFolder?: FolderPicker | undefined;
   log?: Pick<Console, 'info' | 'warn' | 'error'>;
@@ -204,11 +207,28 @@ export class RunnerClient {
         return this.sendChecks();
       case 'folder.pick':
         return void this.pickFolder(msg);
+      case 'assist.request':
+        return void this.assist(msg);
       case 'run.ack': {
         this.journals.get(msg.runId).ack(msg.seq);
         if (!this.sessions.has(msg.runId)) this.journals.dropIfSettled(msg.runId);
         return;
       }
+    }
+  }
+
+  // ---------- assistenza ----------
+
+  private async assist(msg: Extract<ServerToRunner, { type: 'assist.request' }>): Promise<void> {
+    const reply = (text: string | null, error?: string) =>
+      this.raw({ type: 'assist.result', requestId: msg.requestId, text, ...(error && { error }) });
+    if (!this.opts.assist) return reply(null, 'Assistenza non disponibile');
+    try {
+      reply(await this.opts.assist(msg.prompt));
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      this.log.warn(`assistenza: ${reason}`);
+      reply(null, reason);
     }
   }
 

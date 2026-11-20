@@ -54,7 +54,7 @@ export async function buildApp({
   }));
 
   await app.register(projectRoutes, { projects, hub });
-  await app.register(workflowRoutes, { workflows });
+  await app.register(workflowRoutes, { workflows, hub });
   await app.register(runRoutes, { runs, workflows, hub });
   await app.register(setupRoutes, { db, hub, tokens, version: VERSION });
   await app.register(runnerRoutes, { tokens, runnerDist, serverUrl });

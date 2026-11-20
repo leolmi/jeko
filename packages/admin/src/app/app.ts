@@ -49,6 +49,15 @@ const SPLASH_MS = 600;
             </span>
             <jk-prefs />
             <a
+              routerLink="/workflow"
+              class="jk-btn-ghost px-2"
+              routerLinkActive="bg-subtle !text-fg"
+              [title]="i18n.t('nav.workflows')"
+              [attr.aria-label]="i18n.t('nav.workflows')"
+            >
+              <jk-icon name="account_tree" [size]="18" />
+            </a>
+            <a
               routerLink="/opzioni"
               class="jk-btn-ghost px-2"
               routerLinkActive="bg-subtle !text-fg"

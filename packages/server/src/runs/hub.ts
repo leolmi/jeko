@@ -23,6 +23,8 @@ const isRunnerMessage = validator(RunnerToServerSchema);
 
 /** Quanto si aspetta che l'utente scelga una cartella nel dialogo. */
 const PICK_TIMEOUT_MS = 10 * 60_000;
+/** Quanto si aspetta una risposta di claude a una richiesta di assistenza. */
+const ASSIST_TIMEOUT_MS = 5 * 60_000;
 
 export type AnswerOutcome = 'ok' | 'not-found' | 'already-answered' | 'wrong-kind';
 
@@ -41,8 +43,8 @@ export class RunnerHub {
   private checks: { list: Check[]; at: string } | null = null;
   private readonly admins = new Set<WebSocket>();
   private pumping: Promise<void> = Promise.resolve();
-  /** Dialoghi di scelta cartella aperti sul PC, in attesa della risposta. */
-  private readonly picks = new Map<
+  /** Richieste al runner (dialogo della cartella, assistenza) in attesa della risposta. */
+  private readonly requests = new Map<
     string,
     { resolve: (path: string | null) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
   >();
@@ -79,27 +81,36 @@ export class RunnerHub {
    * il percorso, o null se l'utente annulla. Fallisce se il runner manca o si scollega.
    */
   pickFolder(opts: { start?: string; title?: string }, timeoutMs = PICK_TIMEOUT_MS) {
+    return this.request(timeoutMs, (requestId) => ({
+      type: 'folder.pick',
+      requestId,
+      ...(opts.start && { start: opts.start }),
+      ...(opts.title && { title: opts.title }),
+    }));
+  }
+
+  /** Chiede a claude, tramite il runner, una risposta testuale a un prompt. */
+  assist(prompt: string, timeoutMs = ASSIST_TIMEOUT_MS) {
+    return this.request(timeoutMs, (requestId) => ({ type: 'assist.request', requestId, prompt }));
+  }
+
+  /** Manda una richiesta al runner e ne attende la risposta (errori: offline, timeout…). */
+  private request(timeoutMs: number, build: (requestId: string) => ServerToRunner) {
     return new Promise<string | null>((resolve, reject) => {
       const requestId = randomUUID();
-      const timer = setTimeout(() => this.settlePick(requestId, new Error('timeout')), timeoutMs);
-      this.picks.set(requestId, { resolve, reject, timer });
-      const sent = this.sendRunner({
-        type: 'folder.pick',
-        requestId,
-        ...(opts.start && { start: opts.start }),
-        ...(opts.title && { title: opts.title }),
-      });
-      if (!sent) this.settlePick(requestId, new Error('offline'));
+      const timer = setTimeout(() => this.settle(requestId, new Error('timeout')), timeoutMs);
+      this.requests.set(requestId, { resolve, reject, timer });
+      if (!this.sendRunner(build(requestId))) this.settle(requestId, new Error('offline'));
     });
   }
 
-  private settlePick(requestId: string, result: string | null | Error): void {
-    const pick = this.picks.get(requestId);
-    if (!pick) return;
-    this.picks.delete(requestId);
-    clearTimeout(pick.timer);
-    if (result instanceof Error) pick.reject(result);
-    else pick.resolve(result);
+  private settle(requestId: string, result: string | null | Error): void {
+    const pending = this.requests.get(requestId);
+    if (!pending) return;
+    this.requests.delete(requestId);
+    clearTimeout(pending.timer);
+    if (result instanceof Error) pending.reject(result);
+    else pending.resolve(result);
   }
 
   // ---------- connessioni ----------
@@ -118,7 +129,7 @@ export class RunnerHub {
       if (this.runner?.socket !== socket) return;
       this.runner = null;
       this.checks = null;
-      for (const id of [...this.picks.keys()]) this.settlePick(id, new Error('offline'));
+      for (const id of [...this.requests.keys()]) this.settle(id, new Error('offline'));
       this.broadcast({ type: 'runner', connected: false });
     });
   }
@@ -198,7 +209,9 @@ export class RunnerHub {
         this.checks = { list: msg.checks, at: new Date().toISOString() };
         return;
       case 'folder.picked':
-        return this.settlePick(msg.requestId, msg.error ? new Error(msg.error) : msg.path);
+        return this.settle(msg.requestId, msg.error ? new Error(msg.error) : msg.path);
+      case 'assist.result':
+        return this.settle(msg.requestId, msg.error ? new Error(msg.error) : msg.text);
     }
   }
 

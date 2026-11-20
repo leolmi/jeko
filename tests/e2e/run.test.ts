@@ -79,6 +79,11 @@ describe('run server ↔ runner', () => {
       log: { info: () => {}, warn: () => {}, error: () => {} },
       // Finto dialogo: "sceglie" una sottocartella di quella di partenza, o annulla.
       pickFolder: async ({ start }) => (start ? `${start}\\scelta` : null),
+      // Finto claude: rimette il workflow attuale con una descrizione nuova.
+      assist: async (prompt) => {
+        const yaml = /Workflow attuale:\n```yaml\n([\s\S]*?)```/.exec(prompt)![1]!;
+        return `SUMMARY: descrizione aggiunta\n\`\`\`yaml\n${yaml}description: Rivisto\n\`\`\``;
+      },
       makeHost: (io): Host => ({
         ...io,
         functions: {},
@@ -264,6 +269,32 @@ steps:
       return list.length > 0 && list;
     });
     expect(projects).toMatchObject([{ name: 'Nuovo', path: 'C:\\progetti\\Nuovo' }]);
+  });
+
+  it('verifica uno YAML senza salvarlo', async () => {
+    const check = (yaml: string) =>
+      api<{ ok: boolean; issues?: { line?: number }[] }>('POST', '/api/workflows/check', { yaml });
+    expect((await check(WORKFLOW)).body).toMatchObject({ ok: true, workflow: { name: 'demo' } });
+    const bad = await check('name: x\nkind: develop\nversion: 1\nsteps: []\n');
+    expect(bad.body).toMatchObject({ ok: false, issues: [{ line: 4 }] });
+    expect((await api('GET', '/api/workflows/demo')).body).toHaveLength(1);
+  });
+
+  it("chiede all'AI una modifica del workflow, senza salvarla", async () => {
+    const assist = () =>
+      api<{ yaml: string; summary: string; issues: unknown[] }>('POST', '/api/workflows/assist', {
+        yaml: WORKFLOW,
+        request: 'aggiungi una descrizione',
+      });
+    expect((await assist()).status).toBe(409);
+
+    startRunner();
+    await until(async () => (await api<{ runner: boolean }>('GET', '/api/health')).body.runner);
+    const res = await assist();
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ summary: 'descrizione aggiunta', issues: [] });
+    expect(res.body.yaml).toContain('description: Rivisto');
+    expect((await api('GET', '/api/workflows/demo')).body).toHaveLength(1);
   });
 
   it('apre il dialogo della cartella sul PC del runner', async () => {
