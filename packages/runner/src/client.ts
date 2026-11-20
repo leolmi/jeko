@@ -9,8 +9,10 @@ import {
   type RunEvent,
   type RunnerToServer,
   type RunStart,
+  type ServerToRunner,
 } from '@jeko/shared';
 import { runWorkflow, type Host } from './engine/engine.js';
+import type { FolderPicker } from './folder-picker.js';
 import { Journals } from './journal.js';
 
 /** La parte dell'host che passa dal server: domande, approvazioni, revisioni ed eventi. */
@@ -29,6 +31,8 @@ export interface ClientOptions {
   reconnectMs?: number;
   /** Verifiche dell'ambiente, inviate dopo ogni collegamento e su richiesta del server. */
   diagnose?: () => Promise<Check[]>;
+  /** Dialogo di scelta cartella del PC; senza, le richieste ricevono un errore. */
+  pickFolder?: FolderPicker | undefined;
   log?: Pick<Console, 'info' | 'warn' | 'error'>;
 }
 
@@ -198,11 +202,40 @@ export class RunnerClient {
       }
       case 'checks.request':
         return this.sendChecks();
+      case 'folder.pick':
+        return void this.pickFolder(msg);
       case 'run.ack': {
         this.journals.get(msg.runId).ack(msg.seq);
         if (!this.sessions.has(msg.runId)) this.journals.dropIfSettled(msg.runId);
         return;
       }
+    }
+  }
+
+  // ---------- scelta cartella ----------
+
+  private picking = false;
+
+  /** Un dialogo alla volta: un secondo, mentre il primo è aperto, riceve un errore. */
+  private async pickFolder(msg: Extract<ServerToRunner, { type: 'folder.pick' }>): Promise<void> {
+    const reply = (path: string | null, error?: string) =>
+      this.raw({ type: 'folder.picked', requestId: msg.requestId, path, ...(error && { error }) });
+    const pick = this.opts.pickFolder;
+    if (!pick) return reply(null, 'Dialogo non disponibile su questo sistema');
+    if (this.picking) return reply(null, 'C’è già un dialogo aperto');
+    this.picking = true;
+    try {
+      reply(
+        await pick({
+          ...(msg.start && { start: msg.start }),
+          ...(msg.title && { title: msg.title }),
+        }),
+      );
+    } catch (e) {
+      this.log.warn(`dialogo della cartella: ${e instanceof Error ? e.message : String(e)}`);
+      reply(null, 'Dialogo non riuscito');
+    } finally {
+      this.picking = false;
     }
   }
 

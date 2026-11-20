@@ -3,13 +3,16 @@ import type { Routes } from '@angular/router';
 export const routes: Routes = [
   {
     path: '',
-    loadComponent: () => import('./chat/chat').then((m) => m.Chat),
+    loadComponent: () => import('./workspace/workspace').then((m) => m.Workspace),
     children: [
-      { path: '', loadComponent: () => import('./chat/composer').then((m) => m.Composer) },
+      { path: '', loadComponent: () => import('./workspace/tasks').then((m) => m.Tasks) },
       { path: 'runs/:id', loadComponent: () => import('./chat/thread').then((m) => m.Thread) },
+      {
+        path: 'nuovo',
+        loadComponent: () => import('./workspace/new-project').then((m) => m.NewProject),
+      },
     ],
   },
-  { path: 'progetti', loadComponent: () => import('./projects/projects').then((m) => m.Projects) },
   {
     path: 'opzioni',
     loadComponent: () => import('./settings/settings-page').then((m) => m.SettingsPage),

@@ -14,7 +14,7 @@ import type { Db } from '../db/db.js';
 import { iso, json } from '../db/sql.js';
 
 const RUN_COLUMNS = `id, workflow_name AS workflow, workflow_version AS version, request, mode,
-  status, error, ${iso('created_at')} AS "createdAt", ${iso('updated_at')} AS "updatedAt"`;
+  status, error, cwd, ${iso('created_at')} AS "createdAt", ${iso('updated_at')} AS "updatedAt"`;
 
 const PROMPT_COLUMNS = `id, run_id AS "runId", prompt, answer, status, ${iso('created_at')} AS "createdAt"`;
 
@@ -52,7 +52,7 @@ export class RunStore {
     return rows[0]!;
   }
 
-  async list(limit = 50): Promise<RunSummary[]> {
+  async list(limit = 200): Promise<RunSummary[]> {
     const { rows } = await this.db.query<RunSummary>(
       `SELECT ${RUN_COLUMNS} FROM runs ORDER BY created_at DESC LIMIT $1`,
       [limit],
@@ -91,6 +91,15 @@ export class RunStore {
        FROM runs WHERE status IN ('queued', 'running', 'waiting') ORDER BY created_at`,
     );
     return rows;
+  }
+
+  /** Valori della run (input e variabili) dall'ultimo stato salvato. */
+  async values(id: string): Promise<Record<string, unknown>> {
+    const { rows } = await this.db.query<{ state: RunState | null }>(
+      `SELECT state FROM runs WHERE id = $1`,
+      [id],
+    );
+    return rows[0]?.state?.values ?? {};
   }
 
   async setStatus(id: string, status: RunRowStatus, error: string | null = null): Promise<void> {

@@ -1,7 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { filter, map } from 'rxjs';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { I18n } from './core/i18n';
 import { Realtime } from './core/realtime';
 import { Setup } from './core/setup';
@@ -36,20 +34,6 @@ const SPLASH_MS = 600;
               <span class="font-mono text-lg font-semibold tracking-tight">jeko</span>
               <span class="hidden text-xs text-faint sm:inline">{{ i18n.t('app.tagline') }}</span>
             </a>
-            <nav class="flex gap-1 text-sm">
-              <a
-                routerLink="/"
-                class="rounded-md px-2.5 py-1 text-muted transition-colors hover:text-fg"
-                [class]="onProjects() ? '' : 'bg-subtle !text-fg'"
-                >{{ i18n.t('nav.chat') }}</a
-              >
-              <a
-                routerLink="/progetti"
-                class="rounded-md px-2.5 py-1 text-muted transition-colors hover:text-fg"
-                routerLinkActive="bg-subtle text-fg"
-                >{{ i18n.t('nav.projects') }}</a
-              >
-            </nav>
             <span class="ml-auto flex items-center gap-2 text-xs text-muted" aria-live="polite">
               <span
                 class="size-2 rounded-full"
@@ -96,17 +80,6 @@ export class App {
   protected readonly rt = inject(Realtime);
   protected readonly setup = inject(Setup);
   private readonly minDelay = signal(true);
-  private readonly url = toSignal(
-    inject(Router).events.pipe(
-      filter((e) => e instanceof NavigationEnd),
-      map((e) => e.urlAfterRedirects),
-    ),
-    { initialValue: '/' },
-  );
-  /** "Chat" è attiva ovunque tranne che in Progetti. */
-  /** Su una pagina che non è la chat (Progetti, Opzioni). */
-  protected readonly onProjects = computed(() => /^\/(progetti|opzioni)/.test(this.url()));
-
   protected readonly phase = computed(() => {
     const s = this.setup.status();
     if (!s || this.minDelay()) return 'splash';

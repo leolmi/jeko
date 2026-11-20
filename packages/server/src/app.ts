@@ -3,9 +3,10 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
-import { CreateProjectSchema, HealthSchema, ProjectSchema, type Project } from '@jeko/shared';
-import { Type } from '@sinclair/typebox';
+import { HealthSchema } from '@jeko/shared';
 import type { Db } from './db/db.js';
+import { ProjectStore } from './projects/store.js';
+import { projectRoutes } from './routes/projects.js';
 import { runnerRoutes } from './routes/runner.js';
 import { runRoutes } from './routes/runs.js';
 import { settingsRoutes } from './routes/settings.js';
@@ -28,9 +29,6 @@ export interface AppOptions {
 
 const VERSION = '0.1.0';
 
-const PROJECT_COLUMNS = `id, name,
-  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt"`;
-
 export async function buildApp({
   db,
   logger = false,
@@ -45,7 +43,8 @@ export async function buildApp({
   const workflows = new WorkflowStore(db);
   const runs = new RunStore(db);
   const settings = new UserSettingsStore(db);
-  const hub = new RunnerHub(runs, workflows, settings, app.log);
+  const projects = new ProjectStore(db);
+  const hub = new RunnerHub(runs, workflows, settings, projects, app.log);
   const tokens = new RunnerTokens(db);
 
   app.get('/api/health', { schema: { response: { 200: HealthSchema } } }, async () => ({
@@ -54,29 +53,7 @@ export async function buildApp({
     runner: hub.connected,
   }));
 
-  app.get(
-    '/api/projects',
-    { schema: { response: { 200: Type.Array(ProjectSchema) } } },
-    async () => {
-      const { rows } = await db.query<Project>(
-        `SELECT ${PROJECT_COLUMNS} FROM projects ORDER BY created_at`,
-      );
-      return rows;
-    },
-  );
-
-  app.post(
-    '/api/projects',
-    { schema: { body: CreateProjectSchema, response: { 201: ProjectSchema } } },
-    async (req, reply) => {
-      const { rows } = await db.query<Project>(
-        `INSERT INTO projects (name) VALUES ($1) RETURNING ${PROJECT_COLUMNS}`,
-        [req.body.name],
-      );
-      return reply.code(201).send(rows[0]!);
-    },
-  );
-
+  await app.register(projectRoutes, { projects, hub });
   await app.register(workflowRoutes, { workflows });
   await app.register(runRoutes, { runs, workflows, hub });
   await app.register(setupRoutes, { db, hub, tokens, version: VERSION });

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { RunnerClient } from './client.js';
 import { loadConfig } from './config.js';
 import { runDiagnostics } from './diagnostics.js';
+import { systemFolderPicker } from './folder-picker.js';
 import { createNodeHost } from './engine/node-host.js';
 import { defaultDataDir } from './journal.js';
 import { createPermissionBridge } from './permissions/bridge.js';
@@ -35,6 +36,7 @@ const client = new RunnerClient({
   runnerId: process.env['JEKO_RUNNER_ID'] ?? hostname(),
   version: VERSION,
   dataDir,
+  pickFolder: systemFolderPicker(),
   diagnose: () => runDiagnostics({ claude, dataDir, scriptsDir, permissionsEndpoint: true }),
   makeHost: (io, start, { runDir }) =>
     createNodeHost({

@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyBaseLogger } from 'fastify';
 import type { WebSocket } from 'ws';
 import {
   FINAL_STATUSES,
+  folderKey,
   RunnerToServerSchema,
   validator,
   type AdminMessage,
@@ -12,11 +14,15 @@ import {
   type RunRowStatus,
   type ServerToRunner,
 } from '@jeko/shared';
+import type { ProjectStore } from '../projects/store.js';
 import type { UserSettingsStore } from '../settings/store.js';
 import type { WorkflowStore } from '../workflows/store.js';
 import type { RunLaunch, RunStore } from './store.js';
 
 const isRunnerMessage = validator(RunnerToServerSchema);
+
+/** Quanto si aspetta che l'utente scelga una cartella nel dialogo. */
+const PICK_TIMEOUT_MS = 10 * 60_000;
 
 export type AnswerOutcome = 'ok' | 'not-found' | 'already-answered' | 'wrong-kind';
 
@@ -34,11 +40,18 @@ export class RunnerHub {
   /** Ultime verifiche dell'ambiente ricevute dal runner collegato. */
   private checks: { list: Check[]; at: string } | null = null;
   private readonly admins = new Set<WebSocket>();
+  private pumping: Promise<void> = Promise.resolve();
+  /** Dialoghi di scelta cartella aperti sul PC, in attesa della risposta. */
+  private readonly picks = new Map<
+    string,
+    { resolve: (path: string | null) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
+  >();
 
   constructor(
     private readonly runs: RunStore,
     private readonly workflows: WorkflowStore,
     private readonly settings: UserSettingsStore,
+    private readonly projects: ProjectStore,
     private readonly log: FastifyBaseLogger,
   ) {}
 
@@ -61,6 +74,34 @@ export class RunnerHub {
     return this.sendRunner({ type: 'checks.request' });
   }
 
+  /**
+   * Apre sul PC del runner il dialogo di scelta di una cartella e ne attende la risposta:
+   * il percorso, o null se l'utente annulla. Fallisce se il runner manca o si scollega.
+   */
+  pickFolder(opts: { start?: string; title?: string }, timeoutMs = PICK_TIMEOUT_MS) {
+    return new Promise<string | null>((resolve, reject) => {
+      const requestId = randomUUID();
+      const timer = setTimeout(() => this.settlePick(requestId, new Error('timeout')), timeoutMs);
+      this.picks.set(requestId, { resolve, reject, timer });
+      const sent = this.sendRunner({
+        type: 'folder.pick',
+        requestId,
+        ...(opts.start && { start: opts.start }),
+        ...(opts.title && { title: opts.title }),
+      });
+      if (!sent) this.settlePick(requestId, new Error('offline'));
+    });
+  }
+
+  private settlePick(requestId: string, result: string | null | Error): void {
+    const pick = this.picks.get(requestId);
+    if (!pick) return;
+    this.picks.delete(requestId);
+    clearTimeout(pick.timer);
+    if (result instanceof Error) pick.reject(result);
+    else pick.resolve(result);
+  }
+
   // ---------- connessioni ----------
 
   attachRunner(socket: WebSocket): void {
@@ -77,6 +118,7 @@ export class RunnerHub {
       if (this.runner?.socket !== socket) return;
       this.runner = null;
       this.checks = null;
+      for (const id of [...this.picks.keys()]) this.settlePick(id, new Error('offline'));
       this.broadcast({ type: 'runner', connected: false });
     });
   }
@@ -93,11 +135,9 @@ export class RunnerHub {
 
   // ---------- azioni dall'API ----------
 
-  /** Avvia una run appena creata, se c'è un runner; altrimenti resta in coda. */
-  async start(runId: string): Promise<void> {
-    if (!this.runner) return;
-    const run = (await this.runs.launchable()).find((r) => r.id === runId);
-    if (run) await this.launch(run);
+  /** Avvia una run appena creata se c'è un runner e la sua cartella è libera; altrimenti resta in coda. */
+  async start(): Promise<void> {
+    await this.pump(false);
   }
 
   async answer(runId: string, promptId: string, answer: Answer): Promise<AnswerOutcome> {
@@ -157,6 +197,8 @@ export class RunnerHub {
       case 'checks':
         this.checks = { list: msg.checks, at: new Date().toISOString() };
         return;
+      case 'folder.picked':
+        return this.settlePick(msg.requestId, msg.error ? new Error(msg.error) : msg.path);
     }
   }
 
@@ -175,13 +217,7 @@ export class RunnerHub {
 
   /** Il runner ha reinviato il suo giornale: ora lo stato salvato è aggiornato. */
   private async onReady() {
-    const active = this.runner?.activeRuns ?? [];
-    // Run vive nel runner: continuano da sole. Le altre ripartono dallo stato salvato.
-    for (const run of await this.runs.launchable()) {
-      if (active.includes(run.id)) continue;
-      if (run.status !== 'queued') await this.runs.supersedePending(run.id);
-      await this.launch(run);
-    }
+    await this.pump(true);
   }
 
   private async onEvent(seq: number, event: RunEvent) {
@@ -196,6 +232,9 @@ export class RunnerHub {
     if (event.type === 'run.finished') {
       await this.runs.supersedePending(run.id);
       await this.setStatus(run.id, event.status, event.error ?? null);
+      if (event.status === 'done') await this.addCreatedProject(run.id, run.workflow, run.version);
+      // La cartella si è liberata: può partire la prossima in coda.
+      await this.pump(false);
     }
   }
 
@@ -219,11 +258,58 @@ export class RunnerHub {
 
   // ---------- supporto ----------
 
-  private async launch(run: RunLaunch): Promise<void> {
+  /**
+   * Un workflow di creazione concluso aggiunge il progetto all'elenco. Per convenzione
+   * il workflow ha l'input `name` e la variabile `dir` (la cartella creata).
+   */
+  private async addCreatedProject(runId: string, workflow: string, version: number) {
+    const def = await this.workflows.definition(workflow, version);
+    if (def?.workflow.kind !== 'create') return;
+    const { name, dir } = await this.runs.values(runId);
+    if (typeof name !== 'string' || typeof dir !== 'string' || !name.trim() || !dir.trim()) return;
+    // `dir` unisce la cartella dei progetti (es. `C:\dev`) e lo slug con `/`: un solo separatore.
+    const path = dir.includes('\\') ? dir.replace(/\//g, '\\') : dir;
+    const project = await this.projects.add({ name, path });
+    if (project) this.broadcast({ type: 'project.added', project });
+  }
+
+  /**
+   * Avvia le run in coda, una sola attiva per cartella: due run nella stessa cartella
+   * toccherebbero gli stessi file. Con `resume` riavvia anche quelle già partite che il
+   * runner non ha più (dopo un suo riavvio). Le chiamate si mettono in fila.
+   */
+  private pump(resume: boolean): Promise<void> {
+    const next = this.pumping.then(() => this.launchNext(resume));
+    this.pumping = next.catch((e: unknown) => this.log.error({ err: e }, 'errore nella coda'));
+    return next;
+  }
+
+  private async launchNext(resume: boolean): Promise<void> {
+    if (!this.runner) return;
+    const alive = this.runner.activeRuns;
+    const busy = new Set<string>();
+    for (const run of await this.runs.launchable()) {
+      const key = folderKey(run.cwd);
+      if (run.status !== 'queued') {
+        // Già partita: tiene occupata la cartella, che sia viva nel runner o da riprendere.
+        if (key) busy.add(key);
+        if (!resume || alive.includes(run.id)) continue;
+        await this.runs.supersedePending(run.id);
+        if ((await this.launch(run)) === 'offline') return;
+        continue;
+      }
+      if (key && busy.has(key)) continue;
+      const outcome = await this.launch(run);
+      if (outcome === 'offline') return;
+      if (outcome === 'sent' && key) busy.add(key);
+    }
+  }
+
+  private async launch(run: RunLaunch): Promise<'sent' | 'failed' | 'offline'> {
     const def = await this.workflows.definition(run.workflow, run.version);
     if (!def) {
       await this.setStatus(run.id, 'failed', `Workflow ${run.workflow}@${run.version} non trovato`);
-      return;
+      return 'failed';
     }
     const settings = await this.settings.get();
     const sent = this.sendRunner({
@@ -237,7 +323,9 @@ export class RunnerHub {
       ...(run.state && { state: run.state }),
       settings,
     });
-    if (sent) await this.setStatus(run.id, 'running');
+    if (!sent) return 'offline';
+    await this.setStatus(run.id, 'running');
+    return 'sent';
   }
 
   private async setStatus(runId: string, status: RunRowStatus, error: string | null = null) {

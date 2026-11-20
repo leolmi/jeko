@@ -1,5 +1,5 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { Id, Timestamp, UserSettingsSchema } from './contract.js';
+import { Id, Timestamp, UserSettingsSchema, type Project } from './contract.js';
 import { RunEventSchema, RunModeSchema, RunStateSchema } from './workflow/run.js';
 import { PolicyActionSchema, WorkflowKindSchema, WorkflowSchema } from './workflow/schema.js';
 
@@ -98,6 +98,13 @@ export const RunnerToServerSchema = Type.Union([
   }),
   /** Fine del reinvio dopo `hello`: ora il server può (ri)avviare le run. */
   Type.Object({ type: Type.Literal('ready') }),
+  /** Cartella scelta col dialogo del PC: `path` null se l'utente ha annullato. */
+  Type.Object({
+    type: Type.Literal('folder.picked'),
+    requestId: Type.String({ minLength: 1 }),
+    path: Type.Union([Type.String(), Type.Null()]),
+    error: Type.Optional(Type.String()),
+  }),
   Type.Object({
     type: Type.Literal('run.prompt'),
     runId: Type.String(),
@@ -132,6 +139,13 @@ export const ServerToRunnerSchema = Type.Union([
   Type.Object({ type: Type.Literal('run.cancel'), runId: Type.String() }),
   /** Rifai le verifiche dell'ambiente e rimandale. */
   Type.Object({ type: Type.Literal('checks.request') }),
+  /** Apri sul PC il dialogo di scelta di una cartella e rimanda quella scelta. */
+  Type.Object({
+    type: Type.Literal('folder.pick'),
+    requestId: Type.String({ minLength: 1 }),
+    start: Type.Optional(Type.String()),
+    title: Type.Optional(Type.String({ maxLength: 200 })),
+  }),
   /** Eventi salvati fino a `seq` compreso: il runner può toglierli dal giornale. */
   Type.Object({
     type: Type.Literal('run.ack'),
@@ -140,6 +154,16 @@ export const ServerToRunnerSchema = Type.Union([
   }),
 ]);
 export type ServerToRunner = Static<typeof ServerToRunnerSchema>;
+
+/** Richiesta della web-app: aprire il dialogo di scelta della cartella sul PC del runner. */
+export const PickFolderSchema = Type.Object(
+  {
+    start: Type.Optional(Type.String({ maxLength: 1000 })),
+    title: Type.Optional(Type.String({ maxLength: 200 })),
+  },
+  { additionalProperties: false },
+);
+export type PickFolder = Static<typeof PickFolderSchema>;
 
 // ---------- REST ----------
 
@@ -192,6 +216,8 @@ export const RunSummarySchema = Type.Object({
   mode: RunModeSchema,
   status: RunRowStatusSchema,
   error: Type.Union([Type.String(), Type.Null()]),
+  /** Cartella in cui lavora: lega la run al suo progetto. */
+  cwd: Type.Union([Type.String(), Type.Null()]),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });
@@ -241,4 +267,6 @@ export type AdminMessage =
   | { type: 'runner'; connected: boolean; runnerId?: string }
   | { type: 'run.status'; runId: string; status: RunRowStatus; error: string | null }
   | { type: 'run.event'; runId: string; record: RunEventRecord }
-  | { type: 'run.prompt'; runId: string; prompt: PromptRecord };
+  | { type: 'run.prompt'; runId: string; prompt: PromptRecord }
+  /** Un workflow di creazione ha aggiunto un progetto. */
+  | { type: 'project.added'; project: Project };

@@ -53,6 +53,8 @@ const migrations: string[] = [
   `CREATE UNIQUE INDEX run_events_runner_seq ON run_events (run_id, runner_seq)`,
   // Impostazioni dell'installazione (es. primo avvio completato).
   `CREATE TABLE settings (key text PRIMARY KEY, value jsonb NOT NULL)`,
+  // Cartella del progetto: le sue run lavorano lì.
+  `ALTER TABLE projects ADD COLUMN path text NOT NULL DEFAULT ''`,
 ];
 
 export async function migrate(db: Db): Promise<void> {

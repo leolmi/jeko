@@ -13,6 +13,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { FINAL_STATUSES, type Answer, type RunDetail } from '@jeko/shared';
 import { I18n, type I18nKey } from '../core/i18n';
 import { Realtime } from '../core/realtime';
@@ -24,7 +25,7 @@ import { buildTimeline } from './timeline';
 /** Filo di una run: la richiesta, l'avanzamento e le domande a cui rispondere. */
 @Component({
   selector: 'jk-thread',
-  imports: [NgTemplateOutlet, Icon, Status, PromptCard],
+  imports: [NgTemplateOutlet, RouterLink, Icon, Status, PromptCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex h-full flex-col' },
   template: `
@@ -32,6 +33,14 @@ import { buildTimeline } from './timeline';
       <p class="m-auto text-sm text-muted">{{ i18n.t('thread.notFound') }}</p>
     } @else if (run(); as r) {
       <header class="flex items-center gap-3 border-b border-line px-6 py-3">
+        <a
+          routerLink="/"
+          class="jk-btn-ghost -ml-2 px-1.5"
+          [title]="i18n.t('tasks.back')"
+          [attr.aria-label]="i18n.t('tasks.back')"
+        >
+          <jk-icon name="arrow_back" [size]="18" />
+        </a>
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium">{{ r.request }}</p>
           <p class="font-mono text-xs text-faint">

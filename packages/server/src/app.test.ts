@@ -33,15 +33,21 @@ describe('server', () => {
     expect(res.json()).toMatchObject({ status: 'ok' });
   });
 
-  it('crea e legge un progetto', async () => {
-    const created = await app.inject({
-      method: 'POST',
-      url: '/api/projects',
-      payload: { name: 'Jeko' },
-    });
+  it('aggiunge, legge e toglie un progetto', async () => {
+    const add = (payload: object) => app.inject({ method: 'POST', url: '/api/projects', payload });
+    const created = await add({ name: 'Jeko', path: 'C:\\dev\\jeko' });
     expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ name: 'Jeko', path: 'C:\\dev\\jeko' });
     const list = await app.inject('/api/projects');
     expect(list.json()).toEqual([created.json()]);
+    // La stessa cartella scritta in un altro modo è già usata.
+    expect((await add({ name: 'Altro', path: 'c:/Dev/Jeko/' })).statusCode).toBe(409);
+
+    const id = (created.json() as { id: string }).id;
+    const del = () => app.inject({ method: 'DELETE', url: `/api/projects/${id}` });
+    expect((await del()).statusCode).toBe(204);
+    expect((await del()).statusCode).toBe(404);
+    expect((await app.inject('/api/projects')).json()).toEqual([]);
   });
 
   it("salva e rilegge le opzioni dell'utente", async () => {

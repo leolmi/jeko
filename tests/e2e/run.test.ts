@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
-import type { AdminMessage, PromptRecord, RunDetail, RunSummary } from '@jeko/shared';
+import type { AdminMessage, Project, PromptRecord, RunDetail, RunSummary } from '@jeko/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../../packages/server/src/app.js';
 import type { Db } from '../../packages/server/src/db/db.js';
@@ -77,6 +77,8 @@ describe('run server ↔ runner', () => {
       version: '0.0.0',
       reconnectMs: 50,
       log: { info: () => {}, warn: () => {}, error: () => {} },
+      // Finto dialogo: "sceglie" una sottocartella di quella di partenza, o annulla.
+      pickFolder: async ({ start }) => (start ? `${start}\\scelta` : null),
       makeHost: (io): Host => ({
         ...io,
         functions: {},
@@ -208,6 +210,74 @@ describe('run server ↔ runner', () => {
     await answer(body.id, gate, { kind: 'approve', approved: true });
     await until(async () => (await detail(body.id)).status === 'done');
     expect(agentCalls.map((c) => c.instructions)).toEqual(['Ciao Bob']);
+  });
+
+  it('una run alla volta per cartella: le altre aspettano in coda', async () => {
+    startRunner();
+    const start = (cwd: string) =>
+      api<RunSummary>('POST', '/api/runs', {
+        workflow: 'demo',
+        request: 'x',
+        mode: 'checkpoint',
+        cwd,
+      });
+    const status = async (id: string) => (await detail(id)).status;
+
+    const first = (await start('C:\\progetti\\uno')).body;
+    await pendingPrompt(first.id);
+    // Stessa cartella scritta in un altro modo: resta in coda. Un'altra cartella parte subito.
+    const second = (await start('c:/Progetti/uno/')).body;
+    const other = (await start('C:\\progetti\\due')).body;
+    await pendingPrompt(other.id);
+    expect(await status(second.id)).toBe('queued');
+
+    await api('POST', `/api/runs/${first.id}/cancel`);
+    await until(async () => (await status(first.id)) === 'cancelled');
+    await pendingPrompt(second.id);
+    expect(await status(second.id)).toBe('waiting');
+  });
+
+  it('un workflow di creazione concluso aggiunge il progetto', async () => {
+    const yaml = `
+name: crea
+kind: create
+version: 1
+inputs:
+  name: { prompt: Nome, required: true }
+vars:
+  dir: '{{ jeko.projectsDir }}/{{ name }}'
+steps:
+  - { id: lavoro, type: agent, instructions: 'Crea {{ dir }}' }
+`;
+    expect((await api('POST', '/api/workflows', { yaml })).status).toBe(201);
+    await api('PUT', '/api/settings', { projectsDir: 'C:\\progetti' });
+    startRunner();
+    const { body } = await api<RunSummary>('POST', '/api/runs', {
+      workflow: 'crea',
+      request: 'x',
+      mode: 'headless',
+      inputs: { name: 'Nuovo' },
+    });
+    await until(async () => (await detail(body.id)).status === 'done');
+    const projects = await until(async () => {
+      const list = (await api<Project[]>('GET', '/api/projects')).body;
+      return list.length > 0 && list;
+    });
+    expect(projects).toMatchObject([{ name: 'Nuovo', path: 'C:\\progetti\\Nuovo' }]);
+  });
+
+  it('apre il dialogo della cartella sul PC del runner', async () => {
+    const pick = (body: object) =>
+      api<{ path: string | null }>('POST', '/api/projects/pick-folder', body);
+    expect((await pick({ start: 'C:\\dev' })).status).toBe(409);
+
+    startRunner();
+    await until(async () => (await api<{ runner: boolean }>('GET', '/api/health')).body.runner);
+    expect(await pick({ start: 'C:\\dev', title: 'Scegli' })).toEqual({
+      status: 200,
+      body: { path: 'C:\\dev\\scelta' },
+    });
+    expect((await pick({})).body).toEqual({ path: null });
   });
 
   it('rifiuta un workflow non valido con gli errori', async () => {

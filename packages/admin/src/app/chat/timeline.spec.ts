@@ -11,6 +11,7 @@ const run: RunDetail = {
   mode: 'checkpoint',
   status: 'done',
   error: null,
+  cwd: null,
   createdAt: T(0),
   updatedAt: T(9),
   events: [

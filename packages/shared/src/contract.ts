@@ -7,6 +7,8 @@ export const ProjectSchema = Type.Object(
   {
     id: Id,
     name: Type.String({ minLength: 1, maxLength: 120 }),
+    /** Cartella del progetto sul PC del runner: le run del progetto lavorano lì. */
+    path: Type.String(),
     createdAt: Timestamp,
   },
   { additionalProperties: false },
@@ -14,10 +16,26 @@ export const ProjectSchema = Type.Object(
 export type Project = Static<typeof ProjectSchema>;
 
 export const CreateProjectSchema = Type.Object(
-  { name: Type.String({ minLength: 1, maxLength: 120 }) },
+  {
+    name: Type.String({ minLength: 1, maxLength: 120 }),
+    path: Type.String({ minLength: 1, maxLength: 1000 }),
+  },
   { additionalProperties: false },
 );
 export type CreateProject = Static<typeof CreateProjectSchema>;
+
+/**
+ * Chiave di una cartella, per confrontarle: senza distinguere maiuscole né separatori.
+ * Meglio scambiare per uguali due cartelle diverse (raro) che farne lavorare due sulla stessa.
+ */
+export function folderKey(path: string | null | undefined): string | null {
+  const key = path
+    ?.trim()
+    .replace(/[\\/]+/g, '/')
+    .replace(/\/$/, '')
+    .toLowerCase();
+  return key || null;
+}
 
 export const HealthSchema = Type.Object({
   status: Type.Literal('ok'),

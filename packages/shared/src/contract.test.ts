@@ -1,12 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { AnswerSchema, CreateProjectSchema, RunnerToServerSchema, validator } from './index.js';
+import {
+  AnswerSchema,
+  CreateProjectSchema,
+  folderKey,
+  RunnerToServerSchema,
+  validator,
+} from './index.js';
 
 describe('contratto', () => {
   it('valida CreateProject', () => {
     const v = validator(CreateProjectSchema);
-    expect(v({ name: 'Jeko' })).toBe(true);
-    expect(v({ name: '' })).toBe(false);
-    expect(v({ name: 'x', extra: 1 })).toBe(false);
+    expect(v({ name: 'Jeko', path: 'C:\\dev\\jeko' })).toBe(true);
+    expect(v({ name: 'Jeko' })).toBe(false);
+    expect(v({ name: '', path: 'x' })).toBe(false);
+    expect(v({ name: 'x', path: 'x', extra: 1 })).toBe(false);
+  });
+
+  it('confronta le cartelle senza maiuscole né separatori', () => {
+    expect(folderKey('C:\\Dev\\Jeko\\')).toBe(folderKey('c:/dev/jeko'));
+    expect(folderKey('C:\\dev\\jeko')).not.toBe(folderKey('C:\\dev\\jeko2'));
+    expect(folderKey('  ')).toBeNull();
+    expect(folderKey(null)).toBeNull();
   });
 
   it('valida i messaggi del runner', () => {
