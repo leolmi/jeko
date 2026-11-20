@@ -101,6 +101,10 @@ export const CheckStepSchema = Type.Object(
     type: Type.Literal('check'),
     /** Comandi senza shell: ogni comando è [programma, ...argomenti], tutti template. */
     exec: Type.Optional(Type.Array(Type.Array(TemplateSchema, { minItems: 1 }), { minItems: 1 })),
+    /** Comandi del progetto per nome (`.jeko/commands.yaml`), prima di `exec`; i mancanti si saltano. */
+    commands: Type.Optional(
+      Type.Array(Type.String({ pattern: '^[a-z][a-z0-9-]*$' }), { minItems: 1, uniqueItems: true }),
+    ),
     cwd: Type.Optional(TemplateSchema),
     expect: Type.Optional(ExprSchema),
     onFail: Type.Optional(OnFailSchema),

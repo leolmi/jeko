@@ -93,7 +93,7 @@ const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
                 name="cwd"
                 autocomplete="off"
                 spellcheck="false"
-                placeholder="C:\\Leo\\sviluppo\\…"
+                placeholder="C:\\progetti\\…"
                 [(ngModel)]="cwd"
               />
             </div>

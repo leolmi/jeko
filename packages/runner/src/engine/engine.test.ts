@@ -61,6 +61,7 @@ function fakeHost(opts: {
         typeof p === 'string' && typeof t === 'string' && (opts.files?.[p] ?? '').includes(t),
     },
     emit: (e) => f.events.push(e),
+    projectsDir: 'progetti',
   };
   return f;
 }
@@ -109,8 +110,9 @@ describe('motore', () => {
     const f = fakeHost({
       files,
       agent: async (req) => {
-        if (req.stepId === 'gitignore')
-          files['C:\\Leo\\sviluppo\\gestione-clienti/.gitignore'] = '.idea/\n';
+        if (req.stepId === 'gitignore') files['progetti/gestione-clienti/.gitignore'] = '.idea/\n';
+        if (req.stepId === 'conoscenza')
+          files['progetti/gestione-clienti/.jeko/project.md'] = '# Gestione Clienti';
         return { ok: true, output: 'ok', sessionId: 's1' };
       },
     });
@@ -123,14 +125,42 @@ describe('motore', () => {
     expect(out).toMatchObject({ status: 'done' });
     expect(f.asked).toEqual([]);
     expect(f.agentCalls[0]?.instructions).toContain(
-      'Crea un progetto semplice con stack Angular in C:\\Leo\\sviluppo\\gestione-clienti',
+      'Crea un progetto semplice con stack Angular in progetti/gestione-clienti',
     );
     expect(f.agentCalls[1]?.sessionId).toBe('s1');
     expect(f.execCalls).toEqual([
-      { argv: ['git', 'init', '-b', 'main'], cwd: 'C:\\Leo\\sviluppo\\gestione-clienti' },
+      { argv: ['git', 'init', '-b', 'main'], cwd: 'progetti/gestione-clienti' },
     ]);
     // Il gate del commit è "always": si ferma anche in headless.
     expect(f.approvals).toEqual(['gate:commit']);
+    expect(f.agentCalls.find((c) => c.stepId === 'conoscenza')?.cwd).toBe(
+      'progetti/gestione-clienti',
+    );
+  });
+
+  it('i check con commands usano i comandi del progetto, saltando i mancanti', async () => {
+    const w = wf(`
+name: t
+kind: develop
+version: 1
+steps:
+  - id: verifica
+    type: check
+    commands: [typecheck, lint, test]
+    exec: [[node, -v]]
+`);
+    const f = fakeHost({});
+    f.host.projectCommands = async () => ({ test: ['npm', 'test'], typecheck: ['tsc'] });
+    expect((await run(w, f)).status).toBe('done');
+    expect(f.execCalls.map((c) => c.argv)).toEqual([['tsc'], ['npm', 'test'], ['node', '-v']]);
+
+    const bad = fakeHost({});
+    bad.host.projectCommands = async () => {
+      throw new Error('commands.yaml: comando non valido');
+    };
+    const out = await run(w, bad);
+    expect(out.status).toBe('failed');
+    expect(out.error).toContain('commands.yaml: comando non valido');
   });
 
   it('chiede gli input mancanti e salta i passi esclusi da when', async () => {
@@ -138,7 +168,8 @@ describe('motore', () => {
     const f = fakeHost({ answers: ['Prova', 'vuoto'], files });
     f.host.agent = async (req) => {
       f.agentCalls.push(req);
-      files['C:\\Leo\\sviluppo\\prova/.gitignore'] = '.idea/';
+      files['progetti/prova/.gitignore'] = '.idea/';
+      files['progetti/prova/.jeko/project.md'] = '# Prova';
       return { ok: true, output: '' };
     };
     const out = await run(example, f);
@@ -173,7 +204,7 @@ steps:
   });
 
   it('si ferma se la cartella esiste già', async () => {
-    const f = fakeHost({ files: { 'C:\\Leo\\sviluppo\\jeko': '' } });
+    const f = fakeHost({ files: { 'progetti/jeko': '' } });
     const out = await run(example, f, 'headless', { name: 'Jeko', type: 'vuoto' });
     expect(out.status).toBe('failed');
     expect(out.error).toContain("Controllo 'check-dir' fallito");

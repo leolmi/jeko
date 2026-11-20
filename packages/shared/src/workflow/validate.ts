@@ -193,8 +193,8 @@ function semanticIssues(wf: Workflow): Issue[] {
         }
         break;
       case 'check':
-        if (!step.exec && !step.expect) {
-          issues.push({ path: at(), message: "un check vuole 'exec' o 'expect'" });
+        if (!step.exec && !step.commands && !step.expect) {
+          issues.push({ path: at(), message: "un check vuole 'exec', 'commands' o 'expect'" });
         }
         step.exec?.forEach((cmd, c) =>
           cmd.forEach((arg, a) => checkTemplate(arg, at('exec', c, a), known)),

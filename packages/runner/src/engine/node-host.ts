@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import type { RunEvent } from '@jeko/shared';
+import { knowledgePrompt, type RunEvent } from '@jeko/shared';
+import { loadKnowledge } from '../knowledge.js';
 import type { PermissionBridge } from '../permissions/bridge.js';
 import { run } from '../spawn.js';
 import { durableTurn } from '../turn.js';
@@ -9,6 +10,8 @@ import { hostFunctions } from './host-functions.js';
 export interface NodeHostOptions {
   /** Cartella di lavoro predefinita (per WF2 la cartella del progetto). */
   cwd?: string;
+  /** Cartella in cui nascono i progetti nuovi. */
+  projectsDir?: string;
   /** Dove stanno i turni di claude della run (nel suo giornale). */
   turnsDir: string;
   /** Comando di claude; di default `JEKO_CLAUDE_BIN` o `claude`. */
@@ -25,21 +28,37 @@ export interface NodeHostOptions {
 /** Host reale: comandi locali, file system e claude CLI. */
 export function createNodeHost(opts: NodeHostOptions): Host {
   const claude = opts.claude ?? [process.env['JEKO_CLAUDE_BIN'] ?? 'claude'];
+  // Cartelle la cui conoscenza (.jeko/) claude ha già ricevuto in questa run.
+  const informed = new Set<string>();
+  const withKnowledge = (instructions: string, dir: string | undefined) => {
+    if (dir === undefined || informed.has(dir)) return instructions;
+    const k = loadKnowledge(dir);
+    if (!k) return instructions; // un progetto nuovo la crea più avanti
+    informed.add(dir);
+    return `${knowledgePrompt(k)}\n\n---\n\n${instructions}`;
+  };
   return {
     ask: opts.ask,
     approve: opts.approve,
     review: opts.review,
     emit: opts.emit,
+    ...(opts.projectsDir !== undefined && { projectsDir: opts.projectsDir }),
     functions: hostFunctions,
     exec: (argv, cwd) =>
       run(argv, { ...((cwd ?? opts.cwd) !== undefined && { cwd: cwd ?? opts.cwd }) }),
+    projectCommands: async (cwd) => {
+      const k = loadKnowledge(cwd ?? opts.cwd ?? process.cwd());
+      if (k?.commandsError) throw new Error(k.commandsError);
+      return k?.commands ?? {};
+    },
     agent: (req) => {
       const permissions = opts.permissions;
+      const cwd = req.cwd ?? opts.cwd;
       return durableTurn({
         dir: join(opts.turnsDir, req.turnKey),
         command: claude,
-        prompt: req.instructions,
-        cwd: req.cwd ?? opts.cwd,
+        prompt: withKnowledge(req.instructions, cwd),
+        cwd,
         sessionId: req.sessionId,
         allowedTools: req.tools,
         signal: req.signal,

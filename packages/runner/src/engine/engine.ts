@@ -82,6 +82,10 @@ export interface Host {
   review(req: { stepId: string; output: string }): Promise<Review>;
   agent(req: AgentRequest): Promise<AgentResult>;
   exec(argv: string[], cwd?: string): Promise<ExecResult>;
+  /** Cartella in cui nascono i progetti nuovi (`jeko.projectsDir` nei workflow). */
+  projectsDir?: string;
+  /** Comandi del progetto (`.jeko/commands.yaml`) per i check con `commands`. */
+  projectCommands?(cwd?: string): Promise<Record<string, string[]>>;
   functions: Functions;
   emit(event: RunEvent): void;
 }
@@ -132,7 +136,12 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
       ...state.values,
       request: opts.request,
       steps: state.steps,
-      jeko: { mode, runId, lastFailure: state.lastFailure ?? null },
+      jeko: {
+        mode,
+        runId,
+        lastFailure: state.lastFailure ?? null,
+        projectsDir: host.projectsDir ?? null,
+      },
     },
     functions: host.functions,
   });
@@ -334,8 +343,19 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
   /** null se il controllo passa, altrimenti il motivo. */
   async function runCheck(step: CheckStep): Promise<string | null> {
     const cwd = step.cwd ? render(step.cwd) : undefined;
-    for (const cmd of step.exec ?? []) {
-      const argv = cmd.map(render);
+    const argvs: string[][] = [];
+    if (step.commands?.length) {
+      let known: Record<string, string[]>;
+      try {
+        known = (await host.projectCommands?.(cwd)) ?? {};
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
+      // Un comando che il progetto non definisce si salta: non tutti hanno lint o typecheck.
+      for (const name of step.commands) if (known[name]) argvs.push(known[name]);
+    }
+    for (const cmd of step.exec ?? []) argvs.push(cmd.map(render));
+    for (const argv of argvs) {
       const line = argv.join(' ');
       if (!(await authorize(step.id, classifyCommand(line), line))) {
         throw new Stop('rejected', `Comando non approvato: ${line}`);

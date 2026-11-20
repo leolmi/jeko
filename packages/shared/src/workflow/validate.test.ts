@@ -26,6 +26,8 @@ describe('workflow', () => {
       'git',
       'gitignore',
       'gitignore-ok',
+      'conoscenza',
+      'conoscenza-ok',
       'commit',
     ]);
   });
@@ -91,8 +93,11 @@ describe('workflow', () => {
     ]);
   });
 
-  it('un check vuole exec o expect', () => {
+  it('un check vuole exec, commands o expect', () => {
     const r = parseWorkflow(`${base}  - id: a\n    type: check\n`);
-    expect(messages(r)).toEqual(["6:5 steps[0]: un check vuole 'exec' o 'expect'"]);
+    expect(messages(r)).toEqual(["6:5 steps[0]: un check vuole 'exec', 'commands' o 'expect'"]);
+    expect(parseWorkflow(`${base}  - id: a\n    type: check\n    commands: [test]\n`).ok).toBe(
+      true,
+    );
   });
 });

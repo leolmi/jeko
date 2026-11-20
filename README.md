@@ -29,3 +29,13 @@ npm run dev:admin      # http://localhost:4200, /api in proxy sul server
 ```
 
 Variabili d'ambiente: vedi `.env.example`.
+
+## Conoscenza del progetto (`.jeko/`)
+
+Alla radice di ogni progetto gestito da Jeko:
+
+- `project.md`: cos'è, stack, convenzioni;
+- `commands.yaml`: `nome: comando` senza shell (es. `test: npm test`), usati dai check con `commands: [typecheck, lint, test]`;
+- `notes/*.md`: cose imparate lavorando.
+
+Il runner la passa a claude nel primo turno di ogni run. `nuovo-progetto` la crea, `sviluppo` la aggiorna prima del gate finale.

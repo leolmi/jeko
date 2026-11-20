@@ -1,7 +1,7 @@
 name: nuovo-progetto
 kind: create
 version: 1
-description: Crea un nuovo progetto in C:\Leo\sviluppo
+description: Crea un nuovo progetto nella cartella dei progetti del runner
 
 inputs:
   name:
@@ -16,7 +16,8 @@ inputs:
 
 vars:
   slug: '{{ kebab(name) }}'
-  dir: 'C:\Leo\sviluppo\{{ slug }}'
+  # Cartella dei progetti: config.json del runner (projectsDir) o JEKO_PROJECTS_DIR.
+  dir: '{{ jeko.projectsDir }}/{{ slug }}'
 
 policies:
   - match: install
@@ -57,6 +58,25 @@ steps:
     expect: fileContains(dir + '/.gitignore', '.idea/')
     onFail:
       goto: gitignore
+      retries: 2
+
+  - id: conoscenza
+    type: agent
+    title: Conoscenza del progetto (.jeko/)
+    cwd: '{{ dir }}'
+    instructions: |
+      Crea in {{ dir }}/.jeko/ la conoscenza del progetto {{ name }}:
+      - project.md: cos'è (richiesta: {{ request }}), stack, struttura delle cartelle, convenzioni;
+      - commands.yaml: i comandi del progetto, uno per riga come `nome: comando` senza shell
+        (es. `test: npm test`), solo quelli che esistono davvero tra build, test, lint e typecheck.
+      Sii breve. Non fare commit.
+
+  - id: conoscenza-ok
+    type: check
+    title: Verifica .jeko/
+    expect: exists(dir + '/.jeko/project.md')
+    onFail:
+      goto: conoscenza
       retries: 2
 
   - id: commit

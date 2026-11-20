@@ -33,8 +33,27 @@ steps:
       Implementa il piano concordato per la richiesta: {{ request }}
       Aggiungi o aggiorna i test. Non fare commit.
 
+  - id: verifica
+    type: check
+    title: Controlli del progetto
+    commands: [typecheck, lint, test]
+    onFail:
+      goto: sviluppo
+      retries: 2
+
+  - id: conoscenza
+    type: agent
+    title: Aggiornamento di .jeko/
+    instructions: |
+      Aggiorna la conoscenza del progetto in .jeko/ con quello che hai imparato in questa richiesta:
+      - project.md se sono cambiati stack, struttura o convenzioni;
+      - commands.yaml se i comandi di build, test, lint o typecheck sono cambiati o mancano
+        (nome: comando senza shell, es. `test: npm test`);
+      - una nota breve in notes/ (file .md dal nome parlante) per decisioni o trappole utili in futuro.
+      Se non c'è niente di nuovo non toccare nulla. Scrivi solo in .jeko/ e non fare commit.
+
   - id: commit
     type: gate
     title: Approvazione delle modifiche
     level: always
-    message: Le modifiche sono pronte. Le approvi?
+    message: Le modifiche (codice e .jeko/) sono pronte. Le approvi?

@@ -129,12 +129,12 @@ describe('run server ↔ runner', () => {
     expect(ask.prompt).toMatchObject({ kind: 'ask', question: 'Come si chiama?' });
     expect((await api<RunSummary>('GET', `/api/runs/${id}`)).body.status).toBe('waiting');
     expect((await answer(id, ask, { kind: 'approve', approved: true })).status).toBe(400);
-    expect((await answer(id, ask, { kind: 'ask', value: 'Leo' })).status).toBe(204);
-    expect((await answer(id, ask, { kind: 'ask', value: 'Leo' })).status).toBe(409);
+    expect((await answer(id, ask, { kind: 'ask', value: 'Ada' })).status).toBe(204);
+    expect((await answer(id, ask, { kind: 'ask', value: 'Ada' })).status).toBe(409);
 
     const gate = await pendingPrompt(id);
     expect(gate.prompt).toMatchObject({ kind: 'approve', stepId: 'commit', reason: 'gate' });
-    expect(agentCalls.map((c) => c.instructions)).toEqual(['Ciao Leo']);
+    expect(agentCalls.map((c) => c.instructions)).toEqual(['Ciao Ada']);
     await answer(id, gate, { kind: 'approve', approved: true });
 
     const done = await until(async () => {
@@ -144,7 +144,7 @@ describe('run server ↔ runner', () => {
     expect(done.events.map((e) => e.event.type)).toContain('run.finished');
     expect(done.events.find((e) => e.event.type === 'step.finished')?.event).toMatchObject({
       stepId: 'lavoro',
-      output: 'fatto: Ciao Leo',
+      output: 'fatto: Ciao Ada',
     });
     await until(async () => seen.some((m) => m.type === 'run.status' && m.status === 'done'));
     expect(seen[0]).toMatchObject({ type: 'runner', connected: true });
