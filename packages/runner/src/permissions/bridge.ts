@@ -1,10 +1,10 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AgentRequest } from '../engine/engine.js';
+import type { AgentQuestion, AgentRequest } from '../engine/engine.js';
 import type { TurnPermissions } from '../turn.js';
-import type { ApprovalEndpoint } from './endpoint.js';
+import type { ApprovalEndpoint, Authorizer } from './endpoint.js';
 import type { HookPolicy } from './hook.js';
-import { ENV, MCP_SERVER_NAME, PERMISSION_PROMPT_TOOL } from './protocol.js';
+import { ASK_TOOL, ENV, MCP_SERVER_NAME, PERMISSION_PROMPT_TOOL } from './protocol.js';
 
 /**
  * Comando (argv) per lanciare uno script del runner: il bundle `<name>.js` o, in sviluppo,
@@ -27,6 +27,55 @@ export interface BridgeOptions {
   scriptsDir: string;
 }
 
+/** Domande di AskUserQuestion nel formato di claude; [] se l'input non è riconosciuto. */
+export function parseQuestions(input: Record<string, unknown>): AgentQuestion[] {
+  const list = Array.isArray(input['questions']) ? (input['questions'] as unknown[]) : [];
+  const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
+  return list.flatMap((q): AgentQuestion[] => {
+    const o = (q ?? {}) as Record<string, unknown>;
+    const question = str(o['question']);
+    if (!question) return [];
+    const options = (Array.isArray(o['options']) ? (o['options'] as unknown[]) : []).flatMap(
+      (opt) => {
+        const r = (opt ?? {}) as Record<string, unknown>;
+        const label = str(r['label']);
+        const description = str(r['description']);
+        return label ? [{ label, ...(description && { description }) }] : [];
+      },
+    );
+    const header = str(o['header']);
+    return [
+      {
+        question,
+        ...(header && { header }),
+        ...(options.length > 0 && { options }),
+        ...(o['multiSelect'] === true && { multiSelect: true }),
+      },
+    ];
+  });
+}
+
+/**
+ * AskUserQuestion: ogni domanda diventa una richiesta `ask` nella chat; le risposte tornano a
+ * claude nell'input dello strumento (`answers`, domanda → risposta).
+ */
+export async function answerQuestions(
+  input: Record<string, unknown>,
+  ask: (q: AgentQuestion) => Promise<string | null>,
+): ReturnType<Authorizer> {
+  const questions = parseQuestions(input);
+  if (questions.length === 0) return { approved: false, note: 'domande non valide' };
+  const answers: Record<string, string> = {};
+  for (const q of questions) {
+    const value = await ask(q);
+    if (value === null || value === '') {
+      return { approved: false, note: "l'utente non ha risposto, procedi con il tuo giudizio" };
+    }
+    answers[q.question] = value;
+  }
+  return { approved: true, updatedInput: { ...input, answers } };
+}
+
 /** Prepara i permessi di un turno nella sua cartella; con `token` riaggancia un turno esistente. */
 export type PermissionBridge = (req: AgentRequest, dir: string, token?: string) => TurnPermissions;
 
@@ -41,7 +90,10 @@ export function createPermissionBridge(opts: BridgeOptions): PermissionBridge {
 
   return (req, dir, existing) => {
     const { token, dispose } = opts.endpoint.register(
-      async (tool, input) => ({ approved: await req.authorize(tool, input) }),
+      async (tool, input) =>
+        tool === ASK_TOOL && req.askUser
+          ? answerQuestions(input, req.askUser)
+          : { approved: await req.authorize(tool, input) },
       ...(existing !== undefined ? [existing] : []),
     );
     const mcpConfig = join(dir, 'mcp.json');

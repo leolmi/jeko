@@ -26,7 +26,7 @@ import { Icon, type IconName } from '../ui/icon';
     >
       <div class="flex items-center gap-2 px-4 pt-3 text-xs font-medium text-muted">
         <jk-icon [name]="head().icon" [size]="16" [class]="pending ? 'text-amber-500' : ''" />
-        <span>{{ i18n.t(head().label) }}</span>
+        <span>{{ p.kind === 'ask' && p.header ? p.header : i18n.t(head().label) }}</span>
         <span class="font-mono text-faint">· {{ p.stepId }}</span>
       </div>
 
@@ -35,7 +35,67 @@ import { Icon, type IconName } from '../ui/icon';
           @case ('ask') {
             <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ p.question }}</p>
             @if (pending) {
-              @if (p.enum) {
+              @if (p.options) {
+                <div class="mt-3 flex flex-col gap-1.5">
+                  @for (opt of p.options; track opt.label) {
+                    @let on = picked().includes(opt.label);
+                    <button
+                      type="button"
+                      class="flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-subtle disabled:opacity-60"
+                      [class]="on ? 'border-accent bg-subtle' : 'border-line'"
+                      [attr.aria-pressed]="p.multiSelect ? on : null"
+                      [disabled]="busy()"
+                      (click)="choose(opt.label)"
+                    >
+                      @if (p.multiSelect) {
+                        <jk-icon
+                          [name]="on ? 'check_circle' : 'check'"
+                          [size]="16"
+                          class="mt-0.5 shrink-0"
+                          [class]="on ? 'text-accent' : 'text-faint'"
+                        />
+                      }
+                      <span class="min-w-0">
+                        <span class="block text-sm font-medium">{{ opt.label }}</span>
+                        @if (opt.description) {
+                          <span class="block text-xs leading-relaxed text-muted">{{
+                            opt.description
+                          }}</span>
+                        }
+                      </span>
+                    </button>
+                  }
+                </div>
+                @if (p.multiSelect) {
+                  <button
+                    type="button"
+                    class="jk-btn-primary mt-3"
+                    [disabled]="busy() || picked().length === 0"
+                    (click)="send({ kind: 'ask', value: picked().join(', ') })"
+                  >
+                    <jk-icon name="send" [size]="16" />
+                    {{ i18n.t('prompt.answer') }}
+                  </button>
+                }
+                <form class="mt-3 flex gap-2" (ngSubmit)="sendText()">
+                  <input
+                    class="jk-input"
+                    name="other"
+                    autocomplete="off"
+                    [attr.aria-label]="i18n.t('prompt.other')"
+                    [placeholder]="i18n.t('prompt.other')"
+                    [(ngModel)]="text"
+                  />
+                  <button
+                    type="submit"
+                    class="jk-btn-outline"
+                    [disabled]="busy() || !text().trim()"
+                  >
+                    <jk-icon name="send" [size]="16" />
+                    {{ i18n.t('prompt.answer') }}
+                  </button>
+                </form>
+              } @else if (p.enum) {
                 <div class="mt-3 flex flex-wrap gap-2">
                   @for (opt of p.enum; track opt) {
                     <button
@@ -186,6 +246,8 @@ export class PromptCard {
   readonly error = input(false);
   readonly answer = output<Answer>();
   protected readonly text = signal('');
+  /** Scelte selezionate di una domanda a scelta multipla. */
+  protected readonly picked = signal<string[]>([]);
 
   protected readonly head = computed((): { icon: IconName; label: I18nKey } => {
     const p = this.record().prompt;
@@ -217,6 +279,14 @@ export class PromptCard {
 
   protected send(answer: Answer): void {
     this.answer.emit(answer);
+  }
+
+  /** Una scelta: con la scelta multipla si accende o spegne, altrimenti è la risposta. */
+  protected choose(label: string): void {
+    const p = this.record().prompt;
+    if (p.kind !== 'ask') return;
+    if (!p.multiSelect) return this.send({ kind: 'ask', value: label });
+    this.picked.update((l) => (l.includes(label) ? l.filter((x) => x !== label) : [...l, label]));
   }
 
   protected sendText(): void {

@@ -6,7 +6,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AgentRequest } from '../engine/engine.js';
 import { createMcpServer } from '../mcp.js';
-import { createPermissionBridge } from './bridge.js';
+import { answerQuestions, createPermissionBridge, parseQuestions } from './bridge.js';
 import { ApprovalEndpoint, pipePath, type Authorizer } from './endpoint.js';
 import { hookDecision, runHook } from './hook.js';
 import { ENV, PERMISSION_PROMPT_TOOL } from './protocol.js';
@@ -164,6 +164,7 @@ describe('hook PreToolUse', () => {
       hookDecision({ tool_name: 'Bash', tool_input: { command: 'npm test' } }, gates),
     ).toBeNull();
     expect(hookDecision({ tool_name: 'Read', tool_input: {} }, gates)).toBeNull();
+    expect(hookDecision({ tool_name: 'AskUserQuestion', tool_input: {} }, gates)).not.toBeNull();
     // policy interactive in headless: nessun gate
     expect(
       hookDecision(
@@ -184,5 +185,86 @@ describe('hook PreToolUse', () => {
     });
     expect(runHook(JSON.stringify({ tool_name: 'Read' }), env)).toBe('');
     expect(JSON.parse(runHook('{}', {})).hookSpecificOutput.permissionDecision).toBe('ask');
+  });
+});
+
+describe('AskUserQuestion', () => {
+  const input = {
+    questions: [
+      {
+        question: 'Quale database?',
+        header: 'DB',
+        options: [{ label: 'Postgres', description: 'relazionale' }, { label: 'SQLite' }, {}],
+        multiSelect: false,
+      },
+      {
+        question: 'Quali test?',
+        options: [{ label: 'unit' }, { label: 'e2e' }],
+        multiSelect: true,
+      },
+      { header: 'senza domanda' },
+    ],
+  };
+
+  it('legge le domande nel formato di claude', () => {
+    expect(parseQuestions(input)).toEqual([
+      {
+        question: 'Quale database?',
+        header: 'DB',
+        options: [{ label: 'Postgres', description: 'relazionale' }, { label: 'SQLite' }],
+      },
+      {
+        question: 'Quali test?',
+        options: [{ label: 'unit' }, { label: 'e2e' }],
+        multiSelect: true,
+      },
+    ]);
+    expect(parseQuestions({})).toEqual([]);
+  });
+
+  it("restituisce le risposte nell'input dello strumento", async () => {
+    const asked: string[] = [];
+    const res = await answerQuestions(input, async (q) => {
+      asked.push(q.question);
+      return q.multiSelect ? 'unit, e2e' : 'Postgres';
+    });
+    expect(asked).toEqual(['Quale database?', 'Quali test?']);
+    expect(res).toEqual({
+      approved: true,
+      updatedInput: {
+        ...input,
+        answers: { 'Quale database?': 'Postgres', 'Quali test?': 'unit, e2e' },
+      },
+    });
+    expect((await answerQuestions(input, async () => null)).approved).toBe(false);
+    expect((await answerQuestions({}, async () => 'x')).approved).toBe(false);
+  });
+
+  it('il bridge manda le domande alla chat e le risposte a claude', async () => {
+    const ep = new ApprovalEndpoint(pipePath());
+    await ep.start();
+    try {
+      const bridge = createPermissionBridge({ endpoint: ep, scriptsDir: 'C:\\jeko\\dist' });
+      const req: AgentRequest = {
+        stepId: 's',
+        instructions: 'x',
+        turnKey: 's-0',
+        gates,
+        authorize: async () => false,
+        askUser: async () => 'SQLite',
+      };
+      const turn = bridge(req, mkdtempSync(join(tmpdir(), 'jeko-ask-')));
+      const token = JSON.parse(readFileSync(turn.input.mcpConfig!, 'utf8')).mcpServers.jeko.env[
+        ENV.token
+      ];
+      const one = { questions: [input.questions[0]] };
+      expect(await requestDecision({ pipe: ep.path, token }, 'AskUserQuestion', one)).toEqual({
+        behavior: 'allow',
+        updatedInput: { ...one, answers: { 'Quale database?': 'SQLite' } },
+      });
+      turn.dispose();
+    } finally {
+      await ep.stop();
+    }
   });
 });

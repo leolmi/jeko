@@ -24,6 +24,8 @@ export const APPROVAL_PATH = '/approval';
 export const MCP_SERVER_NAME = 'jeko';
 export const MCP_TOOL_NAME = 'approve';
 export const PERMISSION_PROMPT_TOOL = `mcp__${MCP_SERVER_NAME}__${MCP_TOOL_NAME}`;
+/** Strumento con cui claude fa domande all'utente: passa sempre da Jeko. */
+export const ASK_TOOL = 'AskUserQuestion';
 
 /** Variabili d'ambiente con cui il runner configura server MCP e hook di un turno. */
 export const ENV = {

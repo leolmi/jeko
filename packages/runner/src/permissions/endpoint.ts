@@ -10,11 +10,14 @@ import {
   type ClaudeDecision,
 } from './protocol.js';
 
-/** Decide una richiesta di permesso di claude (di solito: policy del workflow e, se serve, l'utente). */
+/**
+ * Decide una richiesta di permesso di claude (di solito: policy del workflow e, se serve,
+ * l'utente). `updatedInput` sostituisce l'input dello strumento (es. le risposte di AskUserQuestion).
+ */
 export type Authorizer = (
   toolName: string,
   input: Record<string, unknown>,
-) => Promise<{ approved: boolean; note?: string }>;
+) => Promise<{ approved: boolean; note?: string; updatedInput?: Record<string, unknown> }>;
 
 interface Pending {
   decision?: ClaudeDecision;
@@ -131,9 +134,9 @@ export class ApprovalEndpoint {
       const p: Pending = {
         done: turn
           .authorize(req.toolName, req.input)
-          .then(({ approved, note }): ClaudeDecision =>
+          .then(({ approved, note, updatedInput }): ClaudeDecision =>
             approved
-              ? { behavior: 'allow', updatedInput: req.input }
+              ? { behavior: 'allow', updatedInput: updatedInput ?? req.input }
               : { behavior: 'deny', message: note ? `Rifiutato: ${note}` : 'Rifiutato da Jeko' },
           )
           .catch((e: unknown) => ({

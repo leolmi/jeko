@@ -5,6 +5,13 @@ import { PolicyActionSchema, WorkflowKindSchema, WorkflowSchema } from './workfl
 
 // ---------- richieste all'utente durante una run ----------
 
+/** Scelta proposta da claude (AskUserQuestion): l'utente può sempre scrivere altro. */
+export const AskOptionSchema = Type.Object({
+  label: Type.String(),
+  description: Type.Optional(Type.String()),
+});
+export type AskOption = Static<typeof AskOptionSchema>;
+
 export const PromptSchema = Type.Union([
   Type.Object({
     kind: Type.Literal('ask'),
@@ -13,6 +20,10 @@ export const PromptSchema = Type.Union([
     required: Type.Boolean(),
     enum: Type.Optional(Type.Array(Type.String())),
     default: Type.Optional(Type.String()),
+    /** Domanda di claude: titolo breve, scelte e se se ne possono prendere più d'una. */
+    header: Type.Optional(Type.String()),
+    options: Type.Optional(Type.Array(AskOptionSchema)),
+    multiSelect: Type.Optional(Type.Boolean()),
   }),
   Type.Object({
     kind: Type.Literal('approve'),

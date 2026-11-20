@@ -67,6 +67,8 @@ const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1
 export function toolDetail(input: unknown): string {
   if (!input || typeof input !== 'object') return '';
   const o = input as Record<string, unknown>;
+  const q = Array.isArray(o['questions']) ? (o['questions'][0] as { question?: unknown }) : null;
+  if (typeof q?.question === 'string') return clip(q.question, MAX_DETAIL);
   for (const k of ['command', 'file_path', 'path', 'pattern', 'url', 'query', 'description']) {
     if (typeof o[k] === 'string' && o[k]) return clip(String(o[k]).split('\n')[0]!, MAX_DETAIL);
   }
