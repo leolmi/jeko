@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import type { AppInfo, UpdateInfo } from '@jeko/shared';
 import { firstValueFrom } from 'rxjs';
 
@@ -12,6 +12,11 @@ export class AppUpdate {
   readonly installing = signal(false);
   /** Messaggio dell'ultimo errore di installazione. */
   readonly error = signal<string | null>(null);
+  readonly update = computed(() => this.info()?.update ?? null);
+  /** C'è una versione nuova, la cartella è aggiornabile e nessun task è al lavoro. */
+  readonly canInstall = computed(
+    () => !!this.update()?.available && !this.update()?.blocked && (this.info()?.active ?? 0) === 0,
+  );
 
   async load(): Promise<AppInfo | null> {
     try {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { AppUpdate } from '../core/app-update';
 import { I18n } from '../core/i18n';
 import { Setup } from '../core/setup';
@@ -114,10 +114,8 @@ export class SettingsPage {
   private readonly setup = inject(Setup);
   protected readonly updates = inject(AppUpdate);
   protected readonly app = this.updates.info;
-  protected readonly update = computed(() => this.app()?.update ?? null);
-  protected readonly canInstall = computed(
-    () => !!this.update()?.available && !this.update()?.blocked && (this.app()?.active ?? 0) === 0,
-  );
+  protected readonly update = this.updates.update;
+  protected readonly canInstall = this.updates.canInstall;
   protected readonly busy = signal(false);
   protected readonly error = signal(false);
 

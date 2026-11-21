@@ -6,6 +6,7 @@ import { I18n } from './core/i18n';
 import { Realtime } from './core/realtime';
 import { Setup } from './core/setup';
 import { Theme } from './core/theme';
+import { UpdatePrompt } from './settings/update-prompt';
 import { Splash } from './setup/splash';
 import { Wizard } from './setup/wizard';
 import { Icon } from './ui/icon';
@@ -16,7 +17,7 @@ const SPLASH_MS = 600;
 
 @Component({
   selector: 'jk-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Splash, Wizard, Prefs, Icon],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Splash, Wizard, Prefs, Icon, UpdatePrompt],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @switch (phase()) {
@@ -88,6 +89,7 @@ const SPLASH_MS = 600;
             <router-outlet />
           </main>
         </div>
+        <jk-update-prompt />
       }
     }
   `,
