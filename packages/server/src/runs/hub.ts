@@ -306,7 +306,8 @@ export class RunnerHub {
       await this.runs.saveState(run.id, event.state);
       await this.sendPath(run.id);
     }
-    if (event.type === 'run.finished') {
+    // Una run già conclusa non cambia esito (es. annullata quando era appena finita).
+    if (event.type === 'run.finished' && !FINAL_STATUSES.includes(run.status)) {
       await this.runs.supersedePending(run.id);
       await this.setStatus(run.id, event.status, event.error ?? null);
       if (event.status === 'done') await this.addCreatedProject(run.id, run.workflow, run.version);

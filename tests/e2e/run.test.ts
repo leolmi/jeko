@@ -456,6 +456,13 @@ describe('run server ↔ runner', () => {
     const done = await until(async () => sent.find((m) => m.event?.type === 'run.finished'));
     expect(done.event).toMatchObject({ status: 'failed' });
     expect(done.event?.error).toMatch(/Avvio non valido/);
+
+    // Annullare una run che il runner non sta eseguendo la chiude comunque.
+    server.send(JSON.stringify({ type: 'run.cancel', runId: 'r2' }));
+    const cancelled = await until(async () =>
+      sent.find((m) => m.event?.type === 'run.finished' && m.event.status === 'cancelled'),
+    );
+    expect(cancelled.event).toMatchObject({ status: 'cancelled' });
   });
 
   it('dopo un riavvio del runner la run riparte dallo stato salvato', async () => {

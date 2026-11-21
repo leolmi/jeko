@@ -211,8 +211,14 @@ export class RunnerClient {
       }
       case 'run.cancel': {
         const s = this.sessions.get(msg.runId);
-        if (s) this.abort(s);
-        return;
+        if (s) return this.abort(s);
+        // Run che il runner non sta eseguendo (es. avvio scartato): resterebbe "in corso".
+        return this.emit({
+          type: 'run.finished',
+          runId: msg.runId,
+          status: 'cancelled',
+          error: 'Run annullata',
+        });
       }
       case 'checks.request':
         return this.sendChecks();
