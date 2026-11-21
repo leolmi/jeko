@@ -9,6 +9,7 @@ import {
   UserSettingsSchema,
   type Project,
 } from './contract.js';
+import { StepMarkSchema, type StepMark } from './workflow/path.js';
 import { AgentUsageSchema, RunEventSchema, RunModeSchema, RunStateSchema } from './workflow/run.js';
 import { PolicyActionSchema, WorkflowKindSchema, WorkflowSchema } from './workflow/schema.js';
 
@@ -336,6 +337,8 @@ export const RunSummarySchema = Type.Object({
   cwd: Type.Union([Type.String(), Type.Null()]),
   /** Consumo dei turni di claude finora (dall'ultimo stato salvato). */
   usage: Type.Union([AgentUsageSchema, Type.Null()]),
+  /** Percorso per l'elenco dei task: passi del workflow o turni del task diretto. */
+  path: Type.Array(StepMarkSchema),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });
@@ -408,6 +411,8 @@ export type AdminMessage =
   | { type: 'run.status'; runId: string; status: RunRowStatus; error: string | null }
   | { type: 'run.event'; runId: string; record: RunEventRecord }
   | { type: 'run.prompt'; runId: string; prompt: PromptRecord }
+  /** Percorso aggiornato della run, per l'elenco dei task. */
+  | { type: 'run.path'; runId: string; path: StepMark[] }
   /** Un workflow di creazione ha aggiunto un progetto. */
   | { type: 'project.added'; project: Project }
   /** Task conclusi eliminati dall'utente. */

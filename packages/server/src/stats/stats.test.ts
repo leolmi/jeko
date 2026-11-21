@@ -34,6 +34,7 @@ const run = (over: Partial<RunDetail>): RunDetail => ({
   error: null,
   cwd: 'c:/leo/jeko',
   usage: null,
+  path: [],
   createdAt: at(0),
   updatedAt: at(0),
   events: [],

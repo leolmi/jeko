@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   FINAL_STATUSES,
+  runPath,
   type Answer,
   type Prompt,
   type PromptRecord,
@@ -43,7 +44,7 @@ export interface RunLaunch {
 }
 
 /** Contenuto di `runs/<id>/run.json`: la run con le sue richieste all'utente. */
-export interface RunFile extends Omit<RunSummary, 'usage'> {
+export interface RunFile extends Omit<RunSummary, 'usage' | 'path'> {
   inputs: Record<string, string> | null;
   state: RunState | null;
   definition: Workflow | null;
@@ -59,15 +60,10 @@ export interface EventLine extends RunEventRecord {
 const RUN = 'run.json';
 const EVENTS = 'events.jsonl';
 
-const summary = ({
-  inputs: _i,
-  state,
-  definition: _d,
-  prompts: _p,
-  ...run
-}: RunFile): RunSummary => ({
+const summary = ({ inputs: _i, state, definition, prompts, ...run }: RunFile): RunSummary => ({
   ...run,
   usage: state?.usage ?? null,
+  path: runPath({ ...run, definition, state, prompts }),
 });
 
 const publicPrompt = ({ answeredAt: _, ...p }: RunFile['prompts'][number]): PromptRecord => p;

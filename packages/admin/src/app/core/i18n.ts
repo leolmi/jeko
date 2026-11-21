@@ -302,6 +302,9 @@ const it = {
   'settings.saved': 'Salvato',
   'settings.error': 'Non è stato possibile leggere o salvare le opzioni.',
 
+  'path.steps': 'Passi: {n} di {total}',
+  'path.turns': 'Turni: {n}',
+  'path.failed': 'falliti: {n}',
   'formats.title': 'Formati',
   'formats.hint': 'Come mostrare date, ore e costi, in tutte le finestre.',
   'formats.date': 'Data',
@@ -684,6 +687,9 @@ const en: Record<I18nKey, string> = {
   'settings.saved': 'Saved',
   'settings.error': 'Could not read or save the options.',
 
+  'path.steps': 'Steps: {n} of {total}',
+  'path.turns': 'Turns: {n}',
+  'path.failed': 'failed: {n}',
   'formats.title': 'Formats',
   'formats.hint': 'How dates, times and costs are shown, in every window.',
   'formats.date': 'Date',

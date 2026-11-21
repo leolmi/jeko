@@ -13,6 +13,7 @@ const run: RunDetail = {
   error: null,
   cwd: null,
   usage: null,
+  path: [],
   createdAt: T(0),
   updatedAt: T(9),
   events: [

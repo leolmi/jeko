@@ -6,13 +6,14 @@ import { I18n } from '../core/i18n';
 import { isOpen, Projects } from '../core/projects';
 import { Runs } from '../core/runs';
 import { Icon } from '../ui/icon';
-import { runTone } from '../ui/mode-tone';
+import { runTone, TONES } from '../ui/mode-tone';
+import { RunPath } from '../ui/run-path';
 import { Status } from '../ui/status';
 
 /** Task del progetto attivo: prima quelli aperti, a richiesta anche quelli chiusi. */
 @Component({
   selector: 'jk-tasks',
-  imports: [RouterLink, Icon, Status],
+  imports: [RouterLink, Icon, Status, RunPath],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
   template: `
@@ -99,6 +100,9 @@ import { Status } from '../ui/status';
                   role="img"
                 ></span>
                 <span class="flex-1 truncate text-sm">{{ t.request }}</span>
+                @if (t.path.length) {
+                  <jk-run-path [path]="t.path" [tone]="tone" [direct]="tone === tones.direct" />
+                }
                 <span class="shrink-0 text-xs text-faint" [title]="i18n.dateTime(t.createdAt)">{{
                   i18n.ago(t.createdAt)
                 }}</span>
@@ -172,6 +176,7 @@ export class Tasks {
   private readonly runs = inject(Runs);
   protected readonly isOpen = isOpen;
   protected readonly runTone = runTone;
+  protected readonly tones = TONES;
   protected readonly deleteError = signal(false);
   protected closedIds = (closed: RunSummary[]) => closed.map((r) => r.id);
 

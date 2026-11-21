@@ -22,6 +22,10 @@ export class Runs {
     rt.onReconnect(() => this.reload());
     rt.on((msg) => {
       if (msg.type === 'runs.removed') return this.drop(msg.ids);
+      if (msg.type === 'run.path') {
+        const { runId, path } = msg;
+        return this.list.update((runs) => runs.map((r) => (r.id === runId ? { ...r, path } : r)));
+      }
       if (msg.type !== 'run.status') return;
       const known = this.list().some((r) => r.id === msg.runId);
       if (!known) return this.reload();

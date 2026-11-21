@@ -17,6 +17,8 @@ export const TONES = {
     badge: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300',
     active: 'bg-sky-600 text-white shadow-sm dark:bg-sky-500',
     dot: 'bg-sky-500',
+    ring: 'ring-sky-500/40',
+    ringBorder: 'border-sky-500',
     /** Segni dei grafici (tonalità verificate su sfondo chiaro e scuro). */
     fill: 'fill-sky-600',
     swatch: 'bg-sky-600',
@@ -30,6 +32,8 @@ export const TONES = {
     badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
     active: 'bg-amber-500 text-white shadow-sm dark:bg-amber-500',
     dot: 'bg-amber-500',
+    ring: 'ring-amber-500/40',
+    ringBorder: 'border-amber-500',
     fill: 'fill-amber-600',
     swatch: 'bg-amber-600',
   },

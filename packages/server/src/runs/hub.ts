@@ -211,6 +211,7 @@ export class RunnerHub {
 
     this.broadcast({ type: 'run.prompt', runId, prompt: record });
     if ((await this.runs.pendingCount(runId)) === 0) await this.setStatus(runId, 'running');
+    else await this.sendPath(runId);
     // Se il runner non c'è, riceverà la risposta quando rimanda la richiesta.
     this.sendRunner({ type: 'run.answer', runId, promptId, answer });
     return 'ok';
@@ -301,7 +302,10 @@ export class RunnerHub {
     if (!run || !record) return;
     this.broadcast({ type: 'run.event', runId: run.id, record });
 
-    if (event.type === 'state') await this.runs.saveState(run.id, event.state);
+    if (event.type === 'state') {
+      await this.runs.saveState(run.id, event.state);
+      await this.sendPath(run.id);
+    }
     if (event.type === 'run.finished') {
       await this.runs.supersedePending(run.id);
       await this.setStatus(run.id, event.status, event.error ?? null);
@@ -410,6 +414,12 @@ export class RunnerHub {
   private async setStatus(runId: string, status: RunRowStatus, error: string | null = null) {
     await this.runs.setStatus(runId, status, error);
     this.broadcast({ type: 'run.status', runId, status, error });
+    await this.sendPath(runId);
+  }
+
+  private async sendPath(runId: string): Promise<void> {
+    const run = await this.runs.get(runId);
+    if (run) this.broadcast({ type: 'run.path', runId, path: run.path });
   }
 
   private sendRunner(msg: ServerToRunner): boolean {
