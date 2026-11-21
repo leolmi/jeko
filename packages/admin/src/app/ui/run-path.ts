@@ -24,17 +24,21 @@ export function collapsePath(path: StepMark[], max = MAX, edge = EDGE): Item[] {
   selector: 'jk-run-path',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    class: 'inline-flex shrink-0 items-center gap-1',
+    class: 'inline-flex w-fit shrink-0 items-center',
     role: 'img',
     '[attr.aria-label]': 'label()',
     '[title]': 'label()',
   },
   template: `
-    @for (item of items(); track $index) {
+    @for (item of items(); track $index; let i = $index) {
+      @if (i > 0) {
+        <!-- Tratto che lega i passi: colorato fin dove si è arrivati. -->
+        <span class="h-0.5 w-2.5" [class]="lineCls(i)"></span>
+      }
       @if ('gap' in item) {
-        <span class="text-[10px] leading-none text-faint">…</span>
+        <span class="px-0.5 text-[10px] leading-none text-faint">…</span>
       } @else {
-        <span class="size-2 rounded-full" [class]="cls(item.mark)"></span>
+        <span class="size-2 shrink-0 rounded-full" [class]="cls(item.mark)"></span>
       }
     }
   `,
@@ -59,6 +63,17 @@ export class RunPath {
         });
     return failed ? `${text} · ${this.i18n.t('path.failed', { n: failed })}` : text;
   });
+
+  /** Il tratto prima dell'elemento `i` è colorato se il percorso è già arrivato lì. */
+  protected lineCls(i: number): string {
+    const items = this.items();
+    const reached = (j: number): boolean => {
+      const it = items[j];
+      if (!it) return false;
+      return 'gap' in it ? reached(j + 1) : it.mark !== 'pending';
+    };
+    return reached(i) ? `${this.tone().dot} opacity-60` : 'bg-zinc-300 dark:bg-zinc-700';
+  }
 
   protected cls(mark: StepMark): string {
     switch (mark) {

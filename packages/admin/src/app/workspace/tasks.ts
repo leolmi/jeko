@@ -99,10 +99,12 @@ import { Status } from '../ui/status';
                   [attr.aria-label]="i18n.t(tone.label)"
                   role="img"
                 ></span>
-                <span class="flex-1 truncate text-sm">{{ t.request }}</span>
-                @if (t.path.length) {
-                  <jk-run-path [path]="t.path" [tone]="tone" [direct]="tone === tones.direct" />
-                }
+                <span class="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span class="truncate text-sm">{{ t.request }}</span>
+                  @if (t.path.length) {
+                    <jk-run-path [path]="t.path" [tone]="tone" [direct]="tone === tones.direct" />
+                  }
+                </span>
                 <span class="shrink-0 text-xs text-faint" [title]="i18n.dateTime(t.createdAt)">{{
                   i18n.ago(t.createdAt)
                 }}</span>
