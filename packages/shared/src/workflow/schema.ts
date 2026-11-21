@@ -66,7 +66,7 @@ export const ModelSchema = Type.String({
   pattern: '^[A-Za-z0-9._\\[\\]-]+$',
 });
 /** Alias dei modelli proposti nelle scelte dell'utente. */
-export const MODEL_ALIASES = ['opus', 'sonnet', 'haiku'] as const;
+export const MODEL_ALIASES = ['opus', 'sonnet', 'fable', 'haiku'] as const;
 
 /**
  * Ragionamento e modello scelti dall'utente (progetto o task): valgono nei passi agent

@@ -87,8 +87,9 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         </button>
         <!-- Vuoti, valgono quelli del progetto; continuando, quelli del task. -->
         <jk-agent-choice
-          [compact]="true"
+          [up]="true"
           [inherited]="project()?.agent"
+          [defaultModel]="defaultModel()"
           [(value)]="agent"
           [class.invisible]="followUp()"
         />
@@ -148,6 +149,9 @@ export class TaskComposer {
     source: () => this.project()?.id,
     computation: () => ({}),
   });
+  protected readonly defaultModel = computed(() =>
+    this.projects.defaultModel(this.project()?.path),
+  );
   /** Task diretto, senza workflow di sviluppo: resta com'è, come la modalità. */
   protected readonly direct = signal(storage.get('direct') === '1');
   /** Task diretto del progetto aperto in pagina, in attesa del messaggio seguente. */

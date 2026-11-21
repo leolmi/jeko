@@ -246,6 +246,28 @@ steps:
     ]);
   });
 
+  it('riporta il modello predefinito solo nei passi senza modello scelto', async () => {
+    const w = wf(`
+name: t
+kind: develop
+version: 1
+steps:
+  - { id: libero, type: agent, instructions: fai }
+  - { id: piano, type: agent, instructions: pianifica, model: haiku }
+`);
+    const f = fakeHost({
+      agent: async (req) => ({ ok: true, output: 'ok', model: req.model ?? 'claude-opus-5-5' }),
+    });
+    expect((await run(w, f, 'headless')).status).toBe('done');
+    const finished = f.events.flatMap((e) =>
+      e.type === 'step.finished' ? [[e.stepId, e.defaultModel]] : [],
+    );
+    expect(finished).toEqual([
+      ['libero', 'claude-opus-5-5'],
+      ['piano', undefined],
+    ]);
+  });
+
   it('richiede di nuovo un valore fuori enum', async () => {
     const w = wf(`
 name: t

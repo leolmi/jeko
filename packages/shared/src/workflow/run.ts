@@ -111,6 +111,8 @@ export const RunEventSchema = Type.Union([
     output: Type.String(),
     /** Passi agent: consumo dei turni di claude del passo. */
     usage: Type.Optional(AgentUsageSchema),
+    /** Passi agent senza modello scelto: quello predefinito di claude (dall'`init`). */
+    defaultModel: Type.Optional(Type.String()),
   }),
   Type.Object({
     ...runId,

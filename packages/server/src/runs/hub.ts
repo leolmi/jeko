@@ -18,6 +18,7 @@ import {
   type ServerToRunner,
 } from '@jeko/shared';
 import type { ProjectStore } from '../projects/store.js';
+import type { ClaudeModelStore } from '../settings/claude-models.js';
 import type { UserSettingsStore } from '../settings/store.js';
 import type { WorkflowStore } from '../workflows/store.js';
 import type { RunLaunch, RunStore } from './store.js';
@@ -70,6 +71,7 @@ export class RunnerHub {
     private readonly settings: UserSettingsStore,
     private readonly projects: ProjectStore,
     private readonly log: FastifyBaseLogger,
+    private readonly models: ClaudeModelStore,
   ) {}
 
   get connected(): boolean {
@@ -193,6 +195,7 @@ export class RunnerHub {
       connected: this.connected,
       ...(this.runner && { runnerId: this.runner.runnerId }),
     });
+    this.sendTo(socket, { type: 'claude.models', models: this.models.get() });
   }
 
   // ---------- azioni dall'API ----------
@@ -302,6 +305,10 @@ export class RunnerHub {
     if (!run || !record) return;
     this.broadcast({ type: 'run.event', runId: run.id, record });
 
+    if (event.type === 'step.finished' && event.defaultModel) {
+      if (this.models.record(run.cwd, event.defaultModel))
+        this.broadcast({ type: 'claude.models', models: this.models.get() });
+    }
     if (event.type === 'state') {
       await this.runs.saveState(run.id, event.state);
       await this.sendPath(run.id);

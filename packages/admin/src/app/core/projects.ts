@@ -5,6 +5,7 @@ import {
   folderKey,
   type ContextExclusions,
   type AgentChoice,
+  type ClaudeModels,
   type CreateProject,
   type Project,
   type RunRowStatus,
@@ -74,6 +75,16 @@ export class Projects {
     () => this.views().find((p) => p.id === this.activeId()) ?? this.views()[0] ?? null,
   );
 
+  /** Modelli predefiniti di claude visti nei task (dal server). */
+  private readonly claudeModels = signal<ClaudeModels>({ byFolder: {}, last: null });
+
+  /** Modello predefinito di claude nella cartella: quello visto lì, o l'ultimo visto. */
+  defaultModel(path: string | null | undefined): string | undefined {
+    const m = this.claudeModels();
+    const key = folderKey(path);
+    return (key && m.byFolder[key]) || m.last || undefined;
+  }
+
   /** Run di creazione ancora aperte: il loro progetto non c'è ancora. */
   readonly creating = computed(() => this.runs.list().filter((r) => !r.cwd && isOpen(r)));
 
@@ -82,6 +93,7 @@ export class Projects {
     this.reload();
     rt.onReconnect(() => this.reload());
     rt.on((msg) => {
+      if (msg.type === 'claude.models') return this.claudeModels.set(msg.models);
       if (msg.type !== 'project.added') return;
       this.list.update((ps) => [...ps.filter((p) => p.id !== msg.project.id), msg.project]);
       this.activeId.set(msg.project.id);

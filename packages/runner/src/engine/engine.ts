@@ -79,6 +79,8 @@ export interface AgentResult {
   sessionId?: string;
   /** Tempi e token del turno, se claude li riporta. */
   usage?: AgentUsage;
+  /** Modello con cui il turno è girato, se claude lo riporta. */
+  model?: string;
 }
 
 export interface ExecResult {
@@ -341,7 +343,8 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
         usage = addUsage(usage, res.usage);
         state.usage = addUsage(state.usage, res.usage);
       }
-      record(step.id, res.ok, res.output, usage);
+      // Senza modello scelto, quello del turno è il predefinito di claude in quella cartella.
+      record(step.id, res.ok, res.output, usage, model ? undefined : res.model);
       if (!res.ok) throw new Stop('failed', `Il passo '${step.id}' è fallito`);
 
       if (mode !== 'interactive') return;
@@ -450,9 +453,22 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
     return undefined;
   }
 
-  function record(stepId: string, ok: boolean, output: string, usage?: AgentUsage): void {
+  function record(
+    stepId: string,
+    ok: boolean,
+    output: string,
+    usage?: AgentUsage,
+    defaultModel?: string,
+  ): void {
     state.steps[stepId] = { ok, output };
-    emit({ type: 'step.finished', stepId, ok, output, ...(usage && { usage }) });
+    emit({
+      type: 'step.finished',
+      stepId,
+      ok,
+      output,
+      ...(usage && { usage }),
+      ...(defaultModel && { defaultModel }),
+    });
   }
 }
 

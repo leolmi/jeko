@@ -28,6 +28,8 @@ export interface TurnOutput {
   output: string;
   sessionId?: string;
   usage?: AgentUsage;
+  /** Modello del turno, dal messaggio `init`. */
+  model?: string;
 }
 
 /** Argomenti per un turno non interattivo; il prompt passa da stdin, l'uscita è stream-json. */
@@ -100,6 +102,7 @@ export function parseInit(line: string, ownMcp: string): ContextInventory | null
 /** Messaggio `result` di un'uscita stream-json (anche parziale); null se il turno non è finito. */
 export function parseStream(text: string): TurnOutput | null {
   let result: TurnOutput | null = null;
+  let model: string | undefined;
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
     let msg: Record<string, unknown>;
@@ -108,6 +111,8 @@ export function parseStream(text: string): TurnOutput | null {
     } catch {
       continue; // riga a metà: il turno sta ancora scrivendo
     }
+    if (msg.type === 'system' && msg['subtype'] === 'init' && typeof msg['model'] === 'string')
+      model = msg['model'];
     if (msg.type !== 'result') continue;
     const usage = parseUsage(msg);
     result = {
@@ -117,7 +122,7 @@ export function parseStream(text: string): TurnOutput | null {
       ...(usage && { usage }),
     };
   }
-  return result;
+  return result && model ? { ...result, model } : result;
 }
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);

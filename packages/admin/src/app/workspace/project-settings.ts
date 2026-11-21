@@ -96,7 +96,7 @@ import { ProjectPrompts } from './project-prompts';
           <p class="text-sm font-medium">{{ i18n.t('agent.title') }}</p>
           <p class="mt-0.5 text-xs text-faint">{{ i18n.t('agent.hint') }}</p>
           <div class="mt-3 flex flex-wrap items-center gap-3">
-            <jk-agent-choice [(value)]="agent" />
+            <jk-agent-choice [(value)]="agent" [defaultModel]="projects.defaultModel(p.path)" />
             @if (agentError()) {
               <span class="text-sm text-red-600 dark:text-red-400">{{
                 i18n.t('project.save.error')

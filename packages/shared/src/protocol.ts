@@ -421,7 +421,15 @@ export type AdminMessage =
   /** Un workflow di creazione ha aggiunto un progetto. */
   | { type: 'project.added'; project: Project }
   /** Task conclusi eliminati dall'utente. */
-  | { type: 'runs.removed'; ids: string[] };
+  | { type: 'runs.removed'; ids: string[] }
+  /** Modelli predefiniti di claude visti nei task: per cartella e l'ultimo in assoluto. */
+  | { type: 'claude.models'; models: ClaudeModels };
+
+/** Modello predefinito di claude per cartella (`folderKey`), e l'ultimo visto. */
+export interface ClaudeModels {
+  byFolder: Record<string, string>;
+  last: string | null;
+}
 
 /** Task conclusi da eliminare: quelli ancora aperti restano. */
 export const RemoveRunsSchema = Type.Object(

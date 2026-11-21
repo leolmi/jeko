@@ -45,6 +45,9 @@ describe('claude', () => {
     ];
     expect(parseStream(lines.join('\n'))).toEqual({ ok: true, output: 'fatto', sessionId: 'abc' });
     expect(parseStream(`${lines.slice(0, 2).join('\n')}\n{"type":"res`)).toBeNull();
+    // Il modello del turno viene dall'init.
+    const withModel = [lines[0]!.replace('}', ',"model":"claude-opus-5-5"}'), lines[2]!];
+    expect(parseStream(withModel.join('\n'))).toMatchObject({ model: 'claude-opus-5-5' });
     expect(parseStream('{"type":"result","result":"no","is_error":true}')).toEqual({
       ok: false,
       output: 'no',

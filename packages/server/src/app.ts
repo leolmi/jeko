@@ -17,6 +17,7 @@ import { templateRoutes } from './routes/templates.js';
 import { workflowRoutes } from './routes/workflows.js';
 import { RunnerHub } from './runs/hub.js';
 import { RunStore } from './runs/store.js';
+import { ClaudeModelStore } from './settings/claude-models.js';
 import { UserSettingsStore } from './settings/store.js';
 import { VERSION } from './version.js';
 import { WorkflowStore } from './workflows/store.js';
@@ -68,7 +69,14 @@ export async function buildApp({
     await workflows.seed(seed.workflows);
     await templates.seed(seed.templates);
   }
-  const hub = new RunnerHub(runs, workflows, settings, projects, app.log);
+  const hub = new RunnerHub(
+    runs,
+    workflows,
+    settings,
+    projects,
+    app.log,
+    new ClaudeModelStore(settingsFile),
+  );
 
   // La pagina d'avvio dell'app (servita da Neutralino) aspetta il servizio leggendo qui.
   app.get('/api/health', { schema: { response: { 200: HealthSchema } } }, async (_req, reply) => {
