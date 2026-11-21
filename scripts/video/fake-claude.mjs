@@ -46,6 +46,12 @@ const request = (/Richiesta: (.+)/.exec(stdin) ?? /richiesta: (.+)/.exec(stdin))
 const topic = (s) => request.toLowerCase().includes(s);
 
 function plan() {
+  if (topic('migrazione'))
+    return {
+      tools: [['Read', { file_path: 'package.json' }]],
+      text: 'Non riesco a leggere lo schema attuale: serve un accesso al database.',
+      fail: true,
+    };
   if (topic('ricerca'))
     return {
       tools: [
@@ -121,7 +127,7 @@ const r = (n) => ((seed * 9301 + n * 49297) % 233280) / 233280;
 out({
   type: 'result',
   result: step.text,
-  is_error: false,
+  is_error: step.fail === true,
   session_id: session,
   duration_ms: Math.round(20000 + r(1) * 90000),
   total_cost_usd: Number((0.05 + r(2) * 0.6).toFixed(4)),

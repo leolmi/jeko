@@ -17,26 +17,97 @@ const dirs = join(process.env.PUBLIC ?? demo, 'jeko-demo');
 export const PORT = 4321;
 const api = `http://127.0.0.1:${PORT}/api`;
 
+// Progetti con le richieste dei task già fatti (le richieste con "migrazione" falliscono).
 const PROJECTS = [
-  { name: 'ricettario', about: 'Web-app Angular per raccogliere e cercare ricette.' },
-  { name: 'bilancio-casa', about: 'API Node (Fastify + PostgreSQL) per le spese di casa.' },
-  { name: 'meteo-cli', about: 'Libreria TypeScript e CLI per le previsioni del tempo.' },
+  {
+    name: 'ricettario',
+    about: 'Web-app Angular per raccogliere e cercare ricette.',
+    requests: [
+      'Pagina di dettaglio della ricetta con le dosi per persona',
+      'Salvataggio delle ricette preferite',
+      'Foto della ricetta con anteprima ridotta',
+      'Lista della spesa generata dalle ricette della settimana',
+      'Correggi lo scorrimento dell’elenco su mobile',
+      'Tempi di preparazione e cottura nella scheda',
+      'Stampa della ricetta senza menu e pulsanti',
+      'Migrazione dei dati delle ricette al nuovo formato',
+    ],
+  },
+  {
+    name: 'bilancio-casa',
+    about: 'API Node (Fastify + PostgreSQL) per le spese di casa.',
+    requests: [
+      'Aggiungi le categorie di spesa con colore e icona',
+      'Esportazione CSV delle spese del mese',
+      'Correggi il totale quando si elimina una spesa ricorrente',
+      'Grafico delle spese per categoria',
+      'Budget mensile con avviso al superamento',
+      'Importazione dell’estratto conto in formato OFX',
+      'Migrazione dello schema a PostgreSQL 18',
+      'Ripartizione delle spese tra i componenti della famiglia',
+    ],
+  },
+  {
+    name: 'meteo-cli',
+    about: 'Libreria TypeScript e CLI per le previsioni del tempo.',
+    requests: [
+      'Correggi il fuso orario nelle previsioni orarie',
+      'Opzione --unita per scegliere tra °C e °F',
+      'Cache delle risposte per 10 minuti',
+      'Messaggio chiaro quando la città non esiste',
+      'Previsioni a 7 giorni in tabella',
+      'Completamento automatico dei comandi per PowerShell',
+    ],
+  },
+  {
+    name: 'sito-studio',
+    about: 'Sito statico (Astro) di uno studio professionale.',
+    requests: [
+      'Modulo contatti con verifica anti-spam',
+      'Pagina dei servizi con le schede',
+      'Migliora i punteggi di Lighthouse su mobile',
+      'Versione inglese delle pagine principali',
+      'Mappa dello studio nella pagina contatti',
+    ],
+  },
+  {
+    name: 'magazzino',
+    about: 'Monorepo Nx (NestJS + Angular) per la gestione del magazzino.',
+    requests: [
+      'Scorte minime con avviso di riordino',
+      'Lettura dei codici a barre dalla fotocamera',
+      'Storico dei movimenti per articolo',
+      'Correggi l’arrotondamento delle giacenze',
+      'Report mensile in PDF',
+      'Ruoli utente: magazziniere e amministratore',
+      'Inventario con conteggio a più persone',
+    ],
+  },
 ];
 
-// Task già fatti, sparsi negli ultimi giorni: [progetto, richiesta, giorni fa, approvato].
-const HISTORY = [
-  ['bilancio-casa', 'Aggiungi le categorie di spesa con colore e icona', 13, true],
-  ['meteo-cli', 'Correggi il fuso orario nelle previsioni orarie', 12, true],
-  ['ricettario', 'Pagina di dettaglio della ricetta con le dosi per persona', 11, true],
-  ['bilancio-casa', 'Esportazione CSV delle spese del mese', 9, true],
-  ['meteo-cli', 'Opzione --unita per scegliere tra °C e °F', 8, false],
-  ['ricettario', 'Salvataggio delle ricette preferite', 7, true],
-  ['bilancio-casa', 'Correggi il totale quando si elimina una spesa ricorrente', 5, true],
-  ['meteo-cli', 'Cache delle risposte per 10 minuti', 4, true],
-  ['ricettario', 'Foto della ricetta con anteprima ridotta', 3, true],
-  ['bilancio-casa', 'Grafico delle spese per categoria', 2, true],
-  ['meteo-cli', 'Messaggio chiaro quando la città non esiste', 1, true],
-];
+// Task già fatti negli ultimi 30 giorni: [progetto, richiesta, giorni fa, approvato, diretto].
+const HISTORY = (() => {
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  const out = [];
+  for (let day = 29; day >= 0; day--) {
+    const weekend = [0, 6].includes(new Date(Date.now() - day * 86400000).getDay());
+    const count = Math.round(rnd() * (weekend ? 1.5 : 4.5));
+    for (let i = 0; i < count; i++) {
+      const p = PROJECTS[Math.floor(rnd() * PROJECTS.length)];
+      const direct = rnd() < 0.2;
+      const request = direct
+        ? [
+            'Aggiorna le dipendenze',
+            'Spiega come è organizzato il codice',
+            'Rinomina le variabili poco chiare',
+          ][Math.floor(rnd() * 3)]
+        : p.requests[Math.floor(rnd() * p.requests.length)];
+      out.push([p.name, request, day + rnd() * 0.4, rnd() > 0.08, direct]);
+    }
+  }
+  return out;
+})();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -67,7 +138,9 @@ function project(name, about) {
   );
   writeFileSync(
     join(dir, 'tools', 'check.mjs'),
-    'setTimeout(() => console.log(`${process.argv[2]}: ok`), 1200);\n',
+    "import { existsSync } from 'node:fs';\n" +
+      "const fast = process.env.DEMO_DIR && existsSync(process.env.DEMO_DIR + '/fast');\n" +
+      'setTimeout(() => console.log(`${process.argv[2]}: ok`), fast ? 0 : 1200);\n',
   );
   return dir;
 }
@@ -114,7 +187,7 @@ async function finish(id, approved) {
             : { kind: 'ask', value: '' };
       await call('POST', `/runs/${id}/prompts/${p.id}`, answer).catch(() => {});
     }
-    await sleep(700);
+    await sleep(1000);
   }
 }
 
@@ -142,7 +215,7 @@ function backdate(ages) {
   }
   const file = join(data, 'projects.json');
   const projects = JSON.parse(readFileSync(file, 'utf8'));
-  for (const p of projects) p.createdAt = shift(p.createdAt, 15);
+  for (const p of projects) p.createdAt = shift(p.createdAt, 35);
   writeFileSync(file, JSON.stringify(projects, null, 2));
 }
 
@@ -164,7 +237,11 @@ async function prepare() {
   await waitUp();
   await call('POST', '/setup/complete');
   const settings = await call('GET', '/settings');
-  await call('PUT', '/settings', { ...settings, projectsDir: dirs });
+  await call('PUT', '/settings', {
+    ...settings,
+    projectsDir: dirs,
+    formats: { currency: 'EUR', rates: { EUR: 0.91 }, time: 'h24' },
+  });
   const byName = {};
   for (const p of PROJECTS) {
     const created = await call('POST', '/projects', {
@@ -174,17 +251,24 @@ async function prepare() {
     await call('PATCH', `/projects/${created.id}`, { workflow: 'sviluppo' });
     byName[p.name] = created;
   }
+  // Un task alla volta per progetto, i progetti in parallelo.
   const ages = [];
-  for (const [name, request, days, approved] of HISTORY) {
-    const run = await call('POST', '/runs', {
-      request,
-      mode: 'checkpoint',
-      cwd: byName[name].path,
-    });
-    await finish(run.id, approved);
-    ages.push([run.id, days]);
-    console.info(`task: ${request}`);
-  }
+  await Promise.all(
+    PROJECTS.map(async (p) => {
+      for (const [name, request, days, approved, direct] of HISTORY) {
+        if (name !== p.name) continue;
+        const run = await call('POST', '/runs', {
+          request,
+          mode: 'checkpoint',
+          cwd: byName[name].path,
+          ...(direct && { direct: true }),
+        });
+        await finish(run.id, approved);
+        ages.push([run.id, days]);
+      }
+    }),
+  );
+  console.info(`task preparati: ${ages.length}`);
   server.kill();
   await sleep(1500);
   backdate(ages);
