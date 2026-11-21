@@ -15,7 +15,12 @@ import { startRunner } from '../../runner/src/runner.js';
 import { buildApp, type JekoApp } from './app.js';
 import { defaultDataDir } from './data/files.js';
 import { Lifecycle } from './desktop/lifecycle.js';
-import { NeutralinoLink, parseNeutralinoInfo, readNeutralinoStdin } from './desktop/neutralino.js';
+import {
+  type NeutralinoInfo,
+  NeutralinoLink,
+  parseNeutralinoInfo,
+  readNeutralinoStdin,
+} from './desktop/neutralino.js';
 import { Updater } from './desktop/updater.js';
 import { parseTemplateFile, type TemplateFile } from './projects/templates.js';
 import type { AppControl } from './routes/app.js';
@@ -88,6 +93,21 @@ export async function launchDesktop(): Promise<void> {
   process.exit(0);
 }
 
+/** Passa al servizio già acceso i dati della finestra che ha avviato questo processo. */
+async function handOverWindow(port: number): Promise<void> {
+  const info = parseNeutralinoInfo(process.env['JEKO_NL']);
+  if (!info) return;
+  try {
+    await fetch(`http://127.0.0.1:${port}/api/app/window`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(info),
+    });
+  } catch {
+    /* un servizio di una versione precedente non lo sa fare: pazienza */
+  }
+}
+
 async function isJeko(port: number): Promise<boolean> {
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/health`);
@@ -103,9 +123,11 @@ export async function runService({ desktop }: { desktop: boolean }): Promise<voi
   const port = Number(process.env['JEKO_PORT'] ?? process.env['PORT'] ?? 4310);
   const logger = desktop ? { level: 'info', stream: logStream(dataDir) } : true;
 
-  // Jeko è già acceso (es. sta finendo dei task a finestra chiusa): la finestra usa quello.
+  // Jeko è già acceso (es. sta finendo dei task a finestra chiusa): la finestra usa quello,
+  // che riceve i dati per collegarsi a lei (e chiuderla quando si riavvia).
   if (await isJeko(port)) {
     console.info(`Jeko è già attivo sulla porta ${port}`);
+    if (desktop) await handOverWindow(port);
     process.exit(0);
   }
 
@@ -124,23 +146,29 @@ export async function runService({ desktop }: { desktop: boolean }): Promise<voi
       log: { info: (m) => app.log.info(m), warn: (m) => app.log.warn(m) },
     });
     updater.cleanup();
-    const nl = parseNeutralinoInfo(process.env['JEKO_NL']);
-    const neutralino = nl ? new NeutralinoLink(nl, { warn: (m) => app.log.warn(m) }) : null;
+    // Le finestre collegate: quella che ha avviato il servizio e quelle aperte dopo.
+    const windows = new Set<NeutralinoLink>();
+    const attachWindow = (info: NeutralinoInfo) => {
+      const link = new NeutralinoLink(info, { warn: (m) => app.log.warn(m) });
+      windows.add(link);
+      link.connect();
+      link.onClose(() => {
+        windows.delete(link);
+        app.log.info('finestra chiusa');
+        lifecycle?.arm();
+      });
+    };
     control = {
       updater,
       restart: () => {
         updater!.relaunch();
-        neutralino?.exit();
+        for (const w of windows) w.exit();
         void shutdown();
       },
+      attachWindow,
     };
-    if (neutralino) {
-      neutralino.connect();
-      neutralino.onClose(() => {
-        app.log.info('finestra chiusa');
-        lifecycle?.arm();
-      });
-    }
+    const nl = parseNeutralinoInfo(process.env['JEKO_NL']);
+    if (nl) attachWindow(nl);
   }
 
   app = await buildApp({ dataDir, logger, adminDir: adminDir(), control, seed: builtins() });

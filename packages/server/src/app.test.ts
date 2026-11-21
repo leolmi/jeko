@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app.js';
 
 describe('server', () => {
@@ -232,6 +232,27 @@ describe('dati su file', () => {
     expect((await app.inject('/manca.js')).statusCode).toBe(404);
     expect((await app.inject('/api/manca')).statusCode).toBe(404);
     expect((await app.inject('/..%2f..%2fsegreto.txt')).statusCode).toBe(404);
+    await app.close();
+  });
+});
+
+describe('finestre dell’app desktop', () => {
+  const info = { nlPort: '5000', nlToken: 't', nlConnectToken: 'c', nlExtensionId: 'e' };
+
+  it('collega al servizio acceso una finestra aperta dopo', async () => {
+    const attachWindow = vi.fn();
+    const control = { updater: {} as never, restart: vi.fn(), attachWindow };
+    const app = await buildApp({ dataDir: mkdtempSync(join(tmpdir(), 'jeko-app-')), control });
+    const res = await app.inject({ method: 'POST', url: '/api/app/window', payload: info });
+    expect(res.statusCode).toBe(204);
+    expect(attachWindow).toHaveBeenCalledWith(info);
+    await app.close();
+  });
+
+  it('fuori dall’app desktop non collega niente', async () => {
+    const app = await buildApp({ dataDir: mkdtempSync(join(tmpdir(), 'jeko-app-')) });
+    const res = await app.inject({ method: 'POST', url: '/api/app/window', payload: info });
+    expect(res.statusCode).toBe(409);
     await app.close();
   });
 });

@@ -1,14 +1,17 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import type { AppInfo, UpdateInfo } from '@jeko/shared';
 import { Type } from '@sinclair/typebox';
+import type { NeutralinoInfo } from '../desktop/neutralino.js';
 import type { Updater } from '../desktop/updater.js';
 import type { RunStore } from '../runs/store.js';
 
 /** Comandi dell'app desktop: aggiornamenti e riavvio. */
 export interface AppControl {
   updater: Updater;
-  /** Chiude la finestra e il servizio, poi riapre l'app (dopo un aggiornamento). */
+  /** Chiude le finestre e il servizio, poi riapre l'app (dopo un aggiornamento). */
   restart(): void;
+  /** Collega una finestra aperta quando il servizio era già acceso. */
+  attachWindow(info: NeutralinoInfo): void;
 }
 
 /** Versione dell'app e aggiornamenti (solo nell'app desktop). */
@@ -23,6 +26,29 @@ export const appRoutes: FastifyPluginAsyncTypebox<{
     update: control?.updater.info ?? null,
     active: runs.activeCount,
   }));
+
+  // Una finestra nuova ha trovato il servizio già acceso: le serve per poterla chiudere.
+  app.post(
+    '/api/app/window',
+    {
+      schema: {
+        body: Type.Object(
+          {
+            nlPort: Type.String({ minLength: 1 }),
+            nlToken: Type.String({ minLength: 1 }),
+            nlConnectToken: Type.String(),
+            nlExtensionId: Type.String({ minLength: 1 }),
+          },
+          { additionalProperties: false },
+        ),
+      },
+    },
+    async (req, reply) => {
+      if (!control) return reply.code(409).send({ message: 'Solo nell’app desktop' });
+      control.attachWindow(req.body);
+      return reply.code(204).send();
+    },
+  );
 
   app.post('/api/app/update/check', async (_req, reply): Promise<UpdateInfo> => {
     if (!control) return reply.code(409).send({ message: 'Solo nell’app desktop' });
