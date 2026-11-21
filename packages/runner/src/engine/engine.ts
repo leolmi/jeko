@@ -7,6 +7,8 @@ import {
   renderTemplate,
   truthy,
   type CheckStep,
+  addUsage,
+  type AgentUsage,
   type Effort,
   type Functions,
   type GateLevel,
@@ -74,6 +76,8 @@ export interface AgentResult {
   ok: boolean;
   output: string;
   sessionId?: string;
+  /** Tempi e token del turno, se claude li riporta. */
+  usage?: AgentUsage;
 }
 
 export interface ExecResult {
@@ -299,6 +303,7 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
       instructions += `\n\nAttenzione, il controllo precedente è fallito:\n${state.lastFailure}`;
     }
 
+    let usage: AgentUsage | undefined;
     for (let round = 0; ; round++) {
       // Lo stato si salva a fine passo: dopo un riavvio i turni del passo hanno le stesse chiavi.
       const n = state.turns ?? 0;
@@ -326,7 +331,11 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
         onActivity: (a) => emit({ type: 'agent.activity', stepId: step.id, ...a }),
       });
       if (res.sessionId) state.sessionId = res.sessionId;
-      record(step.id, res.ok, res.output);
+      if (res.usage) {
+        usage = addUsage(usage, res.usage);
+        state.usage = addUsage(state.usage, res.usage);
+      }
+      record(step.id, res.ok, res.output, usage);
       if (!res.ok) throw new Stop('failed', `Il passo '${step.id}' è fallito`);
 
       if (mode !== 'interactive') return;
@@ -435,9 +444,9 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
     return undefined;
   }
 
-  function record(stepId: string, ok: boolean, output: string): void {
+  function record(stepId: string, ok: boolean, output: string, usage?: AgentUsage): void {
     state.steps[stepId] = { ok, output };
-    emit({ type: 'step.finished', stepId, ok, output });
+    emit({ type: 'step.finished', stepId, ok, output, ...(usage && { usage }) });
   }
 }
 

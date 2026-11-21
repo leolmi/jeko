@@ -1,4 +1,5 @@
 import { effect, Injectable, signal } from '@angular/core';
+import type { AgentUsage } from '@jeko/shared';
 import { storage } from './storage';
 
 export type Lang = 'it' | 'en';
@@ -127,6 +128,10 @@ const it = {
   'thread.policy': 'Azione sensibile',
   'thread.policy.approved': 'consentita',
   'thread.policy.denied': 'bloccata',
+  'usage.tokens': '{n} token',
+  'usage.detail':
+    'Lavoro di claude: {time} · turni {turns}\nInput {input} · Output {output}\nCache letta {cacheRead} · Cache scritta {cacheWrite}',
+  'usage.cost': 'Costo stimato: {cost}',
   'thread.finished.done': 'Completato',
   'thread.finished.failed': 'Interrotto per errore',
   'thread.finished.rejected': 'Fermato da un rifiuto',
@@ -439,6 +444,10 @@ const en: Record<I18nKey, string> = {
   'thread.policy': 'Sensitive action',
   'thread.policy.approved': 'allowed',
   'thread.policy.denied': 'blocked',
+  'usage.tokens': '{n} tokens',
+  'usage.detail':
+    'Claude work: {time} · turns {turns}\nInput {input} · Output {output}\nCache read {cacheRead} · Cache write {cacheWrite}',
+  'usage.cost': 'Estimated cost: {cost}',
   'thread.finished.done': 'Completed',
   'thread.finished.failed': 'Stopped by an error',
   'thread.finished.rejected': 'Stopped by a rejection',
@@ -666,6 +675,50 @@ export class I18n {
       value /= size;
     }
     return rtf.format(Math.round(value), 'year');
+  }
+
+  /** "45s", "3m 20s", "1h 05m". */
+  duration(ms: number): string {
+    const s = Math.round(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ${String(s % 60).padStart(2, '0')}s`;
+    return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+  }
+
+  /** Numero compatto: "950", "12,3k", "1,2M". */
+  compact(n: number): string {
+    return new Intl.NumberFormat(this.lang(), {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(n);
+  }
+
+  number(n: number): string {
+    return new Intl.NumberFormat(this.lang()).format(n);
+  }
+
+  /** Riga breve del consumo di claude ("3m 20s · 12,3k token") e il dettaglio per il tooltip. */
+  usage(u: AgentUsage): { short: string; detail: string } {
+    const total = u.inputTokens + u.outputTokens + u.cacheReadTokens + u.cacheWriteTokens;
+    const time = this.duration(u.durationMs);
+    let detail = this.t('usage.detail', {
+      time,
+      turns: u.turns,
+      input: this.number(u.inputTokens),
+      output: this.number(u.outputTokens),
+      cacheRead: this.number(u.cacheReadTokens),
+      cacheWrite: this.number(u.cacheWriteTokens),
+    });
+    if (u.costUsd !== undefined) {
+      const cost = new Intl.NumberFormat(this.lang(), {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 2,
+      }).format(u.costUsd);
+      detail += `\n${this.t('usage.cost', { cost })}`;
+    }
+    return { short: `${time} · ${this.t('usage.tokens', { n: this.compact(total) })}`, detail };
   }
 
   time(iso: string): string {

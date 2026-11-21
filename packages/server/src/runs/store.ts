@@ -16,7 +16,7 @@ import type { Db } from '../db/db.js';
 import { iso, json } from '../db/sql.js';
 
 const RUN_COLUMNS = `id, workflow_name AS workflow, workflow_version AS version, request, mode,
-  status, error, cwd, ${iso('created_at')} AS "createdAt", ${iso('updated_at')} AS "updatedAt"`;
+  status, error, cwd, state->'usage' AS usage, ${iso('created_at')} AS "createdAt", ${iso('updated_at')} AS "updatedAt"`;
 
 const PROMPT_COLUMNS = `id, run_id AS "runId", prompt, answer, status, ${iso('created_at')} AS "createdAt"`;
 

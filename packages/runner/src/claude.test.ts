@@ -44,6 +44,31 @@ describe('claude', () => {
     });
   });
 
+  it('ricava tempi, token e costo dal risultato', () => {
+    const line = JSON.stringify({
+      type: 'result',
+      result: 'fatto',
+      is_error: false,
+      duration_ms: 4200,
+      total_cost_usd: 0.12,
+      usage: {
+        input_tokens: 7,
+        output_tokens: 300,
+        cache_read_input_tokens: 9000,
+        cache_creation_input_tokens: 1200,
+      },
+    });
+    expect(parseStream(line)?.usage).toEqual({
+      durationMs: 4200,
+      inputTokens: 7,
+      outputTokens: 300,
+      cacheReadTokens: 9000,
+      cacheWriteTokens: 1200,
+      costUsd: 0.12,
+      turns: 1,
+    });
+  });
+
   it("ricava l'attività dai messaggi assistant", () => {
     const line = JSON.stringify({
       type: 'assistant',

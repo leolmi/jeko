@@ -7,7 +7,7 @@ import {
   UserSettingsSchema,
   type Project,
 } from './contract.js';
-import { RunEventSchema, RunModeSchema, RunStateSchema } from './workflow/run.js';
+import { AgentUsageSchema, RunEventSchema, RunModeSchema, RunStateSchema } from './workflow/run.js';
 import { PolicyActionSchema, WorkflowKindSchema, WorkflowSchema } from './workflow/schema.js';
 
 // ---------- richieste all'utente durante una run ----------
@@ -317,6 +317,8 @@ export const RunSummarySchema = Type.Object({
   error: Type.Union([Type.String(), Type.Null()]),
   /** Cartella in cui lavora: lega la run al suo progetto. */
   cwd: Type.Union([Type.String(), Type.Null()]),
+  /** Consumo dei turni di claude finora (dall'ultimo stato salvato). */
+  usage: Type.Union([AgentUsageSchema, Type.Null()]),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });

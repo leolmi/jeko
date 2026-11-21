@@ -1,6 +1,7 @@
 import {
   DIRECT_FOLLOW_UP,
   FINAL_STATUSES,
+  type AgentUsage,
   type PolicyAction,
   type PromptRecord,
   type RunDetail,
@@ -24,6 +25,8 @@ export type TimelineItem =
       title?: string;
       state: 'running' | 'ok' | 'failed' | 'skipped';
       output?: string;
+      /** Passi agent: tempi e token di claude. */
+      usage?: AgentUsage;
       activity: Activity[];
       at: string;
     }
@@ -91,6 +94,7 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
             if (item) {
               item.state = event.ok ? 'ok' : 'failed';
               if (event.output) item.output = event.output;
+              if (event.usage) item.usage = event.usage;
               open.delete(event.stepId);
             } else {
               items.push({
@@ -100,6 +104,7 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
                 ...title(event.stepId),
                 state: event.ok ? 'ok' : 'failed',
                 ...(event.output && { output: event.output }),
+                ...(event.usage && { usage: event.usage }),
                 activity: [],
                 at,
               });

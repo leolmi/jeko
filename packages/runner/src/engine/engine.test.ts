@@ -7,7 +7,13 @@ import {
   type Workflow,
 } from '@jeko/shared';
 import { describe, expect, it } from 'vitest';
-import { runWorkflow, type AgentRequest, type Host, type Review } from './engine.js';
+import {
+  runWorkflow,
+  type AgentRequest,
+  type AgentResult,
+  type Host,
+  type Review,
+} from './engine.js';
 
 function wf(yaml: string): Workflow {
   const r = parseWorkflow(yaml);
@@ -29,7 +35,7 @@ function fakeHost(opts: {
   approve?: boolean[];
   reviews?: Review[];
   exec?: (argv: string[]) => number;
-  agent?: (req: AgentRequest) => Promise<{ ok: boolean; output: string; sessionId?: string }>;
+  agent?: (req: AgentRequest) => Promise<AgentResult>;
   files?: Record<string, string>;
   /** Prompt del progetto, per nome. */
   prompts?: Record<string, string>;
@@ -297,6 +303,48 @@ steps:
       ['diretto-3', '{{ x }} così com’è'],
     ]);
     expect(f.agentCalls[2]!.sessionId).toBe('sess');
+  });
+
+  it('somma tempi e token per passo (con le revisioni) e per run', async () => {
+    const w = wf(`
+name: t
+kind: develop
+version: 1
+steps:
+  - { id: piano, type: agent, instructions: pianifica }
+  - { id: lavoro, type: agent, instructions: lavora }
+`);
+    const usage = (ms: number, cost?: number) => ({
+      durationMs: ms,
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheReadTokens: 100,
+      cacheWriteTokens: 1,
+      ...(cost !== undefined && { costUsd: cost }),
+      turns: 1,
+    });
+    const costs = [0.5, 0.25, undefined];
+    const f = fakeHost({
+      reviews: [{ ok: false, feedback: 'rivedi' }, { ok: true }, { ok: true }],
+      agent: async () => ({ ok: true, output: 'ok', usage: usage(1000, costs.shift()) }),
+    });
+    const out = await run(w, f, 'interactive');
+    const finished = f.events.flatMap((e) => (e.type === 'step.finished' ? [e] : []));
+    expect(finished.map((e) => [e.stepId, e.usage?.durationMs, e.usage?.turns])).toEqual([
+      ['piano', 1000, 1],
+      ['piano', 2000, 2],
+      ['lavoro', 1000, 1],
+    ]);
+    expect(finished[1]!.usage?.costUsd).toBe(0.75);
+    expect(out.state.usage).toEqual({
+      durationMs: 3000,
+      inputTokens: 30,
+      outputTokens: 15,
+      cacheReadTokens: 300,
+      cacheWriteTokens: 3,
+      costUsd: 0.75,
+      turns: 3,
+    });
   });
 
   it("fermata dall'utente durante un passo agent: annullata, non fallita", async () => {

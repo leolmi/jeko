@@ -12,6 +12,7 @@ const run: RunDetail = {
   status: 'done',
   error: null,
   cwd: null,
+  usage: null,
   createdAt: T(0),
   updatedAt: T(9),
   events: [

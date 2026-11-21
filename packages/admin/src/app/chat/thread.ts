@@ -52,6 +52,10 @@ import { buildTimeline } from './timeline';
           <p class="truncate text-sm font-medium">{{ r.request }}</p>
           <p class="font-mono text-xs text-faint">
             {{ r.workflow }}@{{ r.version }} · {{ r.mode }}
+            @if (r.usage; as u) {
+              @let use = i18n.usage(u);
+              <span class="cursor-help" [title]="use.detail">· {{ use.short }}</span>
+            }
           </p>
         </div>
         <jk-status [status]="r.status" />
@@ -120,7 +124,15 @@ import { buildTimeline } from './timeline';
                       @if (item.state === 'skipped' && item.output) {
                         <span class="text-xs text-faint">· {{ item.output }}</span>
                       }
-                      <span class="ml-auto text-xs text-faint">{{ i18n.time(item.at) }}</span>
+                      @if (item.usage; as u) {
+                        @let use = i18n.usage(u);
+                        <span class="ml-auto cursor-help text-xs text-faint" [title]="use.detail">{{
+                          use.short
+                        }}</span>
+                      }
+                      <span class="text-xs text-faint" [class.ml-auto]="!item.usage">{{
+                        i18n.time(item.at)
+                      }}</span>
                     </div>
                     @if (item.state === 'running' && item.activity.length > 0) {
                       <ul class="mt-1.5 ml-7 flex flex-col gap-1">
@@ -293,7 +305,14 @@ export class Thread {
           return this.run.set({ ...r, status: msg.status, error: msg.error });
         case 'run.event':
           if (r.events.some((e) => e.seq === msg.record.seq)) return;
-          return this.run.set({ ...r, events: [...r.events, msg.record] });
+          return this.run.set({
+            ...r,
+            events: [...r.events, msg.record],
+            // Lo stato salvato porta il consumo della run finora.
+            ...(msg.record.event.type === 'state' && {
+              usage: msg.record.event.state.usage ?? null,
+            }),
+          });
         case 'run.prompt': {
           const others = r.prompts.filter((p) => p.id !== msg.prompt.id);
           return this.run.set({ ...r, prompts: [...others, msg.prompt] });

@@ -1,3 +1,5 @@
+import type { AgentUsage } from '@jeko/shared';
+
 export interface TurnInput {
   prompt: string;
   cwd?: string | undefined;
@@ -23,6 +25,7 @@ export interface TurnOutput {
   ok: boolean;
   output: string;
   sessionId?: string;
+  usage?: AgentUsage;
 }
 
 /** Argomenti per un turno non interattivo; il prompt passa da stdin, l'uscita è stream-json. */
@@ -43,20 +46,41 @@ export function parseStream(text: string): TurnOutput | null {
   let result: TurnOutput | null = null;
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
-    let msg: { type?: unknown; result?: unknown; is_error?: unknown; session_id?: unknown };
+    let msg: Record<string, unknown>;
     try {
       msg = JSON.parse(line) as typeof msg;
     } catch {
       continue; // riga a metà: il turno sta ancora scrivendo
     }
     if (msg.type !== 'result') continue;
+    const usage = parseUsage(msg);
     result = {
-      ok: msg.is_error !== true,
-      output: typeof msg.result === 'string' ? msg.result : '',
-      ...(typeof msg.session_id === 'string' && { sessionId: msg.session_id }),
+      ok: msg['is_error'] !== true,
+      output: typeof msg['result'] === 'string' ? msg['result'] : '',
+      ...(typeof msg['session_id'] === 'string' && { sessionId: msg['session_id'] }),
+      ...(usage && { usage }),
     };
   }
   return result;
+}
+
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
+
+/** Tempi, token e costo di un messaggio `result`; null se non ne riporta. */
+export function parseUsage(msg: Record<string, unknown>): AgentUsage | null {
+  const u = msg['usage'];
+  if (typeof msg['duration_ms'] !== 'number' && (!u || typeof u !== 'object')) return null;
+  const t = (u ?? {}) as Record<string, unknown>;
+  const cost = msg['total_cost_usd'];
+  return {
+    durationMs: num(msg['duration_ms']),
+    inputTokens: num(t['input_tokens']),
+    outputTokens: num(t['output_tokens']),
+    cacheReadTokens: num(t['cache_read_input_tokens']),
+    cacheWriteTokens: num(t['cache_creation_input_tokens']),
+    ...(typeof cost === 'number' && cost >= 0 && { costUsd: cost }),
+    turns: 1,
+  };
 }
 
 /** Cosa sta facendo claude in un turno: testo scritto o strumento usato. */
