@@ -26,21 +26,23 @@
     "dev:desktop": "neu run",
     "package": "npm run build && neu build && node scripts/package.mjs",
     "release": "node scripts/release.mjs",
-    "migrate:pglite": "node scripts/migrate-pglite.mjs"
+    "migrate:pglite": "node scripts/migrate-pglite.mjs",
+    "video": "node scripts/video/record.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.17",
     "@eslint/js": "^9.39.5",
+    "@neutralinojs/neu": "^11.8.0",
     "@types/node": "^22.20.5",
     "angular-eslint": "^22.8.0",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "happy-dom": "^21.0.4",
+    "playwright": "^1.65.1",
     "prettier": "^3.10.1",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.73.0",
-    "vitest": "^5.1.1",
-    "@electric-sql/pglite": "^0.5.17",
-    "@neutralinojs/neu": "^11.8.0"
+    "vitest": "^5.1.1"
   }
 }
