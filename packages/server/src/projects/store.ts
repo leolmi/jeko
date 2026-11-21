@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { folderKey, type CreateProject, type Project, type UpdateProject } from '@jeko/shared';
+import {
+  folderKey,
+  noExclusions,
+  type CreateProject,
+  type Project,
+  type UpdateProject,
+} from '@jeko/shared';
 import { now, readJson, writeJson } from '../data/files.js';
 
 /** Progetti gestiti: un nome e la cartella in cui lavorano le sue run. In `projects.json`. */
@@ -41,7 +47,12 @@ export class ProjectStore {
   async update(id: string, p: UpdateProject): Promise<Project | null> {
     const current = this.items.find((x) => x.id === id);
     if (!current) return null;
-    const updated = { ...current, workflow: p.workflow };
+    const updated: Project = {
+      ...current,
+      ...(p.workflow !== undefined && { workflow: p.workflow }),
+      ...(p.exclude !== undefined && { exclude: p.exclude }),
+    };
+    if (noExclusions(updated.exclude)) delete updated.exclude;
     this.save(this.items.map((x) => (x.id === id ? updated : x)));
     return updated;
   }

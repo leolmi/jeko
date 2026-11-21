@@ -1,5 +1,7 @@
 import { Type, type Static } from '@sinclair/typebox';
 import {
+  ContextExclusionsSchema,
+  ContextInventorySchema,
   Id,
   ProjectPromptSchema,
   PromptName,
@@ -128,6 +130,13 @@ export const RunnerToServerSchema = Type.Union([
     prompts: Type.Array(ProjectPromptSchema),
     error: Type.Optional(Type.String()),
   }),
+  /** Cosa claude carica all'avvio nella cartella, o l'errore. */
+  Type.Object({
+    type: Type.Literal('context.result'),
+    requestId: Type.String({ minLength: 1 }),
+    inventory: Type.Union([ContextInventorySchema, Type.Null()]),
+    error: Type.Optional(Type.String()),
+  }),
   /** Terminale aperto sul PC, o l'errore. */
   Type.Object({
     type: Type.Literal('terminal.opened'),
@@ -154,6 +163,8 @@ export const RunStartSchema = Type.Object({
   state: Type.Optional(RunStateSchema),
   /** Opzioni dell'utente al momento dell'avvio. */
   settings: Type.Optional(UserSettingsSchema),
+  /** Esclusioni dal contesto di claude, dal progetto della cartella. */
+  exclude: Type.Optional(ContextExclusionsSchema),
 });
 export type RunStart = Static<typeof RunStartSchema>;
 
@@ -191,6 +202,12 @@ export const ServerToRunnerSchema = Type.Union([
       Type.Object({ kind: Type.Literal('save'), name: PromptName, text: Type.String() }),
       Type.Object({ kind: Type.Literal('delete'), name: PromptName }),
     ]),
+  }),
+  /** Avvia claude un attimo nella cartella e rimanda cosa carica (strumenti, MCP, plugin…). */
+  Type.Object({
+    type: Type.Literal('context.request'),
+    requestId: Type.String({ minLength: 1 }),
+    cwd: Type.String({ minLength: 1 }),
   }),
   /** Apri sul PC un terminale nella cartella (es. per un login o dati sensibili). */
   Type.Object({
@@ -401,3 +418,40 @@ export const RemoveRunsSchema = Type.Object(
   { ids: Type.Array(Id, { minItems: 1, maxItems: 500, uniqueItems: true }) },
   { additionalProperties: false },
 );
+
+// ---------- statistiche ----------
+
+/** Consumo sommato di un gruppo di run (solo quelle che l'hanno registrato). */
+export interface UsageTotals {
+  runs: number;
+  durationMs: number;
+  tokens: number;
+  costUsd: number;
+}
+
+/** Statistiche delle run ancora presenti, di un progetto o di tutti, da una data. */
+export interface Stats {
+  /** Inizio del periodo (giorno locale, YYYY-MM-DD); null = dalla prima run. */
+  from: string | null;
+  to: string;
+  totals: {
+    runs: number;
+    byStatus: Partial<Record<RunRowStatus, number>>;
+    /** Segui workflow e richiesta libera. */
+    plan: UsageTotals;
+    direct: UsageTotals;
+  };
+  /** Un giorno per riga, dal primo del periodo a oggi. */
+  days: { day: string; plan: UsageTotals; direct: UsageTotals }[];
+  /** Per progetto (null = run fuori da un progetto), dal più caro. */
+  projects: {
+    id: string | null;
+    name: string;
+    runs: number;
+    done: number;
+    failed: number;
+    usage: UsageTotals;
+  }[];
+  /** Passi agent sommati per workflow e passo, dal più caro. */
+  steps: { workflow: string; stepId: string; title: string; runs: number; usage: UsageTotals }[];
+}

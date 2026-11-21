@@ -1,5 +1,6 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import {
+  ContextInventorySchema,
   CreateProjectSchema,
   Id,
   IssueSchema,
@@ -54,7 +55,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
     },
     async (req, reply) => {
       const { workflow } = req.body;
-      if (workflow !== null) {
+      if (workflow !== undefined && workflow !== null) {
         const def = await workflows.definition(workflow);
         if (def?.workflow.kind !== 'develop')
           return reply.code(422).send({ message: `'${workflow}' non è un workflow di sviluppo` });
@@ -93,6 +94,34 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
       try {
         await hub.openTerminal(path);
         return reply.code(204).send(null);
+      } catch (e) {
+        const { code, message } = runnerFailure(e);
+        return reply.code(code).send({ message });
+      }
+    },
+  );
+
+  // Cosa claude carica all'avvio nella cartella del progetto: lo legge il runner.
+  app.get(
+    '/api/projects/:id/context',
+    {
+      schema: {
+        params: Type.Object({ id: Id }),
+        response: {
+          200: ContextInventorySchema,
+          409: Message,
+          422: Message,
+          502: Message,
+          504: Message,
+        },
+      },
+    },
+    async (req, reply) => {
+      const path = await folderOf(req.params.id);
+      if (path === undefined) return reply.callNotFound();
+      if (!path) return reply.code(422).send({ message: 'Il progetto non ha cartella' });
+      try {
+        return await hub.contextInventory(path);
       } catch (e) {
         const { code, message } = runnerFailure(e);
         return reply.code(code).send({ message });

@@ -53,6 +53,12 @@ const SPLASH_MS = 600;
                 routerLinkActive="bg-subtle !text-fg"
                 >{{ i18n.t('nav.workflows') }}</a
               >
+              <a
+                routerLink="/statistiche"
+                class="rounded-md px-2.5 py-1 text-muted transition-colors hover:text-fg"
+                routerLinkActive="bg-subtle !text-fg"
+                >{{ i18n.t('nav.stats') }}</a
+              >
             </nav>
             <span class="ml-auto flex items-center gap-2 text-xs text-muted" aria-live="polite">
               <span
@@ -105,7 +111,7 @@ export class App {
   );
   /** Sezione attiva: la pagina dei progetti (task, chat, nuovo progetto) o quella dei workflow. */
   protected readonly section = computed(() =>
-    /^\/(workflow|opzioni)(\/|$|\?)/.test(this.url()) ? 'other' : 'projects',
+    /^\/(workflow|statistiche|opzioni)(\/|$|\?)/.test(this.url()) ? 'other' : 'projects',
   );
   protected readonly connection = computed(() =>
     this.i18n.t(

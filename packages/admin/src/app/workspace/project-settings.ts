@@ -15,6 +15,7 @@ import { I18n } from '../core/i18n';
 import { Projects } from '../core/projects';
 import { Icon } from '../ui/icon';
 import { WorkflowPreview } from '../workflows/preview';
+import { ProjectContext } from './project-context';
 import { ProjectPrompts } from './project-prompts';
 
 /**
@@ -23,7 +24,7 @@ import { ProjectPrompts } from './project-prompts';
  */
 @Component({
   selector: 'jk-project-settings',
-  imports: [FormsModule, RouterLink, Icon, WorkflowPreview, ProjectPrompts],
+  imports: [FormsModule, RouterLink, Icon, WorkflowPreview, ProjectPrompts, ProjectContext],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
   template: `
@@ -91,6 +92,9 @@ import { ProjectPrompts } from './project-prompts';
         @if (p.path) {
           <section class="mt-4 rounded-xl border border-line bg-surface p-4">
             <jk-project-prompts [projectId]="p.id" [used]="usedPrompts()" />
+          </section>
+          <section class="mt-4 rounded-xl border border-line bg-surface p-4">
+            <jk-project-context [project]="p" />
           </section>
         }
       </div>

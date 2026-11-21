@@ -2,6 +2,7 @@ import { hostname, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { claudeAssistant } from './assist.js';
+import { claudeContextProbe } from './context-probe.js';
 import { RunnerClient } from './client.js';
 import { runDiagnostics } from './diagnostics.js';
 import { systemFolderPicker } from './folder-picker.js';
@@ -54,6 +55,7 @@ export async function startRunner(opts: {
     pickFolder: systemFolderPicker(),
     openTerminal: systemTerminal(),
     assist: claudeAssistant(claude),
+    probeContext: claudeContextProbe(claude),
     diagnose: () => runDiagnostics({ claude, dataDir, scriptsDir, permissionsEndpoint: true }),
     makeHost: (io, start, { runDir }) =>
       createNodeHost({
@@ -61,6 +63,7 @@ export async function startRunner(opts: {
         permissions,
         turnsDir: join(runDir, 'turns'),
         ...(start.cwd !== undefined && { cwd: start.cwd }),
+        ...(start.exclude && { exclude: start.exclude }),
       }),
     ...(opts.log && { log: opts.log }),
   });

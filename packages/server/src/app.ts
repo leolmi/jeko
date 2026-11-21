@@ -12,6 +12,7 @@ import { runRoutes } from './routes/runs.js';
 import { settingsRoutes } from './routes/settings.js';
 import { setupRoutes } from './routes/setup.js';
 import { staticRoutes } from './routes/static.js';
+import { statsRoutes } from './routes/stats.js';
 import { templateRoutes } from './routes/templates.js';
 import { workflowRoutes } from './routes/workflows.js';
 import { RunnerHub } from './runs/hub.js';
@@ -79,6 +80,7 @@ export async function buildApp({
   await app.register(templateRoutes, { templates, runs, hub });
   await app.register(workflowRoutes, { workflows, projects, hub });
   await app.register(runRoutes, { runs, workflows, projects, hub });
+  await app.register(statsRoutes, { runs, projects });
   await app.register(setupRoutes, { settings: settingsFile, workflows, hub, version: VERSION });
   await app.register(settingsRoutes, { settings });
   await app.register(appRoutes, { control, runs, version: VERSION });

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   ServerToRunnerSchema,
   type Check,
+  type ContextInventory,
   validator,
   type Answer,
   type Prompt,
@@ -13,6 +14,7 @@ import {
 } from '@jeko/shared';
 import { runWorkflow, type Host } from './engine/engine.js';
 import type { Assistant } from './assist.js';
+import type { ContextProbe } from './context-probe.js';
 import type { FolderPicker } from './folder-picker.js';
 import { deletePrompt, listPrompts, savePrompt } from './prompts.js';
 import type { TerminalOpener } from './terminal.js';
@@ -40,6 +42,8 @@ export interface ClientOptions {
   pickFolder?: FolderPicker | undefined;
   /** Terminale del PC in una cartella; senza, le richieste ricevono un errore. */
   openTerminal?: TerminalOpener | undefined;
+  /** Cosa claude carica all'avvio in una cartella; senza, le richieste ricevono un errore. */
+  probeContext?: ContextProbe | undefined;
   log?: Pick<Console, 'info' | 'warn' | 'error'>;
 }
 
@@ -202,6 +206,8 @@ export class RunnerClient {
         return void this.pickFolder(msg);
       case 'terminal.open':
         return void this.openTerminal(msg);
+      case 'context.request':
+        return void this.probeContext(msg);
       case 'prompts.request':
         return this.projectPrompts(msg);
       case 'assist.request':
@@ -276,6 +282,27 @@ export class RunnerClient {
       const reason = e instanceof Error ? e.message : String(e);
       this.log.warn(`prompt del progetto: ${reason}`);
       reply([], reason);
+    }
+  }
+
+  // ---------- contesto di claude ----------
+
+  private async probeContext(msg: Extract<ServerToRunner, { type: 'context.request' }>) {
+    const reply = (inventory: ContextInventory | null, error?: string) =>
+      this.raw({
+        type: 'context.result',
+        requestId: msg.requestId,
+        inventory,
+        ...(error && { error }),
+      });
+    const probe = this.opts.probeContext;
+    if (!probe) return reply(null, 'Lettura del contesto non disponibile');
+    try {
+      reply(await probe(msg.cwd));
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      this.log.warn(`contesto di claude: ${reason}`);
+      reply(null, reason);
     }
   }
 

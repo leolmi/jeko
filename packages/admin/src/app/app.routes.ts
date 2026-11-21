@@ -22,6 +22,10 @@ export const routes: Routes = [
     loadComponent: () => import('./workflows/workflows-page').then((m) => m.WorkflowsPage),
   },
   {
+    path: 'statistiche',
+    loadComponent: () => import('./stats/stats-page').then((m) => m.StatsPage),
+  },
+  {
     path: 'opzioni',
     loadComponent: () => import('./settings/settings-page').then((m) => m.SettingsPage),
   },

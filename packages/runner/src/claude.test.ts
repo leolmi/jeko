@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { claudeArgs, parseActivity, parseStream, toolDetail } from './claude.js';
+import {
+  claudeArgs,
+  parseActivity,
+  parseInit,
+  parseStream,
+  settingsWithPlugins,
+  toolDetail,
+} from './claude.js';
 
 describe('claude', () => {
   it('costruisce gli argomenti del turno', () => {
@@ -88,5 +95,64 @@ describe('claude', () => {
     expect(parseActivity('{"type":"assi')).toEqual([]);
     expect(toolDetail({ command: 'npm test\nnpm run lint' })).toBe('npm test');
     expect(toolDetail({ todos: [] })).toBe('');
+  });
+});
+
+describe('esclusioni dal contesto', () => {
+  const base = { sessionId: 's', resume: false };
+
+  it('strumenti e server MCP diventano --disallowedTools, le skill --disable-slash-commands', () => {
+    const args = claudeArgs({
+      ...base,
+      exclude: {
+        tools: ['WebSearch'],
+        mcpServers: ['github', 'claude.ai Gmail'],
+        plugins: ['x@y'],
+        skills: true,
+      },
+    });
+    expect(args).toContain('--disable-slash-commands');
+    expect(args[args.indexOf('--disallowedTools') + 1]).toBe(
+      'WebSearch,mcp__github,mcp__claude_ai_Gmail',
+    );
+  });
+
+  it('senza esclusioni non aggiunge nulla', () => {
+    const args = claudeArgs({
+      ...base,
+      exclude: { tools: [], mcpServers: [], plugins: [], skills: false },
+    });
+    expect(args).not.toContain('--disallowedTools');
+    expect(args).not.toContain('--disable-slash-commands');
+  });
+
+  it('i plugin esclusi si aggiungono alle impostazioni esistenti', () => {
+    expect(
+      settingsWithPlugins({ hooks: { a: 1 }, enabledPlugins: { 'k@m': true } }, ['p@m']),
+    ).toEqual({ hooks: { a: 1 }, enabledPlugins: { 'k@m': true, 'p@m': false } });
+  });
+
+  it('legge il messaggio init, senza il server di Jeko né i plugin integrati', () => {
+    const line = JSON.stringify({
+      type: 'system',
+      subtype: 'init',
+      tools: ['Bash', 'WebSearch', 'mcp__github__issue'],
+      mcp_servers: [
+        { name: 'github', status: 'connected' },
+        { name: 'jeko', status: 'connected' },
+      ],
+      plugins: [
+        { name: 'armadillo', source: 'armadillo@market' },
+        { name: 'tel', source: 'cc-plugin-telemetry@builtin' },
+      ],
+      skills: ['dataviz'],
+    });
+    expect(parseInit(line, 'jeko')).toEqual({
+      tools: ['Bash', 'WebSearch'],
+      mcpServers: [{ name: 'github', status: 'connected' }],
+      plugins: [{ name: 'armadillo', source: 'armadillo@market' }],
+      skills: ['dataviz'],
+    });
+    expect(parseInit('{"type":"assistant"}', 'jeko')).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import type { AgentUsage } from '@jeko/shared';
+import type { AgentUsage, ContextExclusions, ContextInventory } from '@jeko/shared';
 
 export interface TurnInput {
   prompt: string;
@@ -19,6 +19,8 @@ export interface TurnInput {
   settings?: string | undefined;
   /** Variabili d'ambiente in più per claude (e quindi per hook e server MCP). */
   env?: Record<string, string> | undefined;
+  /** Cosa togliere dal contesto (i plugin passano invece dalle impostazioni). */
+  exclude?: ContextExclusions | undefined;
 }
 
 export interface TurnOutput {
@@ -38,7 +40,61 @@ export function claudeArgs(input: Omit<TurnInput, 'prompt' | 'cwd' | 'env'>): st
   if (input.mcpConfig) args.push('--mcp-config', input.mcpConfig);
   if (input.permissionPromptTool) args.push('--permission-prompt-tool', input.permissionPromptTool);
   if (input.settings) args.push('--settings', input.settings);
+  const deny = [
+    ...(input.exclude?.tools ?? []),
+    ...(input.exclude?.mcpServers ?? []).map(mcpPrefix),
+  ];
+  if (deny.length) args.push('--disallowedTools', deny.join(','));
+  if (input.exclude?.skills) args.push('--disable-slash-commands');
   return args;
+}
+
+/**
+ * Prefisso degli strumenti di un server MCP: claude li chiama `mcp__<server>__<strumento>`,
+ * col nome del server ridotto a lettere, cifre, `_` e `-` (es. "claude.ai Gmail" → claude_ai_Gmail).
+ */
+export const mcpPrefix = (server: string) => `mcp__${server.replace(/[^\w-]/g, '_')}`;
+
+/** Impostazioni con i plugin esclusi aggiunte (claude ne legge un solo `--settings`). */
+export function settingsWithPlugins(
+  settings: Record<string, unknown>,
+  plugins: readonly string[],
+): Record<string, unknown> {
+  const current = (settings['enabledPlugins'] ?? {}) as Record<string, boolean>;
+  return {
+    ...settings,
+    enabledPlugins: { ...current, ...Object.fromEntries(plugins.map((p) => [p, false])) },
+  };
+}
+
+const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
+
+/**
+ * Cosa claude ha caricato, dal messaggio `system/init` dello stream-json; null se la riga
+ * non lo è. Restano fuori il server MCP di Jeko e i plugin integrati nell'app di Claude.
+ */
+export function parseInit(line: string, ownMcp: string): ContextInventory | null {
+  let msg: Record<string, unknown>;
+  try {
+    msg = JSON.parse(line) as typeof msg;
+  } catch {
+    return null;
+  }
+  if (msg['type'] !== 'system' || msg['subtype'] !== 'init') return null;
+  const objects = (v: unknown) =>
+    (Array.isArray(v) ? v : []).filter(
+      (x): x is Record<string, unknown> => !!x && typeof x === 'object',
+    );
+  return {
+    tools: strings(msg['tools']).filter((t) => !t.startsWith('mcp__')),
+    mcpServers: objects(msg['mcp_servers'])
+      .filter((m) => typeof m['name'] === 'string' && m['name'] !== ownMcp)
+      .map((m) => ({ name: String(m['name']), status: String(m['status'] ?? '') })),
+    plugins: objects(msg['plugins'])
+      .filter((p) => typeof p['source'] === 'string' && !String(p['source']).endsWith('@builtin'))
+      .map((p) => ({ name: String(p['name'] ?? p['source']), source: String(p['source']) })),
+    skills: strings(msg['skills']),
+  };
 }
 
 /** Messaggio `result` di un'uscita stream-json (anche parziale); null se il turno non è finito. */

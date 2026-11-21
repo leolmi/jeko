@@ -3,6 +3,48 @@ import { Type, type Static } from '@sinclair/typebox';
 export const Id = Type.String({ format: 'uuid' });
 export const Timestamp = Type.String({ format: 'date-time' });
 
+/**
+ * Cosa togliere dal contesto di claude nelle run del progetto, per non gonfiare il budget
+ * iniziale: strumenti integrati e server MCP (`--disallowedTools`), plugin (`enabledPlugins`
+ * a false nelle impostazioni) e, in blocco, skill e comandi (`--disable-slash-commands`).
+ */
+export const ContextExclusionsSchema = Type.Object(
+  {
+    tools: Type.Array(Type.String({ minLength: 1 })),
+    mcpServers: Type.Array(Type.String({ minLength: 1 })),
+    /** Come li riporta claude: `nome@marketplace`. */
+    plugins: Type.Array(Type.String({ minLength: 1 })),
+    skills: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
+export type ContextExclusions = Static<typeof ContextExclusionsSchema>;
+
+/** Strumenti che servono ai workflow: non si escludono. */
+export const ESSENTIAL_TOOLS = [
+  'Bash',
+  'PowerShell',
+  'Read',
+  'Write',
+  'Edit',
+  'Glob',
+  'Grep',
+  'ToolSearch',
+] as const;
+
+/** Nessuna esclusione da applicare. */
+export const noExclusions = (e: ContextExclusions | undefined): boolean =>
+  !e || (!e.tools.length && !e.mcpServers.length && !e.plugins.length && !e.skills);
+
+/** Cosa claude carica all'avvio in una cartella (dal messaggio `init`). */
+export const ContextInventorySchema = Type.Object({
+  tools: Type.Array(Type.String()),
+  mcpServers: Type.Array(Type.Object({ name: Type.String(), status: Type.String() })),
+  plugins: Type.Array(Type.Object({ name: Type.String(), source: Type.String() })),
+  skills: Type.Array(Type.String()),
+});
+export type ContextInventory = Static<typeof ContextInventorySchema>;
+
 export const ProjectSchema = Type.Object(
   {
     id: Id,
@@ -11,6 +53,8 @@ export const ProjectSchema = Type.Object(
     path: Type.String(),
     /** Workflow `develop` che guida i task del progetto; null = il predefinito. */
     workflow: Type.Union([Type.String(), Type.Null()]),
+    /** Esclusioni dal contesto di claude; assente = nessuna. */
+    exclude: Type.Optional(ContextExclusionsSchema),
     createdAt: Timestamp,
   },
   { additionalProperties: false },
@@ -27,7 +71,10 @@ export const CreateProjectSchema = Type.Object(
 export type CreateProject = Static<typeof CreateProjectSchema>;
 
 export const UpdateProjectSchema = Type.Object(
-  { workflow: Type.Union([Type.String({ minLength: 1 }), Type.Null()]) },
+  {
+    workflow: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+    exclude: Type.Optional(ContextExclusionsSchema),
+  },
   { additionalProperties: false },
 );
 export type UpdateProject = Static<typeof UpdateProjectSchema>;

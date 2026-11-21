@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { knowledgePrompt, type RunEvent } from '@jeko/shared';
+import { knowledgePrompt, type ContextExclusions, type RunEvent } from '@jeko/shared';
 import { loadKnowledge } from '../knowledge.js';
 import { readPrompt } from '../prompts.js';
 import type { PermissionBridge } from '../permissions/bridge.js';
@@ -22,6 +22,8 @@ export interface NodeHostOptions {
   emit: (e: RunEvent) => void;
   /** Collega ogni turno di claude ai permessi di Jeko (server MCP + hook). */
   permissions?: PermissionBridge;
+  /** Esclusioni dal contesto di claude, dal progetto della run. */
+  exclude?: ContextExclusions;
 }
 
 /** Host reale: comandi locali, file system e claude CLI. */
@@ -62,6 +64,7 @@ export function createNodeHost(opts: NodeHostOptions): Host {
         allowedTools: req.tools,
         effort: req.effort,
         model: req.model,
+        exclude: opts.exclude,
         signal: req.signal,
         onActivity: req.onActivity,
         ...(permissions && {

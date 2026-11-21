@@ -67,11 +67,11 @@ describe('App', () => {
     expect(el.querySelector('header')?.textContent).toContain('jeko');
   });
 
-  it('passa tra progetti e workflow dall’intestazione', async () => {
+  it('passa tra progetti, workflow e statistiche dall’intestazione', async () => {
     const el = await render(status(true));
     await stable();
     const nav = [...el.querySelectorAll<HTMLAnchorElement>('header nav a')];
-    expect(nav.map((a) => a.getAttribute('href'))).toEqual(['/', '/workflow']);
+    expect(nav.map((a) => a.getAttribute('href'))).toEqual(['/', '/workflow', '/statistiche']);
     // Il primo avvio si rifà dalle Opzioni, non più dall'intestazione.
     expect(el.querySelector('header > button')).toBeNull();
   });

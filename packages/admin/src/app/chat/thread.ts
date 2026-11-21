@@ -28,12 +28,14 @@ import { Icon } from '../ui/icon';
 import { ModeBadge, runTone } from '../ui/mode-tone';
 import { Status } from '../ui/status';
 import { PromptCard } from './prompt-card';
+import { buildBreakdown } from './breakdown';
 import { buildTimeline } from './timeline';
+import { UsageBar } from './usage-bar';
 
 /** Filo di una run: la richiesta, l'avanzamento e le domande a cui rispondere. */
 @Component({
   selector: 'jk-thread',
-  imports: [NgTemplateOutlet, RouterLink, Icon, Status, PromptCard, ModeBadge],
+  imports: [NgTemplateOutlet, RouterLink, Icon, Status, PromptCard, ModeBadge, UsageBar],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex h-full flex-col' },
   template: `
@@ -78,6 +80,9 @@ import { buildTimeline } from './timeline';
           </button>
         }
       </header>
+      @if (breakdown(); as b) {
+        <jk-usage-bar class="border-b border-line px-6 py-2.5" [breakdown]="b" />
+      }
 
       <div #scroller class="flex-1 overflow-y-auto">
         <ol class="mx-auto flex max-w-3xl flex-col gap-3 px-6 py-8">
@@ -285,6 +290,8 @@ export class Thread {
     const r = this.run();
     return r ? buildTimeline(r) : [];
   });
+  /** Dove ha speso la run, passo per passo. */
+  protected readonly breakdown = computed(() => buildBreakdown(this.timeline()));
   protected readonly final = computed(() => {
     const r = this.run();
     return !r || FINAL_STATUSES.includes(r.status);

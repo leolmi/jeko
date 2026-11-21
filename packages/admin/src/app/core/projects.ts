@@ -3,6 +3,7 @@ import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import {
   FINAL_STATUSES,
   folderKey,
+  type ContextExclusions,
   type CreateProject,
   type Project,
   type RunRowStatus,
@@ -126,6 +127,14 @@ export class Projects {
   async setWorkflow(id: string, workflow: string | null): Promise<void> {
     const project = await firstValueFrom(
       this.http.patch<Project>(`/api/projects/${id}`, { workflow }),
+    );
+    this.list.update((ps) => ps.map((p) => (p.id === id ? project : p)));
+  }
+
+  /** Esclusioni dal contesto di claude per le run del progetto. */
+  async setExclusions(id: string, exclude: ContextExclusions): Promise<void> {
+    const project = await firstValueFrom(
+      this.http.patch<Project>(`/api/projects/${id}`, { exclude }),
     );
     this.list.update((ps) => ps.map((p) => (p.id === id ? project : p)));
   }

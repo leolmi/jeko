@@ -4,11 +4,13 @@ import type { WebSocket } from 'ws';
 import {
   FINAL_STATUSES,
   folderKey,
+  noExclusions,
   RunnerToServerSchema,
   validator,
   type AdminMessage,
   type Answer,
   type Check,
+  type ContextInventory,
   type ProjectPrompt,
   type RunEvent,
   type RunnerToServer,
@@ -37,6 +39,8 @@ const PICK_TIMEOUT_MS = 10 * 60_000;
 const TERMINAL_TIMEOUT_MS = 15_000;
 /** Quanto si aspetta una risposta di claude a una richiesta di assistenza. */
 const ASSIST_TIMEOUT_MS = 5 * 60_000;
+/** Lettura del contesto: claude parte, carica plugin e server MCP e manda l'elenco. */
+const CONTEXT_TIMEOUT_MS = 90_000;
 
 export type AnswerOutcome = 'ok' | 'not-found' | 'already-answered' | 'wrong-kind';
 
@@ -108,6 +112,15 @@ export class RunnerHub {
   /** Apre sul PC del runner un terminale nella cartella. Fallisce se il runner manca. */
   async openTerminal(cwd: string, timeoutMs = TERMINAL_TIMEOUT_MS): Promise<void> {
     await this.request(timeoutMs, (requestId) => ({ type: 'terminal.open', requestId, cwd }));
+  }
+
+  /** Cosa claude carica all'avvio nella cartella: strumenti, server MCP, plugin e skill. */
+  contextInventory(cwd: string, timeoutMs = CONTEXT_TIMEOUT_MS) {
+    return this.request<ContextInventory>(timeoutMs, (requestId) => ({
+      type: 'context.request',
+      requestId,
+      cwd,
+    }));
   }
 
   /** Chiede a claude, tramite il runner, una risposta testuale a un prompt. */
@@ -254,6 +267,11 @@ export class RunnerHub {
         return this.settle(msg.requestId, msg.error ? new Error(msg.error) : null);
       case 'prompts.result':
         return this.settle(msg.requestId, msg.error ? new Error(msg.error) : msg.prompts);
+      case 'context.result':
+        return this.settle(
+          msg.requestId,
+          msg.error || !msg.inventory ? new Error(msg.error ?? 'nessun elenco') : msg.inventory,
+        );
     }
   }
 
@@ -371,6 +389,7 @@ export class RunnerHub {
       return 'failed';
     }
     const settings = await this.settings.get();
+    const exclude = (await this.projects.byPath(run.cwd))?.exclude;
     const sent = this.sendRunner({
       type: 'run.start',
       runId: run.id,
@@ -381,6 +400,7 @@ export class RunnerHub {
       ...(run.cwd && { cwd: run.cwd }),
       ...(run.state && { state: run.state }),
       settings,
+      ...(exclude && !noExclusions(exclude) && { exclude }),
     });
     if (!sent) return 'offline';
     await this.setStatus(run.id, 'running');

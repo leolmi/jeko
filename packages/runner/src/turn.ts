@@ -6,10 +6,12 @@ import {
   claudeArgs,
   parseActivity,
   parseStream,
+  settingsWithPlugins,
   type Activity,
   type TurnInput,
   type TurnOutput,
 } from './claude.js';
+import type { ContextExclusions } from '@jeko/shared';
 import { writeAtomic } from './journal.js';
 import { killTree, processAlive, sameProcess } from './process.js';
 import { spawnArgv } from './spawn.js';
@@ -34,6 +36,8 @@ export interface DurableTurnOptions {
   /** Ragionamento e modello del passo (`--effort`, `--model`). */
   effort?: string | undefined;
   model?: string | undefined;
+  /** Esclusioni dal contesto di claude, dal progetto. */
+  exclude?: ContextExclusions | undefined;
   /** Collega il turno ai permessi di Jeko; `token` c'è quando si riaggancia un turno. */
   permissions?: ((dir: string, token?: string) => TurnPermissions) | undefined;
   signal?: AbortSignal | undefined;
@@ -174,6 +178,8 @@ function spawnTurn(
       effort: o.effort,
       model: o.model,
       ...perms?.input,
+      settings: excludePlugins(perms?.input.settings, o),
+      exclude: o.exclude,
     });
     const child = spawnArgv([...o.command, ...args], {
       ...(o.cwd !== undefined && { cwd: o.cwd }),
@@ -237,4 +243,16 @@ function pumpActivity(o: DurableTurnOptions, meta: TurnMeta, n: number): void {
   }
   meta.seen = { n, bytes: start + end + 1 };
   save(o.dir, meta);
+}
+
+/** File di impostazioni del turno con i plugin esclusi; senza esclusioni quello dei permessi. */
+function excludePlugins(settings: string | undefined, o: DurableTurnOptions): string | undefined {
+  const plugins = o.exclude?.plugins ?? [];
+  if (!plugins.length) return settings;
+  const base = settings
+    ? (JSON.parse(readFileSync(settings, 'utf8')) as Record<string, unknown>)
+    : {};
+  const file = join(o.dir, 'settings.exclude.json');
+  writeFileSync(file, JSON.stringify(settingsWithPlugins(base, plugins)));
+  return file;
 }
