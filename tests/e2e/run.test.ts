@@ -1,16 +1,13 @@
-import { PGlite } from '@electric-sql/pglite';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import type { FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
 import type { AdminMessage, Project, PromptRecord, RunDetail, RunSummary } from '@jeko/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buildApp } from '../../packages/server/src/app.js';
-import type { Db } from '../../packages/server/src/db/db.js';
-import { migrate } from '../../packages/server/src/db/migrate.js';
+import { buildApp, type JekoApp } from '../../packages/server/src/app.js';
 import { RunnerClient } from '../../packages/runner/src/client.js';
+import { linkPair, type LinkSocket } from '../../packages/runner/src/link.js';
 import type { AgentRequest, Host } from '../../packages/runner/src/engine/engine.js';
 
 const WORKFLOW = `
@@ -27,16 +24,6 @@ steps:
   - { id: commit, type: gate, level: always, message: Commit? }
 `;
 
-function pgliteDb(): Db {
-  const pg = new PGlite();
-  return {
-    query: async <R>(sql: string, params?: unknown[]) => ({
-      rows: (await pg.query<R>(sql, params)).rows,
-    }),
-    close: () => pg.close(),
-  };
-}
-
 async function until<T>(fn: () => Promise<T | undefined | null | false>, ms = 5000): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
@@ -48,7 +35,9 @@ async function until<T>(fn: () => Promise<T | undefined | null | false>, ms = 50
 }
 
 describe('run server ↔ runner', () => {
-  let app: FastifyInstance;
+  let app: JekoApp;
+  /** Capi lato server delle connessioni del runner, per farle cadere. */
+  let links: LinkSocket[];
   let base: string;
   let client: RunnerClient | undefined;
   let others: RunnerClient[];
@@ -76,7 +65,12 @@ describe('run server ↔ runner', () => {
   const startRunner = () => {
     client = new RunnerClient({
       dataDir,
-      url: `${base.replace('http', 'ws')}/ws/runner`,
+      connect: () => {
+        const [server, runner] = linkPair();
+        links.push(server);
+        app.jeko.hub.attachRunner(server);
+        return runner;
+      },
       runnerId: 'test-pc',
       version: '0.0.0',
       reconnectMs: 50,
@@ -112,10 +106,9 @@ describe('run server ↔ runner', () => {
     terminals = [];
     functions = {};
     others = [];
+    links = [];
     dataDir = mkdtempSync(join(tmpdir(), 'jeko-e2e-'));
-    const db = pgliteDb();
-    await migrate(db);
-    app = await buildApp({ db });
+    app = await buildApp({ dataDir: mkdtempSync(join(tmpdir(), 'jeko-e2e-data-')) });
     await app.listen({ host: '127.0.0.1', port: 0 });
     base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
     expect((await api('POST', '/api/workflows', { yaml: WORKFLOW })).status).toBe(201);
@@ -239,8 +232,8 @@ describe('run server ↔ runner', () => {
     });
     const ask = await pendingPrompt(body.id);
 
-    // Il server chiude le connessioni dei runner: il client si ricollega da solo.
-    for (const c of app.websocketServer.clients) c.terminate();
+    // La connessione con il runner cade: il client si ricollega da solo.
+    for (const l of links) l.terminate();
     await answer(body.id, ask, { kind: 'ask', value: 'Bob' });
 
     const gate = await until(async () =>
@@ -415,7 +408,8 @@ describe('run server ↔ runner', () => {
       mode: 'headless',
       inputs: { nome: 'Ada' },
     });
-    const ws = new WebSocket(`${base.replace('http', 'ws')}/ws/runner`);
+    const [server, ws] = linkPair();
+    app.jeko.hub.attachRunner(server);
     const acks: number[] = [];
     let started: unknown = null;
     ws.on('message', (d) => {
@@ -423,7 +417,7 @@ describe('run server ↔ runner', () => {
       if (m.type === 'run.ack') acks.push(m.seq!);
       if (m.type === 'run.start') started = m;
     });
-    await new Promise((r) => ws.once('open', r));
+    await new Promise<void>((r) => ws.on('open', r));
     const send = (m: object) => ws.send(JSON.stringify(m));
     send({ type: 'hello', runnerId: 'finto', version: '0', activeRuns: [] });
     send({ type: 'ready' });

@@ -22,6 +22,16 @@ import type { RunLaunch, RunStore } from './store.js';
 
 const isRunnerMessage = validator(RunnerToServerSchema);
 
+/** Capo del server della connessione con il runner (in memoria, stesso processo). */
+export interface RunnerSocket {
+  readonly OPEN: number;
+  readonly readyState: number;
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  on(event: 'message', listener: (data: unknown) => void): unknown;
+  on(event: 'close', listener: () => void): unknown;
+}
+
 /** Quanto si aspetta che l'utente scelga una cartella nel dialogo. */
 const PICK_TIMEOUT_MS = 10 * 60_000;
 const TERMINAL_TIMEOUT_MS = 15_000;
@@ -31,12 +41,11 @@ const ASSIST_TIMEOUT_MS = 5 * 60_000;
 export type AnswerOutcome = 'ok' | 'not-found' | 'already-answered' | 'wrong-kind';
 
 /**
- * Collega l'unico runner (connessione in uscita dal PC dell'utente) con le run nel DB
- * e con le pagine admin aperte. Il runner non apre porte: è sempre lui a collegarsi.
+ * Collega il runner (nello stesso processo) con le run salvate e con le pagine admin aperte.
  */
 export class RunnerHub {
   private runner: {
-    socket: WebSocket;
+    socket: RunnerSocket;
     runnerId: string;
     version: string;
     activeRuns: string[];
@@ -61,6 +70,11 @@ export class RunnerHub {
 
   get connected(): boolean {
     return this.runner !== null;
+  }
+
+  /** Pagine admin collegate (finestre dell'app aperte). */
+  get adminCount(): number {
+    return this.admins.size;
   }
 
   /** Runner collegato e sue verifiche, per il primo avvio. */
@@ -139,7 +153,7 @@ export class RunnerHub {
 
   // ---------- connessioni ----------
 
-  attachRunner(socket: WebSocket): void {
+  attachRunner(socket: RunnerSocket): void {
     // I messaggi di un socket si elaborano in ordine: gli eventi di una run dipendono dai precedenti.
     let queue = Promise.resolve();
     socket.on('message', (raw) => {
@@ -203,7 +217,7 @@ export class RunnerHub {
 
   // ---------- messaggi dal runner ----------
 
-  private async onRunnerMessage(socket: WebSocket, raw: unknown): Promise<void> {
+  private async onRunnerMessage(socket: RunnerSocket, raw: unknown): Promise<void> {
     let msg: unknown;
     try {
       msg = JSON.parse(String(raw));
@@ -243,7 +257,7 @@ export class RunnerHub {
     }
   }
 
-  private async onHello(socket: WebSocket, msg: Extract<RunnerToServer, { type: 'hello' }>) {
+  private async onHello(socket: RunnerSocket, msg: Extract<RunnerToServer, { type: 'hello' }>) {
     if (this.runner && this.runner.socket !== socket) this.runner.socket.close(4000, 'Sostituito');
     this.runner = {
       socket,

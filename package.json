@@ -14,7 +14,7 @@
     "packages/admin"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w @jeko/shared && npm run build -w @jeko/admin && npm run build -w @jeko/server",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run && npm test -w @jeko/admin",
     "test:watch": "vitest",
@@ -22,8 +22,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev:server": "npm run dev -w @jeko/server",
-    "dev:runner": "npm run dev -w @jeko/runner",
-    "dev:admin": "npm start -w @jeko/admin"
+    "dev:admin": "npm start -w @jeko/admin",
+    "dev:desktop": "neu run",
+    "package": "npm run build && neu build && node scripts/package.mjs",
+    "release": "node scripts/release.mjs",
+    "migrate:pglite": "node scripts/migrate-pglite.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -36,6 +39,8 @@
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.73.0",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.1",
+    "@electric-sql/pglite": "^0.5.17",
+    "@neutralinojs/neu": "^11.8.0"
   }
 }

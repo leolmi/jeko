@@ -7,7 +7,6 @@ import { firstValueFrom } from 'rxjs';
 export function serverChecks(s: SetupStatus): Check[] {
   return [
     { id: 'server.api', ok: true, severity: 'error', detail: `v${s.server.version}` },
-    { id: 'server.database', ok: s.server.database, severity: 'error' },
     {
       id: 'server.workflows',
       ok: s.server.workflows > 0,
@@ -16,10 +15,6 @@ export function serverChecks(s: SetupStatus): Check[] {
     },
   ];
 }
-
-export const INSTALLER_FILE = 'jeko-runner-install.ps1';
-/** Comando per eseguire l'installer scaricato (PowerShell, dalla cartella Download). */
-export const INSTALLER_CMD = `powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\\Downloads\\${INSTALLER_FILE}"`;
 
 /** Si può proseguire se nessuna verifica bloccante è fallita. */
 export const blocking = (checks: readonly Check[]) =>
@@ -54,30 +49,13 @@ export class Setup {
     }
   }
 
-  /**
-   * Scarica l'installer del runner. Ogni installer ha un token nuovo: quello precedente
-   * smette di valere alla prossima connessione del runner.
-   */
-  async downloadInstaller(): Promise<void> {
-    const blob = await firstValueFrom(
-      this.http.post('/api/runner/installer', {}, { responseType: 'blob' }),
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = INSTALLER_FILE;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    this.status.update((s) => s && { ...s, runner: { ...s.runner, token: true } });
-  }
-
   async complete(): Promise<void> {
     await firstValueFrom(this.http.post('/api/setup/complete', {}));
     this.reopened.set(false);
     this.status.update((s) => s && { ...s, completed: true });
   }
 
-  /** Riapre il primo avvio (verifiche, runner, installer). */
+  /** Riapre il primo avvio (verifiche dell'ambiente, opzioni). */
   async reopen(): Promise<void> {
     await firstValueFrom(this.http.delete('/api/setup/complete'));
     this.reopened.set(true);

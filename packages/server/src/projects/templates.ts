@@ -1,11 +1,9 @@
+import { join } from 'node:path';
 import { templateIssues, type ProjectTemplate } from '@jeko/shared';
-import type { Db } from '../db/db.js';
-import { iso, json } from '../db/sql.js';
+import { now, readJson, writeJson, type SettingsFile } from '../data/files.js';
 
 /** Template di serie già caricati una volta: se l'utente li elimina, non tornano. */
 const SEEDED = 'templates.seeded';
-
-const COLUMNS = `name, prompt, ${iso('updated_at')} AS "updatedAt"`;
 
 export type TemplateFile = Pick<ProjectTemplate, 'name' | 'prompt'>;
 
@@ -18,20 +16,29 @@ export function parseTemplateFile(text: string): TemplateFile {
   return { name, prompt };
 }
 
-/** Template per creare progetti con l'AI: prompt già pronti, ciascuno con un nome. */
+const lower = (t: ProjectTemplate) => t.name.toLowerCase();
+const byName = (a: ProjectTemplate, b: ProjectTemplate) =>
+  lower(a) < lower(b) ? -1 : lower(a) > lower(b) ? 1 : 0;
+
+/** Template per creare progetti con l'AI: prompt già pronti con un nome, in `templates.json`. */
 export class TemplateStore {
-  constructor(private readonly db: Db) {}
+  private readonly file: string;
+  private items: ProjectTemplate[];
+
+  constructor(
+    dataDir: string,
+    private readonly settings: SettingsFile,
+  ) {
+    this.file = join(dataDir, 'templates.json');
+    this.items = readJson<ProjectTemplate[]>(this.file, []);
+  }
 
   /**
    * Carica i template di serie una volta sola: non quelli con un nome già usato (quelli
    * dell'utente non si toccano) né quelli già caricati e poi eliminati. Restituisce i nomi aggiunti.
    */
   async seed(files: TemplateFile[]): Promise<string[]> {
-    const { rows } = await this.db.query<{ value: string[] }>(
-      `SELECT value FROM settings WHERE key = $1`,
-      [SEEDED],
-    );
-    const seeded = new Set(rows[0]?.value ?? []);
+    const seeded = new Set(this.settings.get<string[]>(SEEDED) ?? []);
     const added: string[] = [];
     for (const { name, prompt } of files) {
       const issues = templateIssues(prompt);
@@ -42,45 +49,35 @@ export class TemplateStore {
       await this.save(name, prompt);
       added.push(name);
     }
-    await this.db.query(
-      `INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-      [SEEDED, json([...seeded].sort())],
-    );
+    const list = [...seeded].sort();
+    if (JSON.stringify(list) !== JSON.stringify(this.settings.get(SEEDED) ?? []))
+      this.settings.set(SEEDED, list);
     return added;
   }
 
   async list(): Promise<ProjectTemplate[]> {
-    const { rows } = await this.db.query<ProjectTemplate>(
-      `SELECT ${COLUMNS} FROM project_templates ORDER BY lower(name)`,
-    );
-    return rows;
+    return [...this.items].sort(byName);
   }
 
   async get(name: string): Promise<ProjectTemplate | null> {
-    const { rows } = await this.db.query<ProjectTemplate>(
-      `SELECT ${COLUMNS} FROM project_templates WHERE name = $1`,
-      [name],
-    );
-    return rows[0] ?? null;
+    return this.items.find((t) => t.name === name) ?? null;
   }
 
   /** Crea o sostituisce il template con quel nome. */
   async save(name: string, prompt: string): Promise<ProjectTemplate> {
-    const { rows } = await this.db.query<ProjectTemplate>(
-      `INSERT INTO project_templates (name, prompt) VALUES ($1, $2)
-       ON CONFLICT (name) DO UPDATE SET prompt = EXCLUDED.prompt, updated_at = now()
-       RETURNING ${COLUMNS}`,
-      [name.trim(), prompt],
-    );
-    return rows[0]!;
+    const template = { name: name.trim(), prompt, updatedAt: now() };
+    this.write([...this.items.filter((t) => t.name !== template.name), template]);
+    return template;
   }
 
   async remove(name: string): Promise<boolean> {
-    const { rows } = await this.db.query(
-      `DELETE FROM project_templates WHERE name = $1 RETURNING name`,
-      [name],
-    );
-    return rows.length > 0;
+    if (!this.items.some((t) => t.name === name)) return false;
+    this.write(this.items.filter((t) => t.name !== name));
+    return true;
+  }
+
+  private write(items: ProjectTemplate[]): void {
+    writeJson(this.file, items);
+    this.items = items;
   }
 }

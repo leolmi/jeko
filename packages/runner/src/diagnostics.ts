@@ -2,6 +2,7 @@ import { accessSync, constants, existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Check } from '@jeko/shared';
+import { BUNDLE } from './permissions/bridge.js';
 import { run } from './spawn.js';
 
 export interface DiagnosticsOptions {
@@ -24,7 +25,7 @@ async function version(argv: string[], env: NodeJS.ProcessEnv): Promise<string |
 }
 
 function scriptPresent(dir: string, name: string): boolean {
-  return existsSync(join(dir, `${name}.js`)) || existsSync(join(dir, `${name}-main.ts`));
+  return existsSync(join(dir, BUNDLE)) || existsSync(join(dir, `${name}-main.ts`));
 }
 
 /**

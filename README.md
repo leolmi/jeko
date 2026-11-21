@@ -1,45 +1,71 @@
 # Jeko
 
-Tool di SDLC locale e personale.
+Tool di SDLC locale e personale: app desktop per Windows ([Neutralino](https://neutralino.js.org)) con un servizio Node che lancia Claude Code.
 
 ## Pacchetti
 
-| Pacchetto         | Contenuto                                                         |
-| ----------------- | ----------------------------------------------------------------- |
-| `packages/shared` | Contratto e validazione (TypeBox + Ajv)                           |
-| `packages/server` | API Fastify 5 (websocket, rate-limit), PGlite o Postgres con `pg` |
-| `packages/runner` | Client WebSocket, server MCP, lancia `claude` una volta per turno |
-| `packages/admin`  | App web Angular 22 zoneless, Tailwind 4, Lato e IBM Plex Mono     |
+| Pacchetto         | Contenuto                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `packages/shared` | Contratto e validazione (TypeBox + Ajv)                                                  |
+| `packages/server` | Servizio: API Fastify 5, dati su file, runner nello stesso processo, aggiornamenti       |
+| `packages/runner` | Motore dei workflow, server MCP e hook dei permessi, lancia `claude` una volta per turno |
+| `packages/admin`  | Web-app Angular 22 zoneless, Tailwind 4, Lato e IBM Plex Mono                            |
+| `desktop/`        | Pagina d'avvio della finestra Neutralino (`resources.neu`)                               |
 
 ## Requisiti
 
-Node ≥ 22. Sul PC del runner anche Git e Claude Code. Nient'altro da installare.
+Node ≥ 22, Git e Claude Code nel PATH. Nient'altro da installare.
 
-## Database
+## App desktop
 
-Di default il server usa Postgres incorporato ([PGlite](https://pglite.dev)): i dati stanno in `%LOCALAPPDATA%\jeko\db` (o in `JEKO_DB_DIR`) e per il backup basta copiare la cartella a server fermo. Al primo avvio crea le tabelle e carica i workflow di serie.
+Cartella portabile (`release/jeko/`, nessuna installazione):
 
-Per un Postgres vero basta `DATABASE_URL`. [`docker-compose.yml`](docker-compose.yml) ne avvia uno con Docker Engine e Compose (gratuiti, senza Docker Desktop) o con `podman compose`:
-
-```sh
-docker compose up -d
-# poi il server con DATABASE_URL=postgres://jeko:jeko@127.0.0.1:5432/jeko
 ```
+jeko.exe          Neutralino
+resources.neu     pagina d'avvio
+server/jeko.js    servizio: un solo file (API, runner, server MCP e hook dei permessi)
+server/admin/     web-app
+```
+
+- `jeko.exe` avvia il servizio come estensione Neutralino (`node server/jeko.js --desktop`): si stacca dalla finestra, ascolta su `127.0.0.1:4310` e serve la web-app, che la finestra apre appena il servizio risponde.
+- Chiusa la finestra, il servizio esce quando non ha task attivi; se ce ne sono, resta acceso finché non finiscono o si fermano a una domanda o a un gate, poi esce. I task fermi riprendono al prossimo avvio. Riaprendo Jeko mentre il servizio è ancora acceso, la finestra usa quello.
+- Registro: `%LOCALAPPDATA%\jeko\logs\jeko.log`.
+- **Aggiornamenti** (Opzioni → Versione e aggiornamenti; controllo anche all'avvio e ogni 6 ore): l'ultima release GitHub di `leolmi/jeko` ha `manifest.json` e uno zip con exe, `resources.neu` e `server/`. Il servizio scarica lo zip, verifica lo SHA-256, rinomina i file attuali in `*.old`, copia i nuovi e riapre l'app. Solo senza task al lavoro e non dai sorgenti. La prima versione si installa a mano.
+
+## Dati
+
+In `%LOCALAPPDATA%\jeko\data` (o `JEKO_DATA_DIR`); per il backup basta copiare la cartella a Jeko chiuso.
+
+```
+settings.json             opzioni dell'utente, primo avvio, workflow e template di serie già caricati
+projects.json             progetti
+templates.json            template per creare i progetti
+workflows.json            indice delle versioni dei workflow
+workflows/<nome>/<n>.yaml una versione
+runs/<id>/run.json        run con stato e richieste all'utente
+runs/<id>/events.jsonl    eventi della run
+```
+
+Il servizio tiene tutto in memoria tranne YAML ed eventi, letti quando servono; ogni scrittura è atomica (file temporaneo, fsync, rinomina). Il runner ha i suoi file in `%LOCALAPPDATA%\jeko\runner` (giornali delle run e turni di claude).
+
+Dalle versioni con PGlite: `npm run migrate:pglite` copia i dati da `%LOCALAPPDATA%\jeko\db` (lasciandolo com'è) a `%LOCALAPPDATA%\jeko\data`.
 
 ## Comandi
 
 ```sh
 npm install
-npm run build          # shared → server → runner → admin
-npm test               # Vitest (shared, server, runner) + test di admin
+npm run build          # shared → admin → server (dist/jeko.js)
+npm test               # Vitest (shared, server, runner, e2e) + test di admin
 npm run lint
 npm run format
-npm run dev:server     # http://127.0.0.1:4310
-npm run dev:runner
-npm run dev:admin      # http://localhost:4200, /api in proxy sul server
+npm run dev:server     # servizio dai sorgenti, http://127.0.0.1:4310
+npm run dev:admin      # http://localhost:4200, /api e /ws in proxy sul servizio
+npm run dev:desktop    # finestra Neutralino (con dev:server già acceso)
+npm run package        # build + neu build + release/jeko e pacchetto di aggiornamento
+npm run release        # pubblica il pacchetto come release GitHub v<versione> (GitHub CLI)
 ```
 
-Variabili d'ambiente: vedi `.env.example`.
+La versione è quella di `package.json` (da tenere uguale in `neutralino.config.json`). Variabili d'ambiente: vedi `.env.example`.
 
 ## Conoscenza del progetto (`.jeko/`)
 

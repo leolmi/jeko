@@ -1,25 +1,16 @@
-import { PGlite } from '@electric-sql/pglite';
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import type { Db } from '../db/db.js';
-import { migrate } from '../db/migrate.js';
+import { SettingsFile } from '../data/files.js';
 import { WorkflowStore } from './store.js';
 
 const builtinDir = fileURLToPath(new URL('../../../shared/workflows/', import.meta.url));
 const builtin = readdirSync(builtinDir).map((f) => readFileSync(join(builtinDir, f), 'utf8'));
 
-async function store(): Promise<WorkflowStore> {
-  const pg = new PGlite();
-  const db: Db = {
-    query: async <R>(sql: string, params?: unknown[]) => ({
-      rows: (await pg.query<R>(sql, params)).rows,
-    }),
-    close: () => pg.close(),
-  };
-  await migrate(db);
-  return new WorkflowStore(db);
+async function store(dir = mkdtempSync(join(tmpdir(), 'jeko-wf-'))): Promise<WorkflowStore> {
+  return new WorkflowStore(dir, new SettingsFile(dir));
 }
 
 describe('workflow di serie', () => {

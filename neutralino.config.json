@@ -1,0 +1,46 @@
+{
+  "$schema": "https://raw.githubusercontent.com/neutralinojs/neutralinojs/main/schemas/neutralino.config.schema.json",
+  "applicationId": "it.leolmi.jeko",
+  "version": "0.1.0",
+  "applicationName": "Jeko",
+  "description": "Jeko · tool di SDLC locale e personale",
+  "author": "Leonardo Olmi",
+  "defaultMode": "window",
+  "port": 0,
+  "documentRoot": "/desktop/",
+  "url": "/",
+  "enableServer": true,
+  "enableNativeAPI": true,
+  "enableExtensions": true,
+  "tokenSecurity": "one-time",
+  "logging": {
+    "enabled": true,
+    "writeToLogFile": false
+  },
+  "nativeAllowList": ["app.*", "extensions.*"],
+  "extensions": [
+    {
+      "id": "it.leolmi.jeko.service",
+      "commandWindows": "node \"${NL_PATH}/server/jeko.js\" --desktop"
+    }
+  ],
+  "modes": {
+    "window": {
+      "title": "Jeko",
+      "width": 1280,
+      "height": 820,
+      "minWidth": 900,
+      "minHeight": 560,
+      "center": true,
+      "icon": "/desktop/icon.png",
+      "enableInspector": false,
+      "openInspectorOnStartup": false,
+      "exitProcessOnClose": true
+    }
+  },
+  "cli": {
+    "binaryName": "jeko",
+    "resourcesPath": "/desktop/",
+    "binaryVersion": "6.10.0"
+  }
+}

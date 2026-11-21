@@ -1,42 +1,23 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import type { SetupStatus } from '@jeko/shared';
-import type { Db } from '../db/db.js';
-import type { RunnerTokens } from '../runner/token.js';
+import type { SettingsFile } from '../data/files.js';
 import type { RunnerHub } from '../runs/hub.js';
+import type { WorkflowStore } from '../workflows/store.js';
 
 const COMPLETED = 'setup.completed';
 
-/** Primo avvio: stato di server, database, runner e verifiche dell'ambiente. */
+/** Primo avvio: stato del servizio, dei dati, del runner e verifiche dell'ambiente. */
 export const setupRoutes: FastifyPluginAsyncTypebox<{
-  db: Db;
+  settings: SettingsFile;
+  workflows: WorkflowStore;
   hub: RunnerHub;
-  tokens: RunnerTokens;
   version: string;
-}> = async (app, { db, hub, tokens, version }) => {
-  app.get('/api/setup', async (): Promise<SetupStatus> => {
-    let database = true;
-    let workflows = 0;
-    let completed = false;
-    let token = false;
-    try {
-      token = await tokens.configured();
-      const w = await db.query<{ n: number }>(
-        `SELECT count(DISTINCT name)::int AS n FROM workflows`,
-      );
-      workflows = w.rows[0]?.n ?? 0;
-      const s = await db.query<{ value: boolean }>(`SELECT value FROM settings WHERE key = $1`, [
-        COMPLETED,
-      ]);
-      completed = s.rows[0]?.value === true;
-    } catch {
-      database = false;
-    }
-    return {
-      completed,
-      server: { version, database, workflows },
-      runner: { ...hub.runnerInfo, token },
-    };
-  });
+}> = async (app, { settings, workflows, hub, version }) => {
+  app.get('/api/setup', async (): Promise<SetupStatus> => ({
+    completed: settings.get(COMPLETED) === true,
+    server: { version, workflows: workflows.count },
+    runner: hub.runnerInfo,
+  }));
 
   app.post('/api/setup/checks', async (_req, reply) => {
     if (!hub.requestChecks()) return reply.code(409).send({ message: 'Runner non collegato' });
@@ -44,17 +25,13 @@ export const setupRoutes: FastifyPluginAsyncTypebox<{
   });
 
   app.post('/api/setup/complete', async (_req, reply) => {
-    await db.query(
-      `INSERT INTO settings (key, value) VALUES ($1, 'true'::jsonb)
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-      [COMPLETED],
-    );
+    settings.set(COMPLETED, true);
     return reply.code(204).send();
   });
 
   /** Per rifare il primo avvio. */
   app.delete('/api/setup/complete', async (_req, reply) => {
-    await db.query(`DELETE FROM settings WHERE key = $1`, [COMPLETED]);
+    settings.delete(COMPLETED);
     return reply.code(204).send();
   });
 };

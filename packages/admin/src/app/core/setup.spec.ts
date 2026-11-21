@@ -9,8 +9,8 @@ describe('verifiche del primo avvio', () => {
   it('senza workflow il server dà solo un avviso', () => {
     const checks = serverChecks({
       completed: false,
-      server: { version: '0.1.0', database: true, workflows: 0 },
-      runner: { connected: false, checks: null, token: false },
+      server: { version: '0.1.0', workflows: 0 },
+      runner: { connected: false, checks: null },
     });
     expect(blocking(checks)).toBe(false);
     expect(checks.find((c) => c.id === 'server.workflows')?.ok).toBe(false);

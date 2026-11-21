@@ -5,7 +5,16 @@ import angular from 'angular-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', '**/.angular/**', '**/node_modules/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/.angular/**',
+      '**/node_modules/**',
+      'release/**',
+      'bin/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -26,6 +35,19 @@ export default tseslint.config(
   {
     files: ['packages/admin/**/*.html'],
     extends: [...angular.configs.templateRecommended, ...angular.configs.templateAccessibility],
+  },
+  {
+    // Script di build e di rilascio: girano in Node.
+    files: ['scripts/**/*.mjs', 'packages/*/build.mjs'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+  },
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_' },
+      ],
+    },
   },
   prettier,
 );

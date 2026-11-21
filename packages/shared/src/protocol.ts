@@ -347,19 +347,41 @@ export type RunEventRecord = Static<typeof RunEventRecordSchema>;
 
 export type RunDetail = RunSummary & { events: RunEventRecord[]; prompts: PromptRecord[] };
 
-/** Stato del primo avvio: server, runner e verifiche dell'ambiente. */
+/** Stato del primo avvio: servizio, runner e verifiche dell'ambiente. */
 export interface SetupStatus {
   completed: boolean;
-  server: { version: string; database: boolean; workflows: number };
+  server: { version: string; workflows: number };
   runner: {
     connected: boolean;
     runnerId?: string;
     version?: string;
     checks: Check[] | null;
     checkedAt?: string;
-    /** C'è un token del runner (creato scaricando l'installer): da lì in poi è obbligatorio. */
-    token: boolean;
   };
+}
+
+/** Aggiornamento dell'app dalle release GitHub. */
+export interface UpdateInfo {
+  current: string;
+  /** Ultima versione pubblicata; null se non si sa (nessuna release, errore). */
+  latest: string | null;
+  available: boolean;
+  /** Perché non si può installare: avvio dai sorgenti, cartella dell'app non scrivibile. */
+  blocked: 'source' | 'readonly' | null;
+  checkedAt: string;
+  notes?: string;
+  error?: string;
+}
+
+/** Informazioni sull'app (`GET /api/app`). */
+export interface AppInfo {
+  version: string;
+  /** Gira come app desktop (Neutralino): solo lì ci sono gli aggiornamenti. */
+  desktop: boolean;
+  /** Ultimo controllo degli aggiornamenti, se fatto. */
+  update: UpdateInfo | null;
+  /** Task in coda o al lavoro: finché ci sono non si aggiorna. */
+  active: number;
 }
 
 // ---------- WebSocket admin (solo server → admin) ----------

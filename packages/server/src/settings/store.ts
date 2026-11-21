@@ -1,28 +1,19 @@
 import type { UserSettings } from '@jeko/shared';
-import type { Db } from '../db/db.js';
-import { json } from '../db/sql.js';
+import type { SettingsFile } from '../data/files.js';
 
 const KEY = 'user.settings';
 
-/** Opzioni dell'utente: un solo oggetto nella tabella `settings`. */
+/** Opzioni dell'utente: un solo oggetto in `settings.json`. */
 export class UserSettingsStore {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly settings: SettingsFile) {}
 
   async get(): Promise<UserSettings> {
-    const { rows } = await this.db.query<{ value: UserSettings }>(
-      `SELECT value FROM settings WHERE key = $1`,
-      [KEY],
-    );
-    return rows[0]?.value ?? {};
+    return this.settings.get<UserSettings>(KEY) ?? {};
   }
 
   /** Sostituisce le opzioni con quelle date (la web-app manda sempre l'oggetto intero). */
   async set(settings: UserSettings): Promise<UserSettings> {
-    await this.db.query(
-      `INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-      [KEY, json(settings)],
-    );
+    this.settings.set(KEY, settings);
     return settings;
   }
 }

@@ -74,6 +74,8 @@ export const SaveProjectPromptSchema = Type.Object(
 
 export const HealthSchema = Type.Object({
   status: Type.Literal('ok'),
+  /** Per riconoscere il servizio di Jeko sulla porta (pagina d'avvio, seconda istanza). */
+  app: Type.Literal('jeko'),
   version: Type.String(),
   runner: Type.Boolean(),
 });

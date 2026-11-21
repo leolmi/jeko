@@ -1,10 +1,9 @@
-import { PGlite } from '@electric-sql/pglite';
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import type { Db } from '../db/db.js';
-import { migrate } from '../db/migrate.js';
+import { SettingsFile } from '../data/files.js';
 import { parseTemplateFile, TemplateStore } from './templates.js';
 
 const builtinDir = fileURLToPath(new URL('../../../shared/templates/', import.meta.url));
@@ -12,16 +11,8 @@ const builtin = readdirSync(builtinDir).map((f) =>
   parseTemplateFile(readFileSync(join(builtinDir, f), 'utf8')),
 );
 
-async function store(): Promise<TemplateStore> {
-  const pg = new PGlite();
-  const db: Db = {
-    query: async <R>(sql: string, params?: unknown[]) => ({
-      rows: (await pg.query<R>(sql, params)).rows,
-    }),
-    close: () => pg.close(),
-  };
-  await migrate(db);
-  return new TemplateStore(db);
+async function store(dir = mkdtempSync(join(tmpdir(), 'jeko-tpl-'))): Promise<TemplateStore> {
+  return new TemplateStore(dir, new SettingsFile(dir));
 }
 
 describe('template di serie', () => {

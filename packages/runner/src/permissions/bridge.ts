@@ -6,13 +6,16 @@ import type { ApprovalEndpoint, Authorizer } from './endpoint.js';
 import type { HookPolicy } from './hook.js';
 import { ASK_TOOL, ENV, MCP_SERVER_NAME, PERMISSION_PROMPT_TOOL } from './protocol.js';
 
+/** Bundle unico del servizio: `node jeko.js mcp` e `node jeko.js hook` sono gli script dei permessi. */
+export const BUNDLE = 'jeko.js';
+
 /**
- * Comando (argv) per lanciare uno script del runner: il bundle `<name>.js` o, in sviluppo,
+ * Comando (argv) per lanciare uno script del runner: il bundle `jeko.js <name>` o, in sviluppo,
  * `<name>-main.ts` con tsx (risolto da qui: claude gira nella cartella del progetto).
  */
 export function nodeScript(dir: string, name: string): string[] {
-  const js = join(dir, `${name}.js`);
-  if (existsSync(js)) return [process.execPath, js];
+  const bundle = join(dir, BUNDLE);
+  if (existsSync(bundle)) return [process.execPath, bundle, name];
   return [process.execPath, '--import', import.meta.resolve('tsx'), join(dir, `${name}-main.ts`)];
 }
 
@@ -23,7 +26,7 @@ function commandLine(argv: string[]): string {
 
 export interface BridgeOptions {
   endpoint: ApprovalEndpoint;
-  /** Cartella che contiene `mcp` e `hook` (dist nel bundle, src in sviluppo). */
+  /** Cartella del bundle `jeko.js`, o `src/` del runner in sviluppo. */
   scriptsDir: string;
 }
 

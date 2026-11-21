@@ -1,28 +1,15 @@
-import { PGlite } from '@electric-sql/pglite';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from './app.js';
-import type { Db } from './db/db.js';
-import { migrate } from './db/migrate.js';
-
-function pgliteDb(): Db {
-  const pg = new PGlite();
-  return {
-    query: async <R>(sql: string, params?: unknown[]) => {
-      const res = await pg.query<R>(sql, params);
-      return { rows: res.rows };
-    },
-    close: () => pg.close(),
-  };
-}
 
 describe('server', () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
-    const db = pgliteDb();
-    await migrate(db);
-    app = await buildApp({ db });
+    app = await buildApp({ dataDir: mkdtempSync(join(tmpdir(), 'jeko-app-')) });
   });
 
   afterEach(() => app.close());
@@ -64,7 +51,7 @@ describe('server', () => {
     const first = (await app.inject('/api/setup')).json();
     expect(first).toMatchObject({
       completed: false,
-      server: { database: true, workflows: 0 },
+      server: { workflows: 0 },
       runner: { connected: false, checks: null },
     });
     expect((await app.inject({ method: 'POST', url: '/api/setup/checks' })).statusCode).toBe(409);
@@ -178,5 +165,73 @@ describe('server', () => {
   it('rifiuta un body non valido', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/projects', payload: { name: '' } });
     expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('dati su file', () => {
+  it('progetti, opzioni, workflow e run restano dopo un riavvio', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'jeko-files-'));
+    const first = await buildApp({ dataDir });
+    await first.inject({
+      method: 'POST',
+      url: '/api/projects',
+      payload: { name: 'P', path: 'C:\\p' },
+    });
+    await first.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: { projectsDir: 'C:\\dev' },
+    });
+    const yaml =
+      "name: w\nkind: develop\nversion: 1\nsteps:\n  - id: a\n    type: check\n    expect: 'true'\n";
+    await first.inject({ method: 'POST', url: '/api/workflows', payload: { yaml } });
+    await first.inject({ method: 'POST', url: '/api/workflows', payload: { yaml } });
+    const run = (
+      await first.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { workflow: 'w', request: 'x', mode: 'headless' },
+      })
+    ).json() as { id: string };
+    await first.close();
+
+    const again = await buildApp({ dataDir });
+    expect((await again.inject('/api/projects')).json()).toMatchObject([
+      { name: 'P', path: 'C:\\p' },
+    ]);
+    expect((await again.inject('/api/settings')).json()).toEqual({ projectsDir: 'C:\\dev' });
+    expect((await again.inject('/api/workflows/w')).json()).toMatchObject([
+      { version: 2, yaml },
+      { version: 1 },
+    ]);
+    expect((await again.inject(`/api/runs/${run.id}`)).json()).toMatchObject({
+      status: 'queued',
+      events: [],
+      prompts: [],
+    });
+    await again.close();
+  });
+
+  it('rifiuta le richieste da pagine di altri siti', async () => {
+    const app = await buildApp({ dataDir: mkdtempSync(join(tmpdir(), 'jeko-origin-')) });
+    const get = (origin: string) => app.inject({ url: '/api/projects', headers: { origin } });
+    expect((await get('https://evil.example')).statusCode).toBe(403);
+    expect((await get('http://localhost:4200')).statusCode).toBe(200);
+    expect((await get('http://127.0.0.1:4310')).statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('serve la web-app, con index.html per le sue rotte', async () => {
+    const adminDir = mkdtempSync(join(tmpdir(), 'jeko-admin-'));
+    writeFileSync(join(adminDir, 'index.html'), '<html>jeko</html>');
+    writeFileSync(join(adminDir, 'main.js'), 'x');
+    const app = await buildApp({ dataDir: mkdtempSync(join(tmpdir(), 'jeko-static-')), adminDir });
+    expect((await app.inject('/')).body).toBe('<html>jeko</html>');
+    expect((await app.inject('/workflows/qualcosa')).body).toBe('<html>jeko</html>');
+    expect((await app.inject('/main.js')).headers['content-type']).toContain('javascript');
+    expect((await app.inject('/manca.js')).statusCode).toBe(404);
+    expect((await app.inject('/api/manca')).statusCode).toBe(404);
+    expect((await app.inject('/..%2f..%2fsegreto.txt')).statusCode).toBe(404);
+    await app.close();
   });
 });

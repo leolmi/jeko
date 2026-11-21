@@ -13,11 +13,9 @@ export default defineConfig({
           name: dir.split('/')[1]!,
           root: dir,
           include: ['src/**/*.test.ts'],
-          // Ogni test del server avvia PGlite (WASM): con la suite in parallelo supera i 5 s.
-          ...(dir === 'packages/server' && { testTimeout: 15_000 }),
         },
       })),
-      // Server e runner insieme: server reale (PGlite) e runner reale con claude finto.
+      // Server e runner insieme: server reale (dati su file) e runner reale con claude finto.
       {
         extends: true,
         test: { name: 'e2e', root: 'tests/e2e', include: ['**/*.test.ts'], testTimeout: 15_000 },

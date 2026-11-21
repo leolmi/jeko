@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import WebSocket from 'ws';
 import {
   ServerToRunnerSchema,
   type Check,
@@ -18,15 +17,15 @@ import type { FolderPicker } from './folder-picker.js';
 import { deletePrompt, listPrompts, savePrompt } from './prompts.js';
 import type { TerminalOpener } from './terminal.js';
 import { Journals } from './journal.js';
+import type { LinkSocket } from './link.js';
 
 /** La parte dell'host che passa dal server: domande, approvazioni, revisioni ed eventi. */
 export type RemoteIo = Pick<Host, 'ask' | 'approve' | 'review' | 'emit'>;
 export type HostFactory = (io: RemoteIo, start: RunStart, ctx: { runDir: string }) => Host;
 
 export interface ClientOptions {
-  url: string;
-  /** Token del runner, inviato come `Authorization: Bearer`. */
-  token?: string;
+  /** Apre una connessione verso il server (nello stesso processo: `linkPair`). */
+  connect: () => LinkSocket;
   runnerId: string;
   version: string;
   makeHost: HostFactory;
@@ -59,13 +58,13 @@ interface Session {
 const isServerMessage = validator(ServerToRunnerSchema);
 
 /**
- * Connessione del runner al server: solo in uscita, con riconnessione automatica.
+ * Connessione del runner al server, con riconnessione automatica.
  * Ogni evento passa dal giornale su disco prima dell'invio; a ogni connessione si reinvia ciò
  * che il server non ha confermato, anche dopo un riavvio del runner. Le richieste all'utente
  * ancora aperte vengono rimandate (il server le riconosce dall'id).
  */
 export class RunnerClient {
-  private ws: WebSocket | null = null;
+  private ws: LinkSocket | null = null;
   private readonly journals: Journals;
   private readonly sessions = new Map<string, Session>();
   private stopped = false;
@@ -113,22 +112,11 @@ export class RunnerClient {
   // ---------- connessione ----------
 
   private connect(): void {
-    const ws = new WebSocket(this.opts.url, {
-      ...(this.opts.token && { headers: { authorization: `Bearer ${this.opts.token}` } }),
-    });
+    const ws = this.opts.connect();
     this.ws = ws;
 
-    ws.on('unexpected-response', (_req, res) => {
-      if (res.statusCode === 401) {
-        this.log.error(
-          'il server rifiuta il token del runner: scarica un nuovo installer dalla web-app',
-        );
-      } else this.log.warn(`il server ha risposto ${res.statusCode}`);
-      ws.terminate();
-    });
-
     ws.on('open', () => {
-      this.log.info(`runner collegato a ${this.opts.url}`);
+      this.log.info('runner collegato al server');
       this.raw({
         type: 'hello',
         runnerId: this.opts.runnerId,
@@ -168,7 +156,7 @@ export class RunnerClient {
   }
 
   private get open(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+    return this.ws?.readyState === this.ws?.OPEN;
   }
 
   private raw(msg: RunnerToServer): void {
@@ -183,7 +171,7 @@ export class RunnerClient {
 
   // ---------- messaggi dal server ----------
 
-  private onMessage(data: WebSocket.RawData): void {
+  private onMessage(data: string): void {
     let msg: unknown;
     try {
       msg = JSON.parse(String(data));

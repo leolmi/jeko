@@ -9,3 +9,9 @@ coverage/
 .DS_Store
 .idea/
 out-tsc/
+
+# App desktop (Neutralino)
+bin/
+release/
+neutralinojs.log
+.tmp/

@@ -8,8 +8,8 @@ import { Setup } from './core/setup';
 
 const status = (completed: boolean): SetupStatus => ({
   completed,
-  server: { version: '0.1.0', database: true, workflows: 2 },
-  runner: { connected: false, checks: null, token: false },
+  server: { version: '0.1.0', workflows: 2 },
+  runner: { connected: false, checks: null },
 });
 
 let stable: () => Promise<unknown>;
