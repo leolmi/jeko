@@ -137,9 +137,12 @@ import { UsageBar } from './usage-bar';
                           use.short
                         }}</span>
                       }
-                      <span class="text-xs text-faint" [class.ml-auto]="!item.usage">{{
-                        i18n.time(item.at)
-                      }}</span>
+                      <span
+                        class="text-xs text-faint"
+                        [class.ml-auto]="!item.usage"
+                        [title]="i18n.dateTime(item.at)"
+                        >{{ i18n.time(item.at) }}</span
+                      >
                     </div>
                     @if (item.state === 'running' && item.activity.length > 0) {
                       <ul class="mt-1.5 ml-7 flex flex-col gap-1">

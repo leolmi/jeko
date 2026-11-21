@@ -4,11 +4,12 @@ import { I18n } from '../core/i18n';
 import { Setup } from '../core/setup';
 import { Icon } from '../ui/icon';
 import { UserSettings } from '../ui/user-settings';
+import { FormatSettings } from './format-settings';
 
 /** Pagina Opzioni: le opzioni dell'utente, modificabili in ogni momento. */
 @Component({
   selector: 'jk-settings-page',
-  imports: [UserSettings, Icon],
+  imports: [UserSettings, FormatSettings, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
   template: `
@@ -16,6 +17,8 @@ import { UserSettings } from '../ui/user-settings';
       <h1 class="text-2xl font-bold tracking-tight">{{ i18n.t('settings.title') }}</h1>
       <p class="mt-2 text-sm text-muted">{{ i18n.t('settings.body') }}</p>
       <div class="mt-8"><jk-user-settings /></div>
+
+      <jk-format-settings class="mt-8" />
 
       <section class="mt-8 rounded-xl border border-line bg-surface p-4">
         <div class="flex items-center gap-3">

@@ -16,8 +16,9 @@ import { Segmented, type SegmentOption } from '../ui/segmented';
 type Period = '7' | '30' | '90' | 'all';
 type Metric = 'cost' | 'tokens' | 'runs';
 
-const value = (u: UsageTotals, m: Metric) =>
-  m === 'cost' ? u.costUsd : m === 'tokens' ? u.tokens : u.runs;
+/** Il costo è già nella valuta scelta (`rate` da USD). */
+const value = (u: UsageTotals, m: Metric, rate: number) =>
+  m === 'cost' ? u.costUsd * rate : m === 'tokens' ? u.tokens : u.runs;
 
 /**
  * Statistiche delle run presenti, del progetto scelto o di tutti: totali, andamento giorno
@@ -302,18 +303,18 @@ export class StatsPage {
   protected readonly trend = computed(() => {
     const s = this.data();
     const m = this.metric();
+    const rate = this.i18n.rate();
     const days = s?.days ?? [];
-    const max = Math.max(...days.map((d) => value(d.plan, m) + value(d.direct, m)), 0);
+    const max = Math.max(...days.map((d) => value(d.plan, m, rate) + value(d.direct, m, rate)), 0);
     const scale = max > 0 ? niceMax(max) : 1;
-    const dateFmt = new Intl.DateTimeFormat(this.i18n.lang(), { day: 'numeric', month: 'short' });
-    const date = (day: string) => dateFmt.format(new Date(`${day}T12:00:00`));
+    const date = (day: string) => this.i18n.dayMonth(new Date(`${day}T12:00:00`));
     return {
       max: max > 0 ? scale : 0,
       first: days[0] ? date(days[0].day) : '',
       last: days.at(-1) ? date(days.at(-1)!.day) : '',
       days: days.map((d) => {
-        const plan = value(d.plan, m);
-        const direct = value(d.direct, m);
+        const plan = value(d.plan, m, rate);
+        const direct = value(d.direct, m, rate);
         return {
           day: d.day,
           plan: (plan / scale) * 100,
@@ -335,17 +336,18 @@ export class StatsPage {
 
   protected format(n: number): string {
     const m = this.metric();
-    if (m === 'cost') return this.usd(n);
+    if (m === 'cost') return this.money(n);
     if (m === 'tokens') return this.i18n.compact(n);
     return this.i18n.number(Math.round(n * 10) / 10);
   }
 
+  /** Importo già convertito nella valuta scelta. */
+  protected money(n: number): string {
+    return this.i18n.money(n / this.i18n.rate());
+  }
+
   protected usd(n: number): string {
-    return new Intl.NumberFormat(this.i18n.lang(), {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: n > 0 && n < 1 ? 3 : 2,
-    }).format(n);
+    return this.i18n.money(n);
   }
 
   protected sum(a: UsageTotals, b: UsageTotals): UsageTotals {

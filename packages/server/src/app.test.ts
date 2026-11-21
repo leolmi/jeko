@@ -45,6 +45,13 @@ describe('server', () => {
     expect((await put({ projectsDir: '' })).statusCode).toBe(400);
     // I campi sconosciuti si scartano (Fastify, removeAdditional).
     expect((await put({ projectsDir: 'p', altro: 1 })).json()).toEqual({ projectsDir: 'p' });
+    const formats = { date: 'ymd', time: 'h24', currency: 'EUR', rates: { EUR: 0.91 } };
+    expect((await put({ projectsDir: 'p', formats })).json()).toEqual({
+      projectsDir: 'p',
+      formats,
+    });
+    expect((await put({ formats: { currency: 'XYZ' } })).statusCode).toBe(400);
+    expect((await put({ formats: { rates: { EUR: 0 } } })).statusCode).toBe(400);
   });
 
   it('gestisce il primo avvio', async () => {

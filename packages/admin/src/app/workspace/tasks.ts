@@ -99,7 +99,9 @@ import { Status } from '../ui/status';
                   role="img"
                 ></span>
                 <span class="flex-1 truncate text-sm">{{ t.request }}</span>
-                <span class="shrink-0 text-xs text-faint">{{ i18n.ago(t.createdAt) }}</span>
+                <span class="shrink-0 text-xs text-faint" [title]="i18n.dateTime(t.createdAt)">{{
+                  i18n.ago(t.createdAt)
+                }}</span>
               </a>
               @if (!isOpen(t)) {
                 <button

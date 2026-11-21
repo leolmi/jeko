@@ -132,10 +132,55 @@ export type Health = Static<typeof HealthSchema>;
  * Opzioni dell'utente, salvate sul server e modificabili dalla web-app; il runner le riceve
  * con ogni run. La prima volta si impostano nel wizard.
  */
+export const CURRENCIES = ['USD', 'EUR', 'GBP', 'CHF'] as const;
+export const CurrencySchema = Type.Union([
+  Type.Literal('USD'),
+  Type.Literal('EUR'),
+  Type.Literal('GBP'),
+  Type.Literal('CHF'),
+]);
+export type Currency = (typeof CURRENCIES)[number];
+const rate = Type.Number({ exclusiveMinimum: 0 });
+
+/** Come la web-app mostra date, ore e costi (claude dà i costi in USD). */
+export const FormatsSchema = Type.Object(
+  {
+    date: Type.Optional(
+      Type.Union([
+        Type.Literal('auto'),
+        Type.Literal('dmy'),
+        Type.Literal('mdy'),
+        Type.Literal('ymd'),
+      ]),
+    ),
+    time: Type.Optional(
+      Type.Union([Type.Literal('auto'), Type.Literal('h24'), Type.Literal('h12')]),
+    ),
+    currency: Type.Optional(CurrencySchema),
+    /** Cambi: quanto vale 1 USD in ciascuna valuta. */
+    rates: Type.Optional(
+      Type.Object(
+        {
+          USD: Type.Optional(rate),
+          EUR: Type.Optional(rate),
+          GBP: Type.Optional(rate),
+          CHF: Type.Optional(rate),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+export type Formats = Static<typeof FormatsSchema>;
+export type DateFormat = NonNullable<Formats['date']>;
+export type TimeFormat = NonNullable<Formats['time']>;
+
 export const UserSettingsSchema = Type.Object(
   {
     /** Cartella in cui nascono i progetti nuovi (`jeko.projectsDir` nei workflow). */
     projectsDir: Type.Optional(Type.String({ minLength: 1, maxLength: 260 })),
+    formats: Type.Optional(FormatsSchema),
   },
   { additionalProperties: false },
 );

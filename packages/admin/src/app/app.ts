@@ -4,6 +4,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter, map } from 'rxjs';
 import { I18n } from './core/i18n';
 import { Realtime } from './core/realtime';
+import { Settings } from './core/settings';
 import { Setup } from './core/setup';
 import { Theme } from './core/theme';
 import { UpdatePrompt } from './settings/update-prompt';
@@ -121,6 +122,8 @@ export class App {
     ),
   );
 
+  private readonly settings = inject(Settings);
+
   constructor() {
     inject(Theme);
     this.rt.start();
@@ -128,8 +131,9 @@ export class App {
     void this.boot();
   }
 
-  /** Riprova finché il server non risponde. */
+  /** Riprova finché il server non risponde; poi legge le opzioni (servono i formati). */
   private async boot(): Promise<void> {
     while (!(await this.setup.load())) await new Promise((r) => setTimeout(r, 3000));
+    if (!this.settings.value()) await this.settings.load().catch(() => undefined);
   }
 }

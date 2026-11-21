@@ -1,5 +1,6 @@
-import { effect, Injectable, signal } from '@angular/core';
+import { effect, inject, Injectable, signal } from '@angular/core';
 import type { AgentUsage } from '@jeko/shared';
+import { formatDate, formatDayMonth, Formats, formatTime } from './formats';
 import { storage } from './storage';
 
 export type Lang = 'it' | 'en';
@@ -301,6 +302,19 @@ const it = {
   'settings.saved': 'Salvato',
   'settings.error': 'Non è stato possibile leggere o salvare le opzioni.',
 
+  'formats.title': 'Formati',
+  'formats.hint': 'Come mostrare date, ore e costi, in tutte le finestre.',
+  'formats.date': 'Data',
+  'formats.time': 'Ora',
+  'formats.auto': 'Lingua',
+  'formats.h24': '24 ore',
+  'formats.h12': '12 ore',
+  'formats.currency': 'Valuta',
+  'formats.rate': '1 USD =',
+  'formats.rate.fetch': 'Aggiorna dalla BCE',
+  'formats.rate.error': 'Cambio non disponibile: inseriscilo a mano.',
+  'formats.rate.missing': 'Senza cambio i costi restano in USD.',
+  'formats.example': 'Esempio: {date} {time} · {cost}',
   'update.title': 'Versione e aggiornamenti',
   'update.current': 'Jeko {v}',
   'update.available': 'disponibile la {v}',
@@ -669,6 +683,19 @@ const en: Record<I18nKey, string> = {
   'settings.saved': 'Saved',
   'settings.error': 'Could not read or save the options.',
 
+  'formats.title': 'Formats',
+  'formats.hint': 'How dates, times and costs are shown, in every window.',
+  'formats.date': 'Date',
+  'formats.time': 'Time',
+  'formats.auto': 'Language',
+  'formats.h24': '24-hour',
+  'formats.h12': '12-hour',
+  'formats.currency': 'Currency',
+  'formats.rate': '1 USD =',
+  'formats.rate.fetch': 'Update from ECB',
+  'formats.rate.error': 'Rate unavailable: enter it by hand.',
+  'formats.rate.missing': 'Without a rate costs stay in USD.',
+  'formats.example': 'Example: {date} {time} · {cost}',
   'update.title': 'Version and updates',
   'update.current': 'Jeko {v}',
   'update.available': '{v} is available',
@@ -755,6 +782,7 @@ function initialLang(): Lang {
 @Injectable({ providedIn: 'root' })
 export class I18n {
   readonly lang = signal<Lang>(initialLang());
+  readonly formats = inject(Formats);
 
   constructor() {
     effect(() => {
@@ -823,17 +851,41 @@ export class I18n {
       cacheWrite: this.number(u.cacheWriteTokens),
     });
     if (u.costUsd !== undefined) {
-      const cost = new Intl.NumberFormat(this.lang(), {
-        style: 'currency',
-        currency: 'USD',
-        maximumFractionDigits: 2,
-      }).format(u.costUsd);
-      detail += `\n${this.t('usage.cost', { cost })}`;
+      detail += `\n${this.t('usage.cost', { cost: this.money(u.costUsd) })}`;
     }
     return { short: `${time} · ${this.t('usage.tokens', { n: this.compact(total) })}`, detail };
   }
 
-  time(iso: string): string {
-    return new Intl.DateTimeFormat(this.lang(), { timeStyle: 'short' }).format(new Date(iso));
+  /** Costo da USD nella valuta scelta; le cifre piccole con tre decimali. */
+  money(usd: number): string {
+    const { currency, rate } = this.formats.money();
+    const n = usd * rate;
+    return new Intl.NumberFormat(this.lang(), {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: n > 0 && n < 1 ? 3 : 2,
+    }).format(n);
+  }
+
+  /** Fattore da USD alla valuta usata da `money()`. */
+  rate(): number {
+    return this.formats.money().rate;
+  }
+
+  time(iso: string | Date): string {
+    return formatTime(new Date(iso), this.formats.time(), this.lang());
+  }
+
+  date(iso: string | Date): string {
+    return formatDate(new Date(iso), this.formats.date(), this.lang());
+  }
+
+  dayMonth(iso: string | Date): string {
+    return formatDayMonth(new Date(iso), this.formats.date(), this.lang());
+  }
+
+  /** Data e ora, per i tooltip. */
+  dateTime(iso: string | Date): string {
+    return `${this.date(iso)} ${this.time(iso)}`;
   }
 }

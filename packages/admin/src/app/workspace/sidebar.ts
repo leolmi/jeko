@@ -108,7 +108,9 @@ const SORTS: Sort[] = ['activity', 'waiting', 'name'];
           </span>
           <span class="mt-0.5 flex items-center gap-2 text-xs text-faint">
             <span class="truncate font-mono">{{ p.path }}</span>
-            <span class="ml-auto shrink-0">{{ i18n.ago(p.last) }}</span>
+            <span class="ml-auto shrink-0" [title]="i18n.dateTime(p.last)">{{
+              i18n.ago(p.last)
+            }}</span>
           </span>
         </button>
       } @empty {

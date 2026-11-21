@@ -73,11 +73,7 @@ export class UsageBar {
 
   protected amount(n: number, b: Breakdown): string {
     return b.measure === 'cost'
-      ? new Intl.NumberFormat(this.i18n.lang(), {
-          style: 'currency',
-          currency: 'USD',
-          maximumFractionDigits: n < 1 ? 3 : 2,
-        }).format(n)
+      ? this.i18n.money(n)
       : this.i18n.t('usage.tokens', { n: this.i18n.compact(n) });
   }
 

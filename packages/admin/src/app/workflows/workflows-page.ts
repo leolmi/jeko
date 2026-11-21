@@ -169,7 +169,11 @@ const CHECK_DELAY_MS = 300;
                 (change)="loadVersion($any($event.target).value)"
               >
                 @for (v of versions(); track v.version) {
-                  <option [value]="v.version" [selected]="v.version === versions()[0]?.version">
+                  <option
+                    [value]="v.version"
+                    [selected]="v.version === versions()[0]?.version"
+                    [title]="i18n.dateTime(v.createdAt)"
+                  >
                     v{{ v.version }} · {{ i18n.ago(v.createdAt) }}
                   </option>
                 }
