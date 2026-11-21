@@ -2,7 +2,9 @@
 
 Tool di SDLC locale e personale: app desktop per Windows ([Neutralino](https://neutralino.js.org)) con un servizio Node che lancia Claude Code.
 
-![jeko](./docs/jeko-progetti.png)
+**Pagina del progetto, con il video dimostrativo:** [leolmi.github.io/jeko](https://leolmi.github.io/jeko/)
+
+[![jeko](./docs/jeko-progetti.png)](https://leolmi.github.io/jeko/)
 
 ## Pacchetti
 
