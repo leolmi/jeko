@@ -25,6 +25,7 @@ import { I18n, type I18nKey } from '../core/i18n';
 import { Realtime } from '../core/realtime';
 import { Runs } from '../core/runs';
 import { Icon } from '../ui/icon';
+import { ModeBadge, runTone } from '../ui/mode-tone';
 import { Status } from '../ui/status';
 import { PromptCard } from './prompt-card';
 import { buildTimeline } from './timeline';
@@ -32,7 +33,7 @@ import { buildTimeline } from './timeline';
 /** Filo di una run: la richiesta, l'avanzamento e le domande a cui rispondere. */
 @Component({
   selector: 'jk-thread',
-  imports: [NgTemplateOutlet, RouterLink, Icon, Status, PromptCard],
+  imports: [NgTemplateOutlet, RouterLink, Icon, Status, PromptCard, ModeBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex h-full flex-col' },
   template: `
@@ -58,6 +59,7 @@ import { buildTimeline } from './timeline';
             }
           </p>
         </div>
+        <jk-mode-badge [tone]="runTone(r)" />
         <jk-status [status]="r.status" />
         @if (!final()) {
           <button type="button" class="jk-btn-ghost" (click)="cancel()">
@@ -266,6 +268,7 @@ export class Thread {
   protected readonly missing = signal(false);
   /** Task diretto, senza workflow di sviluppo: l'uscita si mostra come risposta. */
   protected readonly direct = computed(() => this.run()?.workflow === DIRECT_WORKFLOW);
+  protected readonly runTone = runTone;
   /** Task diretto in attesa del messaggio seguente (lo scrive l'utente nel composer). */
   protected readonly followUp = computed(() => {
     const r = this.run();

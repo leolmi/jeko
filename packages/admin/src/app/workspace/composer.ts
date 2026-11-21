@@ -14,6 +14,7 @@ import { Realtime } from '../core/realtime';
 import { Runs } from '../core/runs';
 import { storage } from '../core/storage';
 import { Icon } from '../ui/icon';
+import { ModeBadge, TONES } from '../ui/mode-tone';
 import { Segmented, type SegmentOption } from '../ui/segmented';
 
 export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
@@ -24,16 +25,20 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
  */
 @Component({
   selector: 'jk-task-composer',
-  imports: [Icon, Segmented],
+  imports: [Icon, Segmented, ModeBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex flex-col bg-surface px-6 py-3' },
   template: `
     <div
-      class="flex min-h-0 flex-1 flex-col rounded-2xl border border-line bg-bg focus-within:border-faint"
+      class="flex min-h-0 flex-1 flex-col rounded-2xl border-2 bg-bg transition-colors"
+      [class]="tone().border"
       [class.opacity-60]="!project()"
     >
+      <div class="flex justify-end px-3 pt-2.5">
+        <jk-mode-badge [tone]="tone()" />
+      </div>
       <textarea
-        class="block min-h-0 w-full flex-1 resize-none bg-transparent px-4 pt-3 text-sm leading-relaxed outline-none"
+        class="block min-h-0 w-full flex-1 resize-none bg-transparent px-4 pt-1 text-sm leading-relaxed outline-none"
         [attr.aria-label]="i18n.t('composer.request')"
         [placeholder]="
           !project()
@@ -55,19 +60,29 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
           [(value)]="mode"
           [class.invisible]="followUp()"
         />
-        <label
+        <!-- Con o senza workflow: un pulsante, l'icona evidenziata è la modalità attiva. -->
+        <button
+          type="button"
+          class="inline-flex rounded-lg bg-subtle p-0.5"
           [class.invisible]="followUp()"
-          class="flex cursor-pointer items-center gap-1.5 text-sm text-muted select-none hover:text-fg"
-          [title]="i18n.t('composer.direct.hint')"
+          [attr.aria-label]="i18n.t('composer.switch')"
+          [attr.aria-pressed]="direct()"
+          [title]="i18n.t(direct() ? 'composer.direct.hint' : 'composer.plan.hint')"
+          (click)="direct.set(!direct())"
         >
-          <input
-            type="checkbox"
-            class="size-4 accent-accent"
-            [checked]="direct()"
-            (change)="direct.set($any($event.target).checked)"
-          />
-          {{ i18n.t('composer.direct') }}
-        </label>
+          <span
+            class="rounded-md p-1.5 transition-colors"
+            [class]="!direct() ? TONES.plan.active : 'text-muted'"
+          >
+            <jk-icon name="account_tree" [size]="16" />
+          </span>
+          <span
+            class="rounded-md p-1.5 transition-colors"
+            [class]="direct() ? TONES.direct.active : 'text-muted'"
+          >
+            <jk-icon name="flash_on" [size]="16" />
+          </span>
+        </button>
         <span class="hidden min-w-0 flex-1 truncate text-xs text-faint lg:inline">
           @if (error()) {
             <span class="text-red-600 dark:text-red-400">{{ i18n.t('composer.error') }}</span>
@@ -81,7 +96,8 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         </span>
         <button
           type="button"
-          class="jk-btn-primary ml-auto"
+          class="jk-btn ml-auto hover:opacity-90"
+          [class]="tone().active"
           [disabled]="!valid() || sending()"
           (click)="submit()"
         >
@@ -126,6 +142,10 @@ export class TaskComposer {
     const path = this.project()?.path;
     return f && path && f.cwd?.toLowerCase() === path.toLowerCase() ? f : null;
   });
+  /** Modalità mostrata in alto: continuando, è quella del task (sempre diretto). */
+  protected readonly isDirect = computed(() => !!this.followUp() || this.direct());
+  protected readonly TONES = TONES;
+  protected readonly tone = computed(() => (this.isDirect() ? TONES.direct : TONES.plan));
   protected readonly sending = signal(false);
   protected readonly error = signal(false);
   protected readonly valid = computed(

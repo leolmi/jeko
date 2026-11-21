@@ -34,6 +34,9 @@ const SPLASH_MS = 600;
           >
             <a routerLink="/" class="flex items-baseline gap-1.5">
               <span class="font-mono text-lg font-semibold tracking-tight">jeko</span>
+              @if (setup.status()?.server?.version; as v) {
+                <span class="font-mono text-xs text-muted">v{{ v }}</span>
+              }
               <span class="hidden text-xs text-faint sm:inline">{{ i18n.t('app.tagline') }}</span>
             </a>
             <nav class="flex gap-1 text-sm">

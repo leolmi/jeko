@@ -112,7 +112,11 @@ const it = {
   'composer.busy': 'C’è già un task attivo: questo partirà dopo.',
   'composer.continue': 'Invia',
   'composer.continue.placeholder': 'Continua il task su {name}…',
-  'composer.direct': 'Senza workflow',
+  'composer.switch': 'Con o senza workflow',
+  'composer.plan': 'Segui workflow',
+  'composer.plan.hint':
+    'Task con workflow: claude prepara un piano e lo esegue con gate e controlli',
+  'composer.direct': 'Richiesta libera',
   'composer.direct.hint':
     'Task diretto: claude esegue la richiesta così com’è, senza piano, gate né controlli',
 
@@ -423,7 +427,10 @@ const en: Record<I18nKey, string> = {
   'composer.busy': 'A task is already active: this one will start after it.',
   'composer.continue': 'Send',
   'composer.continue.placeholder': 'Continue the task on {name}…',
-  'composer.direct': 'No workflow',
+  'composer.switch': 'With or without workflow',
+  'composer.plan': 'Follow workflow',
+  'composer.plan.hint': 'Workflow task: claude prepares a plan and runs it with gates and checks',
+  'composer.direct': 'Free request',
   'composer.direct.hint':
     'Direct task: claude runs the request as is, with no plan, gates or checks',
 

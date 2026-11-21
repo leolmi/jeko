@@ -6,6 +6,7 @@ import { I18n } from '../core/i18n';
 import { isOpen, Projects } from '../core/projects';
 import { Runs } from '../core/runs';
 import { Icon } from '../ui/icon';
+import { runTone } from '../ui/mode-tone';
 import { Status } from '../ui/status';
 
 /** Task del progetto attivo: prima quelli aperti, a richiesta anche quelli chiusi. */
@@ -89,6 +90,14 @@ import { Status } from '../ui/status';
                 [routerLink]="['/runs', t.id]"
               >
                 <jk-status class="w-24" [status]="t.status" />
+                @let tone = runTone(t);
+                <span
+                  class="size-2.5 shrink-0 rounded-full"
+                  [class]="tone.dot"
+                  [title]="i18n.t(tone.label)"
+                  [attr.aria-label]="i18n.t(tone.label)"
+                  role="img"
+                ></span>
                 <span class="flex-1 truncate text-sm">{{ t.request }}</span>
                 <span class="shrink-0 text-xs text-faint">{{ i18n.ago(t.createdAt) }}</span>
               </a>
@@ -160,6 +169,7 @@ export class Tasks {
 
   private readonly runs = inject(Runs);
   protected readonly isOpen = isOpen;
+  protected readonly runTone = runTone;
   protected readonly deleteError = signal(false);
   protected closedIds = (closed: RunSummary[]) => closed.map((r) => r.id);
 
