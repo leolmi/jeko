@@ -1,4 +1,5 @@
 import { Type, type Static } from '@sinclair/typebox';
+import { AgentChoiceSchema } from './workflow/schema.js';
 
 export const Id = Type.String({ format: 'uuid' });
 export const Timestamp = Type.String({ format: 'date-time' });
@@ -55,6 +56,8 @@ export const ProjectSchema = Type.Object(
     workflow: Type.Union([Type.String(), Type.Null()]),
     /** Esclusioni dal contesto di claude; assente = nessuna. */
     exclude: Type.Optional(ContextExclusionsSchema),
+    /** Ragionamento e modello predefiniti dei task del progetto; assente = quelli di claude. */
+    agent: Type.Optional(AgentChoiceSchema),
     createdAt: Timestamp,
   },
   { additionalProperties: false },
@@ -74,6 +77,8 @@ export const UpdateProjectSchema = Type.Object(
   {
     workflow: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
     exclude: Type.Optional(ContextExclusionsSchema),
+    /** `{}` torna a quelli di claude. */
+    agent: Type.Optional(AgentChoiceSchema),
   },
   { additionalProperties: false },
 );

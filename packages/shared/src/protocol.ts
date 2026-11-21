@@ -10,6 +10,7 @@ import {
   type Project,
 } from './contract.js';
 import { StepMarkSchema, type StepMark } from './workflow/path.js';
+import { AgentChoiceSchema } from './workflow/schema.js';
 import { AgentUsageSchema, RunEventSchema, RunModeSchema, RunStateSchema } from './workflow/run.js';
 import { PolicyActionSchema, WorkflowKindSchema, WorkflowSchema } from './workflow/schema.js';
 
@@ -166,6 +167,8 @@ export const RunStartSchema = Type.Object({
   settings: Type.Optional(UserSettingsSchema),
   /** Esclusioni dal contesto di claude, dal progetto della cartella. */
   exclude: Type.Optional(ContextExclusionsSchema),
+  /** Ragionamento e modello scelti dall'utente, per i passi agent che non li fissano. */
+  agent: Type.Optional(AgentChoiceSchema),
 });
 export type RunStart = Static<typeof RunStartSchema>;
 
@@ -308,6 +311,8 @@ export const StartRunSchema = Type.Object(
     cwd: Type.Optional(Type.String({ minLength: 1 })),
     /** Task diretto: niente workflow di sviluppo, claude esegue la richiesta così com'è. */
     direct: Type.Optional(Type.Boolean()),
+    /** Ragionamento e modello del task; i campi assenti vengono dal progetto della cartella. */
+    agent: Type.Optional(AgentChoiceSchema),
   },
   { additionalProperties: false },
 );

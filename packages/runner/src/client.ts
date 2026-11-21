@@ -390,6 +390,7 @@ export class RunnerClient {
         ...(start.inputs && { inputs: start.inputs }),
         ...(start.state && { state: start.state }),
         ...(start.settings && { settings: start.settings }),
+        ...(start.agent && { agent: start.agent }),
       },
       this.opts.makeHost(io, start, { runDir: this.journals.runDir(start.runId) }),
     )

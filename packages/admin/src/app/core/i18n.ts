@@ -84,6 +84,19 @@ const it = {
     'Il percorso che il progetto segue per ogni fix o implementazione. Vale sempre l’ultima versione del workflow scelto.',
   'project.workflow.open':
     'Vale dai prossimi task: i {n} già aperti continuano col workflow con cui sono partiti.',
+  'agent.title': 'Ragionamento e modello',
+  'agent.hint':
+    'Predefiniti dei task del progetto; si cambiano anche per il singolo task. I passi del workflow che li fissano tengono i loro.',
+  'agent.effort': 'Ragionamento',
+  'agent.model': 'Modello',
+  'agent.effort.default': 'Ragionamento predefinito',
+  'agent.model.default': 'Modello predefinito',
+  'agent.inherit': '{v} (progetto)',
+  'agent.effort.low': 'Ragionamento basso',
+  'agent.effort.medium': 'Ragionamento medio',
+  'agent.effort.high': 'Ragionamento alto',
+  'agent.effort.xhigh': 'Ragionamento molto alto',
+  'agent.effort.max': 'Ragionamento massimo',
   'prompts.title': 'Prompt del progetto',
   'prompts.hint':
     'In .jeko/prompts/: i passi «prompt» del workflow li eseguono; se un prompt manca, il passo si salta.',
@@ -474,6 +487,19 @@ const en: Record<I18nKey, string> = {
     'The path the project follows for every fix or feature. The latest version of the chosen workflow always applies.',
   'project.workflow.open':
     'Applies from the next tasks: the {n} already open keep the workflow they started with.',
+  'agent.title': 'Reasoning and model',
+  'agent.hint':
+    'Defaults for the project tasks; they can also be changed per task. Workflow steps that set them keep their own.',
+  'agent.effort': 'Reasoning',
+  'agent.model': 'Model',
+  'agent.effort.default': 'Default reasoning',
+  'agent.model.default': 'Default model',
+  'agent.inherit': '{v} (project)',
+  'agent.effort.low': 'Low reasoning',
+  'agent.effort.medium': 'Medium reasoning',
+  'agent.effort.high': 'High reasoning',
+  'agent.effort.xhigh': 'Extra-high reasoning',
+  'agent.effort.max': 'Max reasoning',
   'prompts.title': 'Project prompts',
   'prompts.hint':
     'In .jeko/prompts/: the workflow «prompt» steps run them; if a prompt is missing, the step is skipped.',

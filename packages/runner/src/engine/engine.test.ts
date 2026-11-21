@@ -219,6 +219,33 @@ steps:
     }
   });
 
+  it("usa ragionamento e modello dell'utente nei passi che non li fissano", async () => {
+    const w = wf(`
+name: t
+kind: develop
+version: 1
+steps:
+  - { id: libero, type: agent, instructions: fai }
+  - { id: piano, type: agent, instructions: pianifica, effort: high }
+`);
+    const f = fakeHost({});
+    const out = await runWorkflow(
+      {
+        runId: 'r1',
+        workflow: w,
+        request: 'x',
+        mode: 'headless',
+        agent: { effort: 'low', model: 'sonnet' },
+      },
+      f.host,
+    );
+    expect(out.status).toBe('done');
+    expect(f.agentCalls.map((c) => [c.effort, c.model])).toEqual([
+      ['low', 'sonnet'],
+      ['high', 'sonnet'],
+    ]);
+  });
+
   it('richiede di nuovo un valore fuori enum', async () => {
     const w = wf(`
 name: t

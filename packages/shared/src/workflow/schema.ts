@@ -49,8 +49,34 @@ export type Policy = Static<typeof PolicySchema>;
 
 /** Quanto ragiona claude in un passo (`claude --effort`). */
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
-export const EffortSchema = Type.Union(EFFORTS.map((e) => Type.Literal(e)));
-export type Effort = Static<typeof EffortSchema>;
+export type Effort = (typeof EFFORTS)[number];
+// Con i letterali scritti: un'unione costruita con map diventa `never` nei tipi di fastify.
+export const EffortSchema = Type.Union([
+  Type.Literal('low'),
+  Type.Literal('medium'),
+  Type.Literal('high'),
+  Type.Literal('xhigh'),
+  Type.Literal('max'),
+]);
+
+/** Modello di claude (`claude --model`): alias come `opus` o nome completo. */
+export const ModelSchema = Type.String({
+  minLength: 1,
+  maxLength: 100,
+  pattern: '^[A-Za-z0-9._\\[\\]-]+$',
+});
+/** Alias dei modelli proposti nelle scelte dell'utente. */
+export const MODEL_ALIASES = ['opus', 'sonnet', 'haiku'] as const;
+
+/**
+ * Ragionamento e modello scelti dall'utente (progetto o task): valgono nei passi agent
+ * che non li fissano; senza, quelli predefiniti di claude.
+ */
+export const AgentChoiceSchema = Type.Object(
+  { effort: Type.Optional(EffortSchema), model: Type.Optional(ModelSchema) },
+  { additionalProperties: false },
+);
+export type AgentChoice = Static<typeof AgentChoiceSchema>;
 
 const stepBase = {
   id: Name,
@@ -74,9 +100,7 @@ export const AgentStepSchema = Type.Object(
     /** Ragionamento del passo (es. `high` per il piano); senza, quello predefinito di claude. */
     effort: Type.Optional(EffortSchema),
     /** Modello del passo (alias come `opus` o nome completo); senza, quello predefinito. */
-    model: Type.Optional(
-      Type.String({ minLength: 1, maxLength: 100, pattern: '^[A-Za-z0-9._\\[\\]-]+$' }),
-    ),
+    model: Type.Optional(ModelSchema),
   },
   { additionalProperties: false },
 );

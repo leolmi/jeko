@@ -4,6 +4,7 @@ import {
   FINAL_STATUSES,
   folderKey,
   type ContextExclusions,
+  type AgentChoice,
   type CreateProject,
   type Project,
   type RunRowStatus,
@@ -135,6 +136,14 @@ export class Projects {
   async setExclusions(id: string, exclude: ContextExclusions): Promise<void> {
     const project = await firstValueFrom(
       this.http.patch<Project>(`/api/projects/${id}`, { exclude }),
+    );
+    this.list.update((ps) => ps.map((p) => (p.id === id ? project : p)));
+  }
+
+  /** Ragionamento e modello predefiniti dei task del progetto; `{}` = quelli di claude. */
+  async setAgent(id: string, agent: AgentChoice): Promise<void> {
+    const project = await firstValueFrom(
+      this.http.patch<Project>(`/api/projects/${id}`, { agent }),
     );
     this.list.update((ps) => ps.map((p) => (p.id === id ? project : p)));
   }

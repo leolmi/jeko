@@ -8,6 +8,7 @@ import {
   truthy,
   type CheckStep,
   addUsage,
+  type AgentChoice,
   type AgentUsage,
   type Effort,
   type Functions,
@@ -114,6 +115,8 @@ export interface RunOptions {
   state?: RunState;
   /** Opzioni dell'utente (dal server): `projectsDir` diventa `jeko.projectsDir`. */
   settings?: UserSettings;
+  /** Ragionamento e modello scelti dall'utente: valgono nei passi agent che non li fissano. */
+  agent?: AgentChoice;
   /** Annulla la run: si ferma prima del passo successivo o mentre attende l'utente. */
   signal?: AbortSignal;
 }
@@ -303,6 +306,9 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
       instructions += `\n\nAttenzione, il controllo precedente è fallito:\n${state.lastFailure}`;
     }
 
+    // Il passo del workflow vince sulla scelta dell'utente.
+    const effort = step.effort ?? opts.agent?.effort;
+    const model = step.model ?? opts.agent?.model;
     let usage: AgentUsage | undefined;
     for (let round = 0; ; round++) {
       // Lo stato si salva a fine passo: dopo un riavvio i turni del passo hanno le stesse chiavi.
@@ -316,8 +322,8 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
         ...(opts.signal && { signal: opts.signal }),
         ...(cwd !== undefined && { cwd }),
         ...(step.tools && { tools: step.tools }),
-        ...(step.effort && { effort: step.effort }),
-        ...(step.model && { model: step.model }),
+        ...(effort && { effort }),
+        ...(model && { model }),
         ...(state.sessionId !== undefined && { sessionId: state.sessionId }),
         gates: { policies: wf.policies ?? [], mode },
         authorize: async (tool, input) => {

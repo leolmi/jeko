@@ -10,9 +10,10 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import type { WorkflowCheck, WorkflowRecord } from '@jeko/shared';
+import type { AgentChoice, WorkflowCheck, WorkflowRecord } from '@jeko/shared';
 import { I18n } from '../core/i18n';
 import { Projects } from '../core/projects';
+import { AgentChoiceSelect } from '../ui/agent-choice';
 import { Icon } from '../ui/icon';
 import { WorkflowPreview } from '../workflows/preview';
 import { ProjectContext } from './project-context';
@@ -24,7 +25,15 @@ import { ProjectPrompts } from './project-prompts';
  */
 @Component({
   selector: 'jk-project-settings',
-  imports: [FormsModule, RouterLink, Icon, WorkflowPreview, ProjectPrompts, ProjectContext],
+  imports: [
+    FormsModule,
+    RouterLink,
+    Icon,
+    WorkflowPreview,
+    ProjectPrompts,
+    ProjectContext,
+    AgentChoiceSelect,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
   template: `
@@ -81,6 +90,29 @@ import { ProjectPrompts } from './project-prompts';
               {{ i18n.t('project.workflow.open', { n: p.open.length }) }}
             </p>
           }
+        </section>
+
+        <section class="mt-4 rounded-xl border border-line bg-surface p-4">
+          <p class="text-sm font-medium">{{ i18n.t('agent.title') }}</p>
+          <p class="mt-0.5 text-xs text-faint">{{ i18n.t('agent.hint') }}</p>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <jk-agent-choice [(value)]="agent" />
+            @if (agentError()) {
+              <span class="text-sm text-red-600 dark:text-red-400">{{
+                i18n.t('project.save.error')
+              }}</span>
+            } @else if (agentSaved()) {
+              <span class="text-sm text-faint">{{ i18n.t('project.saved') }}</span>
+            }
+            <button
+              type="button"
+              class="jk-btn-primary ml-auto"
+              [disabled]="!agentDirty() || agentSaving()"
+              (click)="saveAgent(p.id)"
+            >
+              <jk-icon name="save" [size]="16" /> {{ i18n.t('project.save') }}
+            </button>
+          </div>
         </section>
 
         @if (preview(); as wf) {
@@ -148,6 +180,29 @@ export class ProjectSettings {
       s.type === 'agent' && s.prompt !== undefined ? [s.prompt] : [],
     ),
   );
+
+  /** Ragionamento e modello nel form. */
+  protected readonly agent = linkedSignal<AgentChoice>(() => this.project()?.agent ?? {});
+  protected readonly agentDirty = computed(() => {
+    const a = this.agent();
+    const p = this.project()?.agent ?? {};
+    return a.effort !== p.effort || a.model !== p.model;
+  });
+  protected readonly agentSaving = signal(false);
+  protected readonly agentSaved = signal(false);
+  protected readonly agentError = signal(false);
+
+  protected saveAgent(id: string): void {
+    if (this.agentSaving()) return;
+    this.agentSaving.set(true);
+    this.agentSaved.set(false);
+    this.agentError.set(false);
+    this.projects
+      .setAgent(id, this.agent())
+      .then(() => this.agentSaved.set(true))
+      .catch(() => this.agentError.set(true))
+      .finally(() => this.agentSaving.set(false));
+  }
 
   protected known(name: string): boolean {
     return this.develop().some((w) => w.name === name);

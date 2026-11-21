@@ -51,8 +51,10 @@ export class ProjectStore {
       ...current,
       ...(p.workflow !== undefined && { workflow: p.workflow }),
       ...(p.exclude !== undefined && { exclude: p.exclude }),
+      ...(p.agent !== undefined && { agent: p.agent }),
     };
     if (noExclusions(updated.exclude)) delete updated.exclude;
+    if (updated.agent && !Object.keys(updated.agent).length) delete updated.agent;
     this.save(this.items.map((x) => (x.id === id ? updated : x)));
     return updated;
   }

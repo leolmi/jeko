@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
@@ -128,6 +128,45 @@ describe('server', () => {
     const [p] = (await app.inject('/api/projects')).json() as { workflow: string | null }[];
     expect(p!.workflow).toBeNull();
     expect((await start('c:/dev/p')).workflow).toBe('a-dev');
+  });
+
+  it('ragionamento e modello: quelli del task sopra quelli del progetto', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'jeko-agent-'));
+    const a = await buildApp({ dataDir });
+    try {
+      const { id } = (
+        await a.inject({
+          method: 'POST',
+          url: '/api/projects',
+          payload: { name: 'P', path: 'C:\\dev\\p' },
+        })
+      ).json() as { id: string };
+      const patch = (agent: object) =>
+        a.inject({ method: 'PATCH', url: `/api/projects/${id}`, payload: { agent } });
+      expect((await patch({ effort: 'nessuno' })).statusCode).toBe(400);
+      expect((await patch({ effort: 'high', model: 'opus' })).json()).toMatchObject({
+        agent: { effort: 'high', model: 'opus' },
+      });
+      const start = async (payload: object) => {
+        const res = await a.inject({
+          method: 'POST',
+          url: '/api/runs',
+          payload: { request: 'x', mode: 'headless', direct: true, ...payload },
+        });
+        const run = (res.json() as { id: string }).id;
+        const file = join(dataDir, 'runs', run, 'run.json');
+        return (JSON.parse(readFileSync(file, 'utf8')) as { agent: unknown }).agent;
+      };
+      expect(await start({ cwd: 'c:/dev/p', agent: { model: 'haiku' } })).toEqual({
+        effort: 'high',
+        model: 'haiku',
+      });
+      expect(await start({ cwd: 'C:\\altro' })).toBeNull();
+      // `{}` torna a quelli di claude.
+      expect((await patch({})).json()).not.toHaveProperty('agent');
+    } finally {
+      await a.close();
+    }
   });
 
   it('salva i template e crea un progetto che li segue', async () => {

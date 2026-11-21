@@ -406,6 +406,7 @@ export class RunnerHub {
       ...(run.state && { state: run.state }),
       settings,
       ...(exclude && !noExclusions(exclude) && { exclude }),
+      ...(run.agent && { agent: run.agent }),
     });
     if (!sent) return 'offline';
     await this.setStatus(run.id, 'running');

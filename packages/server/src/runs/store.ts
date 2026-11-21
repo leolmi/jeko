@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import {
   FINAL_STATUSES,
   runPath,
+  type AgentChoice,
   type Answer,
   type Prompt,
   type PromptRecord,
@@ -27,6 +28,8 @@ export interface NewRun {
   cwd?: string | undefined;
   /** Definizione con cui la run parte e riparte, anche se il workflow viene eliminato. */
   definition?: Workflow | undefined;
+  /** Ragionamento e modello scelti dall'utente. */
+  agent?: AgentChoice | undefined;
 }
 
 /** Dati per (ri)avviare una run sul runner. */
@@ -41,6 +44,7 @@ export interface RunLaunch {
   cwd: string | null;
   state: RunState | null;
   definition: Workflow | null;
+  agent: AgentChoice | null;
 }
 
 /** Contenuto di `runs/<id>/run.json`: la run con le sue richieste all'utente. */
@@ -48,6 +52,8 @@ export interface RunFile extends Omit<RunSummary, 'usage' | 'path'> {
   inputs: Record<string, string> | null;
   state: RunState | null;
   definition: Workflow | null;
+  /** Assente nelle run nate prima della scelta. */
+  agent?: AgentChoice | null;
   prompts: (PromptRecord & { answeredAt?: string })[];
 }
 
@@ -60,7 +66,14 @@ export interface EventLine extends RunEventRecord {
 const RUN = 'run.json';
 const EVENTS = 'events.jsonl';
 
-const summary = ({ inputs: _i, state, definition, prompts, ...run }: RunFile): RunSummary => ({
+const summary = ({
+  inputs: _i,
+  agent: _a,
+  state,
+  definition,
+  prompts,
+  ...run
+}: RunFile): RunSummary => ({
   ...run,
   usage: state?.usage ?? null,
   path: runPath({ ...run, definition, state, prompts }),
@@ -107,6 +120,7 @@ export class RunStore {
       inputs: run.inputs ?? null,
       state: null,
       definition: run.definition ?? null,
+      agent: run.agent && Object.keys(run.agent).length ? run.agent : null,
       prompts: [],
       createdAt: at,
       updatedAt: at,
@@ -161,17 +175,18 @@ export class RunStore {
     return [...this.runs.values()]
       .filter((r) => r.status === 'queued' || r.status === 'running' || r.status === 'waiting')
       .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0))
-      .map(({ id, workflow, version, request, mode, status, inputs, cwd, state, definition }) => ({
-        id,
-        workflow,
-        version,
-        request,
-        mode,
-        status,
-        inputs,
-        cwd,
-        state,
-        definition,
+      .map((r) => ({
+        id: r.id,
+        workflow: r.workflow,
+        version: r.version,
+        request: r.request,
+        mode: r.mode,
+        status: r.status,
+        inputs: r.inputs,
+        cwd: r.cwd,
+        state: r.state,
+        definition: r.definition,
+        agent: r.agent ?? null,
       }));
   }
 

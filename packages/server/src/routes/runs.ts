@@ -40,7 +40,10 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (req, reply) => {
-      const { version, direct, ...rest } = req.body;
+      const { version, direct, agent: choice, ...body } = req.body;
+      const project = await projects.byPath(req.body.cwd);
+      // Ragionamento e modello: quelli del task, campo per campo, su quelli del progetto.
+      const rest = { ...body, agent: { ...project?.agent, ...choice } };
       if (direct) {
         const definition = directWorkflow();
         const run = await runs.create({
@@ -54,9 +57,7 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
       }
       // Senza workflow: quello del progetto della cartella, o il predefinito di sviluppo.
       const workflow =
-        req.body.workflow ??
-        (await projects.byPath(req.body.cwd))?.workflow ??
-        (await workflows.defaultOf('develop'));
+        req.body.workflow ?? project?.workflow ?? (await workflows.defaultOf('develop'));
       const def = workflow ? await workflows.definition(workflow, version) : null;
       if (!workflow || def?.workflow.kind !== 'develop')
         return reply.code(404).send({ message: `Workflow '${workflow ?? ''}' non trovato` });

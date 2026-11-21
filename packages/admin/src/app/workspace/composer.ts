@@ -4,15 +4,17 @@ import {
   computed,
   effect,
   inject,
+  linkedSignal,
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import type { RunMode } from '@jeko/shared';
+import type { AgentChoice, RunMode } from '@jeko/shared';
 import { I18n } from '../core/i18n';
 import { Projects } from '../core/projects';
 import { Realtime } from '../core/realtime';
 import { Runs } from '../core/runs';
 import { storage } from '../core/storage';
+import { AgentChoiceSelect } from '../ui/agent-choice';
 import { Icon } from '../ui/icon';
 import { ModeBadge, TONES } from '../ui/mode-tone';
 import { Segmented, type SegmentOption } from '../ui/segmented';
@@ -25,7 +27,7 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
  */
 @Component({
   selector: 'jk-task-composer',
-  imports: [Icon, Segmented, ModeBadge],
+  imports: [Icon, Segmented, ModeBadge, AgentChoiceSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex flex-col bg-surface px-6 py-3' },
   template: `
@@ -83,6 +85,13 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
             <jk-icon name="flash_on" [size]="16" />
           </span>
         </button>
+        <!-- Vuoti, valgono quelli del progetto; continuando, quelli del task. -->
+        <jk-agent-choice
+          [compact]="true"
+          [inherited]="project()?.agent"
+          [(value)]="agent"
+          [class.invisible]="followUp()"
+        />
         <span class="hidden min-w-0 flex-1 truncate text-xs text-faint lg:inline">
           @if (error()) {
             <span class="text-red-600 dark:text-red-400">{{ i18n.t('composer.error') }}</span>
@@ -134,6 +143,11 @@ export class TaskComposer {
       hint: this.i18n.t(`composer.mode.${m}.hint`),
     })),
   );
+  /** Ragionamento e modello del task: si riparte da quelli del progetto a ogni cambio. */
+  protected readonly agent = linkedSignal<string | undefined, AgentChoice>({
+    source: () => this.project()?.id,
+    computation: () => ({}),
+  });
   /** Task diretto, senza workflow di sviluppo: resta com'è, come la modalità. */
   protected readonly direct = signal(storage.get('direct') === '1');
   /** Task diretto del progetto aperto in pagina, in attesa del messaggio seguente. */
@@ -188,6 +202,7 @@ export class TaskComposer {
         mode: this.mode(),
         cwd: p.path,
         ...(this.direct() && { direct: true }),
+        ...(Object.keys(this.agent()).length && { agent: this.agent() }),
       })
       .subscribe({
         next: (run) => {
