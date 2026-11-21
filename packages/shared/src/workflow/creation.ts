@@ -94,6 +94,20 @@ export function creationWorkflow(prompt?: string): Workflow {
   };
 }
 
+/**
+ * Errori di un prompt del progetto (`.jeko/prompts/`): vale il contesto dei workflow di
+ * sviluppo (`{{ request }}`, `{{ jeko.… }}`); vuoto se va bene.
+ */
+export function promptIssues(text: string): Issue[] {
+  const res = validateWorkflow({
+    name: 'prompt',
+    kind: 'develop',
+    version: 1,
+    steps: [{ id: 'prompt', type: 'agent', instructions: text }],
+  });
+  return res.ok ? [] : res.issues;
+}
+
 /** Errori del prompt di un template (segnaposto o funzioni sconosciute); vuoto se va bene. */
 export function templateIssues(prompt: string): Issue[] {
   const res = validateWorkflow(creationWorkflow(prompt));

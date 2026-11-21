@@ -118,6 +118,49 @@ describe('buildTimeline', () => {
     });
   });
 
+  it('nel task diretto i messaggi seguenti sono richieste, non domande', () => {
+    const followUp = (id: string, s: number, value: string | null, answered = true) => ({
+      id: `00000000-0000-4000-8000-00000000000${id}`,
+      runId: 'r',
+      prompt: { kind: 'ask' as const, stepId: 'seguito', question: 'Altro?', required: false },
+      answer: answered ? { kind: 'ask' as const, value } : null,
+      status: answered ? ('answered' as const) : ('pending' as const),
+      createdAt: T(s),
+    });
+    const items = buildTimeline({
+      ...run,
+      events: run.events.slice(0, 3),
+      prompts: [followUp('3', 3, 'e ora il push'), followUp('4', 8, null, false)],
+    });
+    expect(items.map((i) => i.kind)).toEqual(['request', 'step', 'request']);
+    expect(items[2]).toMatchObject({ kind: 'request', text: 'e ora il push' });
+  });
+
+  it('chiude come saltato un passo già partito, con la nota', () => {
+    const items = buildTimeline({
+      ...run,
+      events: [
+        ...run.events.slice(0, 2),
+        {
+          seq: 9,
+          at: T(2),
+          event: {
+            runId: 'r',
+            type: 'step.skipped',
+            stepId: 'lavoro',
+            note: 'Prompt "end-develop" non presente',
+          },
+        },
+      ],
+      prompts: [],
+    });
+    expect(items.map((i) => i.kind)).toEqual(['request', 'step']);
+    expect(items[1]).toMatchObject({
+      state: 'skipped',
+      output: 'Prompt "end-develop" non presente',
+    });
+  });
+
   it('lascia in corso un passo non ancora finito', () => {
     const items = buildTimeline({ ...run, events: run.events.slice(0, 2), prompts: [] });
     expect(items.at(-1)).toMatchObject({ kind: 'step', state: 'running' });

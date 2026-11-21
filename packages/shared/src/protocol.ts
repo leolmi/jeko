@@ -1,5 +1,12 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { Id, Timestamp, UserSettingsSchema, type Project } from './contract.js';
+import {
+  Id,
+  ProjectPromptSchema,
+  PromptName,
+  Timestamp,
+  UserSettingsSchema,
+  type Project,
+} from './contract.js';
 import { RunEventSchema, RunModeSchema, RunStateSchema } from './workflow/run.js';
 import { PolicyActionSchema, WorkflowKindSchema, WorkflowSchema } from './workflow/schema.js';
 
@@ -114,6 +121,19 @@ export const RunnerToServerSchema = Type.Union([
     path: Type.Union([Type.String(), Type.Null()]),
     error: Type.Optional(Type.String()),
   }),
+  /** Prompt del progetto dopo l'operazione richiesta, o l'errore. */
+  Type.Object({
+    type: Type.Literal('prompts.result'),
+    requestId: Type.String({ minLength: 1 }),
+    prompts: Type.Array(ProjectPromptSchema),
+    error: Type.Optional(Type.String()),
+  }),
+  /** Terminale aperto sul PC, o l'errore. */
+  Type.Object({
+    type: Type.Literal('terminal.opened'),
+    requestId: Type.String({ minLength: 1 }),
+    error: Type.Optional(Type.String()),
+  }),
   Type.Object({
     type: Type.Literal('run.prompt'),
     runId: Type.String(),
@@ -160,6 +180,23 @@ export const ServerToRunnerSchema = Type.Union([
     requestId: Type.String({ minLength: 1 }),
     start: Type.Optional(Type.String()),
     title: Type.Optional(Type.String({ maxLength: 200 })),
+  }),
+  /** Prompt del progetto in `.jeko/prompts/`: elenco, salvataggio o eliminazione di uno. */
+  Type.Object({
+    type: Type.Literal('prompts.request'),
+    requestId: Type.String({ minLength: 1 }),
+    cwd: Type.String({ minLength: 1 }),
+    op: Type.Union([
+      Type.Object({ kind: Type.Literal('list') }),
+      Type.Object({ kind: Type.Literal('save'), name: PromptName, text: Type.String() }),
+      Type.Object({ kind: Type.Literal('delete'), name: PromptName }),
+    ]),
+  }),
+  /** Apri sul PC un terminale nella cartella (es. per un login o dati sensibili). */
+  Type.Object({
+    type: Type.Literal('terminal.open'),
+    requestId: Type.String({ minLength: 1 }),
+    cwd: Type.String({ minLength: 1 }),
   }),
   /** Eventi salvati fino a `seq` compreso: il runner può toglierli dal giornale. */
   Type.Object({
@@ -251,6 +288,8 @@ export const StartRunSchema = Type.Object(
     mode: RunModeSchema,
     inputs: Type.Optional(Type.Record(Type.String(), Type.String())),
     cwd: Type.Optional(Type.String({ minLength: 1 })),
+    /** Task diretto: niente workflow di sviluppo, claude esegue la richiesta così com'è. */
+    direct: Type.Optional(Type.Boolean()),
   },
   { additionalProperties: false },
 );
@@ -329,4 +368,12 @@ export type AdminMessage =
   | { type: 'run.event'; runId: string; record: RunEventRecord }
   | { type: 'run.prompt'; runId: string; prompt: PromptRecord }
   /** Un workflow di creazione ha aggiunto un progetto. */
-  | { type: 'project.added'; project: Project };
+  | { type: 'project.added'; project: Project }
+  /** Task conclusi eliminati dall'utente. */
+  | { type: 'runs.removed'; ids: string[] };
+
+/** Task conclusi da eliminare: quelli ancora aperti restano. */
+export const RemoveRunsSchema = Type.Object(
+  { ids: Type.Array(Id, { minItems: 1, maxItems: 500, uniqueItems: true }) },
+  { additionalProperties: false },
+);

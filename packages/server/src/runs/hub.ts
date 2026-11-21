@@ -9,6 +9,7 @@ import {
   type AdminMessage,
   type Answer,
   type Check,
+  type ProjectPrompt,
   type RunEvent,
   type RunnerToServer,
   type RunRowStatus,
@@ -23,6 +24,7 @@ const isRunnerMessage = validator(RunnerToServerSchema);
 
 /** Quanto si aspetta che l'utente scelga una cartella nel dialogo. */
 const PICK_TIMEOUT_MS = 10 * 60_000;
+const TERMINAL_TIMEOUT_MS = 15_000;
 /** Quanto si aspetta una risposta di claude a una richiesta di assistenza. */
 const ASSIST_TIMEOUT_MS = 5 * 60_000;
 
@@ -46,7 +48,7 @@ export class RunnerHub {
   /** Richieste al runner (dialogo della cartella, assistenza) in attesa della risposta. */
   private readonly requests = new Map<
     string,
-    { resolve: (path: string | null) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
+    { resolve: (value: unknown) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
   >();
 
   constructor(
@@ -89,22 +91,44 @@ export class RunnerHub {
     }));
   }
 
+  /** Apre sul PC del runner un terminale nella cartella. Fallisce se il runner manca. */
+  async openTerminal(cwd: string, timeoutMs = TERMINAL_TIMEOUT_MS): Promise<void> {
+    await this.request(timeoutMs, (requestId) => ({ type: 'terminal.open', requestId, cwd }));
+  }
+
   /** Chiede a claude, tramite il runner, una risposta testuale a un prompt. */
   assist(prompt: string, timeoutMs = ASSIST_TIMEOUT_MS) {
     return this.request(timeoutMs, (requestId) => ({ type: 'assist.request', requestId, prompt }));
   }
 
+  /** Prompt del progetto nella cartella: elenco, o salvataggio/eliminazione e poi l'elenco. */
+  projectPrompts(
+    cwd: string,
+    op: Extract<ServerToRunner, { type: 'prompts.request' }>['op'],
+    timeoutMs = TERMINAL_TIMEOUT_MS,
+  ) {
+    return this.request<ProjectPrompt[]>(timeoutMs, (requestId) => ({
+      type: 'prompts.request',
+      requestId,
+      cwd,
+      op,
+    }));
+  }
+
   /** Manda una richiesta al runner e ne attende la risposta (errori: offline, timeout…). */
-  private request(timeoutMs: number, build: (requestId: string) => ServerToRunner) {
-    return new Promise<string | null>((resolve, reject) => {
+  private request<T = string | null>(
+    timeoutMs: number,
+    build: (requestId: string) => ServerToRunner,
+  ) {
+    return new Promise<T>((resolve, reject) => {
       const requestId = randomUUID();
       const timer = setTimeout(() => this.settle(requestId, new Error('timeout')), timeoutMs);
-      this.requests.set(requestId, { resolve, reject, timer });
+      this.requests.set(requestId, { resolve: resolve as (v: unknown) => void, reject, timer });
       if (!this.sendRunner(build(requestId))) this.settle(requestId, new Error('offline'));
     });
   }
 
-  private settle(requestId: string, result: string | null | Error): void {
+  private settle(requestId: string, result: unknown): void {
     const pending = this.requests.get(requestId);
     if (!pending) return;
     this.requests.delete(requestId);
@@ -212,6 +236,10 @@ export class RunnerHub {
         return this.settle(msg.requestId, msg.error ? new Error(msg.error) : msg.path);
       case 'assist.result':
         return this.settle(msg.requestId, msg.error ? new Error(msg.error) : msg.text);
+      case 'terminal.opened':
+        return this.settle(msg.requestId, msg.error ? new Error(msg.error) : null);
+      case 'prompts.result':
+        return this.settle(msg.requestId, msg.error ? new Error(msg.error) : msg.prompts);
     }
   }
 
@@ -359,6 +387,11 @@ export class RunnerHub {
 
   private sendTo(socket: WebSocket, msg: AdminMessage): void {
     if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(msg));
+  }
+
+  /** Avvisa le pagine aperte che dei task conclusi sono stati eliminati. */
+  runsRemoved(ids: string[]): void {
+    if (ids.length) this.broadcast({ type: 'runs.removed', ids });
   }
 
   private broadcast(msg: AdminMessage): void {

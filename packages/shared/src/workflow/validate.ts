@@ -180,7 +180,11 @@ function semanticIssues(wf: Workflow): Issue[] {
 
     switch (step.type) {
       case 'agent':
-        checkTemplate(step.instructions, at('instructions'), known);
+        if ((step.instructions === undefined) === (step.prompt === undefined)) {
+          issues.push({ path: at(), message: "un passo agent vuole 'instructions' o 'prompt'" });
+        }
+        if (step.instructions !== undefined)
+          checkTemplate(step.instructions, at('instructions'), known);
         if (step.cwd) checkTemplate(step.cwd, at('cwd'), known);
         break;
       case 'gate':

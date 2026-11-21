@@ -36,7 +36,11 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         class="block min-h-0 w-full flex-1 resize-none bg-transparent px-4 pt-3 text-sm leading-relaxed outline-none"
         [attr.aria-label]="i18n.t('composer.request')"
         [placeholder]="
-          project() ? i18n.t('composer.placeholder', { name: project()!.name }) : i18n.t('ws.empty')
+          !project()
+            ? i18n.t('ws.empty')
+            : i18n.t(followUp() ? 'composer.continue.placeholder' : 'composer.placeholder', {
+                name: project()!.name,
+              })
         "
         [disabled]="!project()?.path"
         [value]="draft()"
@@ -44,13 +48,32 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         (keydown.control.enter)="submit()"
       ></textarea>
       <div class="flex flex-wrap items-center gap-3 px-3 pt-1 pb-2.5">
-        <jk-segmented [label]="i18n.t('composer.mode')" [options]="modes()" [(value)]="mode" />
+        <!-- Continuando un task, modalità e workflow sono già quelli del task. -->
+        <jk-segmented
+          [label]="i18n.t('composer.mode')"
+          [options]="modes()"
+          [(value)]="mode"
+          [class.invisible]="followUp()"
+        />
+        <label
+          [class.invisible]="followUp()"
+          class="flex cursor-pointer items-center gap-1.5 text-sm text-muted select-none hover:text-fg"
+          [title]="i18n.t('composer.direct.hint')"
+        >
+          <input
+            type="checkbox"
+            class="size-4 accent-accent"
+            [checked]="direct()"
+            (change)="direct.set($any($event.target).checked)"
+          />
+          {{ i18n.t('composer.direct') }}
+        </label>
         <span class="hidden min-w-0 flex-1 truncate text-xs text-faint lg:inline">
           @if (error()) {
             <span class="text-red-600 dark:text-red-400">{{ i18n.t('composer.error') }}</span>
           } @else if (!rt.runner().connected) {
             {{ i18n.t('composer.queued') }}
-          } @else if (busy()) {
+          } @else if (busy() && !followUp()) {
             {{ i18n.t('composer.busy') }}
           } @else {
             {{ i18n.t('composer.shortcut') }}
@@ -63,7 +86,9 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
           (click)="submit()"
         >
           <jk-icon name="send" [size]="16" />
-          {{ i18n.t(busy() ? 'composer.enqueue' : 'composer.send') }}
+          {{
+            i18n.t(followUp() ? 'composer.continue' : busy() ? 'composer.enqueue' : 'composer.send')
+          }}
         </button>
       </div>
     </div>
@@ -93,6 +118,14 @@ export class TaskComposer {
       hint: this.i18n.t(`composer.mode.${m}.hint`),
     })),
   );
+  /** Task diretto, senza workflow di sviluppo: resta com'è, come la modalità. */
+  protected readonly direct = signal(storage.get('direct') === '1');
+  /** Task diretto del progetto aperto in pagina, in attesa del messaggio seguente. */
+  protected readonly followUp = computed(() => {
+    const f = this.runs.followUp();
+    const path = this.project()?.path;
+    return f && path && f.cwd?.toLowerCase() === path.toLowerCase() ? f : null;
+  });
   protected readonly sending = signal(false);
   protected readonly error = signal(false);
   protected readonly valid = computed(
@@ -101,6 +134,7 @@ export class TaskComposer {
 
   constructor() {
     effect(() => storage.set('mode', this.mode()));
+    effect(() => storage.set('direct', this.direct() ? '1' : '0'));
   }
 
   protected setDraft(text: string): void {
@@ -113,22 +147,34 @@ export class TaskComposer {
     if (!p || !this.valid() || this.sending()) return;
     this.sending.set(true);
     this.error.set(false);
+    const request = this.draft().trim();
+    const done = () => {
+      this.sending.set(false);
+      this.projects.setDraft(p.id, '');
+    };
+    const error = () => {
+      this.sending.set(false);
+      this.error.set(true);
+    };
+    // Task diretto aperto in pagina: il messaggio lo continua, non ne avvia uno nuovo.
+    const f = this.followUp();
+    if (f) {
+      this.runs.continue(f.runId, f.promptId, request).subscribe({ next: done, error });
+      return;
+    }
     this.runs
       .start({
-        request: this.draft().trim(),
+        request,
         mode: this.mode(),
         cwd: p.path,
+        ...(this.direct() && { direct: true }),
       })
       .subscribe({
         next: (run) => {
-          this.sending.set(false);
-          this.projects.setDraft(p.id, '');
+          done();
           void this.router.navigate(['/runs', run.id]);
         },
-        error: () => {
-          this.sending.set(false);
-          this.error.set(true);
-        },
+        error,
       });
   }
 }

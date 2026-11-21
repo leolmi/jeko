@@ -17,7 +17,7 @@ const LOOK: Record<StepType, { icon: IconName; color: string }> = {
 function detail(s: Step): string {
   switch (s.type) {
     case 'agent':
-      return s.instructions.trim();
+      return s.prompt !== undefined ? `▸ prompt ${s.prompt}` : (s.instructions ?? '').trim();
     case 'ask':
       return `${s.question.trim()} → ${s.into}`;
     case 'gate':

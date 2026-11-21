@@ -4,9 +4,13 @@ import { parse } from 'yaml';
  * Conoscenza del progetto, nella cartella `.jeko/` alla radice:
  * - `project.md`: cos'è il progetto, stack, convenzioni;
  * - `commands.yaml`: comandi di build, test, lint… (nome → comando);
- * - `notes/*.md`: cose imparate lavorando (decisioni, trappole).
+ * - `notes/*.md`: cose imparate lavorando (decisioni, trappole);
+ * - `prompts/<nome>.md`: prompt del progetto, eseguiti dai passi agent con `prompt: <nome>`.
  */
 export const JEKO_DIR = '.jeko';
+export const PROMPTS_DIR = 'prompts';
+/** Nome di un prompt del progetto (è anche il nome del file, senza `.md`). */
+export const PROMPT_NAME = /^[a-z][a-z0-9-]*$/;
 
 export interface Knowledge {
   project?: string;

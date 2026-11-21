@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { knowledgePrompt, type RunEvent } from '@jeko/shared';
 import { loadKnowledge } from '../knowledge.js';
+import { readPrompt } from '../prompts.js';
 import type { PermissionBridge } from '../permissions/bridge.js';
 import { run } from '../spawn.js';
 import { durableTurn } from '../turn.js';
@@ -43,6 +44,7 @@ export function createNodeHost(opts: NodeHostOptions): Host {
     functions: hostFunctions,
     exec: (argv, cwd) =>
       run(argv, { ...((cwd ?? opts.cwd) !== undefined && { cwd: cwd ?? opts.cwd }) }),
+    projectPrompt: async (name, cwd) => readPrompt(cwd ?? opts.cwd ?? process.cwd(), name),
     projectCommands: async (cwd) => {
       const k = loadKnowledge(cwd ?? opts.cwd ?? process.cwd());
       if (k?.commandsError) throw new Error(k.commandsError);

@@ -1,5 +1,6 @@
 import {
   creationWorkflow,
+  directWorkflow,
   parseWorkflow,
   type RunEvent,
   type RunMode,
@@ -30,6 +31,8 @@ function fakeHost(opts: {
   exec?: (argv: string[]) => number;
   agent?: (req: AgentRequest) => Promise<{ ok: boolean; output: string; sessionId?: string }>;
   files?: Record<string, string>;
+  /** Prompt del progetto, per nome. */
+  prompts?: Record<string, string>;
 }): Fake {
   const answers = [...(opts.answers ?? [])];
   const approve = [...(opts.approve ?? [])];
@@ -52,6 +55,7 @@ function fakeHost(opts: {
       return { approved: approve.length ? approve.shift()! : true };
     },
     review: async () => reviews.shift() ?? { ok: true },
+    projectPrompt: async (name) => opts.prompts?.[name] ?? null,
     agent: async (req) => {
       f.agentCalls.push(req);
       return opts.agent ? opts.agent(req) : { ok: true, output: 'fatto', sessionId: 'sess' };
@@ -263,6 +267,55 @@ steps:
     const out = await run(w, f);
     expect(out.status).toBe('rejected');
     expect(f.agentCalls).toEqual([]);
+  });
+
+  it('un passo con prompt esegue quello del progetto, o si salta se manca', async () => {
+    const w = wf(`
+name: t
+kind: develop
+version: 1
+steps:
+  - { id: chiusura, type: agent, title: Chiusura, prompt: end-develop }
+  - { id: altro, type: agent, prompt: mancante }
+`);
+    const f = fakeHost({ prompts: { 'end-develop': 'Chiudi: {{ request }}' } });
+    expect((await run(w, f)).status).toBe('done');
+    expect(f.agentCalls.map((c) => c.instructions)).toEqual(['Chiudi: crea Jeko']);
+    expect(f.events.filter((e) => e.type === 'step.skipped')).toMatchObject([
+      { stepId: 'altro', note: 'Prompt "mancante" non presente' },
+    ]);
+  });
+
+  it('il task diretto continua nella stessa sessione finché non si chiude', async () => {
+    const f = fakeHost({ answers: ['e ora il push', '{{ x }} così com’è', ''] });
+    const out = await run(directWorkflow(), f);
+    expect(out.status).toBe('done');
+    expect(f.asked).toEqual(['seguito', 'seguito', 'seguito']);
+    expect(f.agentCalls.map((c) => [c.stepId, c.instructions])).toEqual([
+      ['diretto', 'crea Jeko'],
+      ['diretto-2', 'e ora il push'],
+      ['diretto-3', '{{ x }} così com’è'],
+    ]);
+    expect(f.agentCalls[2]!.sessionId).toBe('sess');
+  });
+
+  it("fermata dall'utente durante un passo agent: annullata, non fallita", async () => {
+    const w = wf(`
+name: t
+kind: develop
+version: 1
+steps:
+  - { id: piano, type: agent, instructions: pianifica }
+`);
+    const ctl = new AbortController();
+    const f = fakeHost({
+      agent: async () => (ctl.abort(), { ok: false, output: 'Turno annullato' }),
+    });
+    const out = await runWorkflow(
+      { runId: 'r1', workflow: w, request: 'x', mode: 'checkpoint', signal: ctl.signal },
+      f.host,
+    );
+    expect(out.status).toBe('cancelled');
   });
 
   it("il gate mostra l'uscita dell'ultimo passo agent", async () => {

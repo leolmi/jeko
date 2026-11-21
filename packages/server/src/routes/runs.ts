@@ -1,5 +1,12 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { AnswerSchema, Id, RunSummarySchema, StartRunSchema } from '@jeko/shared';
+import {
+  AnswerSchema,
+  directWorkflow,
+  Id,
+  RemoveRunsSchema,
+  RunSummarySchema,
+  StartRunSchema,
+} from '@jeko/shared';
 import { Type } from '@sinclair/typebox';
 import type { ProjectStore } from '../projects/store.js';
 import type { RunnerHub } from '../runs/hub.js';
@@ -33,7 +40,18 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (req, reply) => {
-      const { version, ...rest } = req.body;
+      const { version, direct, ...rest } = req.body;
+      if (direct) {
+        const definition = directWorkflow();
+        const run = await runs.create({
+          ...rest,
+          workflow: definition.name,
+          version: definition.version,
+          definition,
+        });
+        await hub.start();
+        return reply.code(201).send((await runs.get(run.id))!);
+      }
       // Senza workflow: quello del progetto della cartella, o il predefinito di sviluppo.
       const workflow =
         req.body.workflow ??
@@ -68,6 +86,22 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
         case 'wrong-kind':
           return reply.code(400).send({ message: 'Tipo di risposta non adatto alla richiesta' });
       }
+    },
+  );
+
+  // Elimina i task conclusi (con eventi e richieste); quelli ancora aperti non si toccano.
+  app.post(
+    '/api/runs/remove',
+    {
+      schema: {
+        body: RemoveRunsSchema,
+        response: { 200: Type.Object({ removed: Type.Array(Type.String()) }) },
+      },
+    },
+    async (req) => {
+      const removed = await runs.remove(req.body.ids);
+      hub.runsRemoved(removed);
+      return { removed };
     },
   );
 

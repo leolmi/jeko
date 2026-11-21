@@ -13,10 +13,17 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { RouterLink } from '@angular/router';
-import { FINAL_STATUSES, type Answer, type RunDetail } from '@jeko/shared';
+import { Router, RouterLink } from '@angular/router';
+import {
+  DIRECT_FOLLOW_UP,
+  DIRECT_WORKFLOW,
+  FINAL_STATUSES,
+  type Answer,
+  type RunDetail,
+} from '@jeko/shared';
 import { I18n, type I18nKey } from '../core/i18n';
 import { Realtime } from '../core/realtime';
+import { Runs } from '../core/runs';
 import { Icon } from '../ui/icon';
 import { Status } from '../ui/status';
 import { PromptCard } from './prompt-card';
@@ -52,6 +59,16 @@ import { buildTimeline } from './timeline';
           <button type="button" class="jk-btn-ghost" (click)="cancel()">
             <jk-icon name="stop" [size]="16" />
             {{ i18n.t('thread.cancel') }}
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="jk-btn-danger py-1"
+            [title]="i18n.t('tasks.delete')"
+            [attr.aria-label]="i18n.t('tasks.delete')"
+            (click)="remove()"
+          >
+            <jk-icon name="delete" [size]="18" />
           </button>
         }
       </header>
@@ -100,6 +117,9 @@ import { buildTimeline } from './timeline';
                       @if (item.state === 'running') {
                         <span class="text-xs text-muted">{{ i18n.t('thread.step.running') }}…</span>
                       }
+                      @if (item.state === 'skipped' && item.output) {
+                        <span class="text-xs text-faint">· {{ item.output }}</span>
+                      }
                       <span class="ml-auto text-xs text-faint">{{ i18n.time(item.at) }}</span>
                     </div>
                     @if (item.state === 'running' && item.activity.length > 0) {
@@ -127,7 +147,12 @@ import { buildTimeline } from './timeline';
                         </ul>
                       </details>
                     }
-                    @if (item.output && item.output.length > 0) {
+                    @if (direct() && item.state !== 'running' && item.output) {
+                      <!-- Task diretto: l'uscita è la risposta di claude, da leggere subito. -->
+                      <pre
+                        class="mt-2 ml-7 rounded-2xl rounded-bl-md border border-line bg-surface px-4 py-3 font-sans text-sm leading-relaxed whitespace-pre-wrap text-fg"
+                        >{{ item.output }}</pre>
+                    } @else if (item.output && item.state !== 'skipped') {
                       <details class="mt-1 ml-7">
                         <summary
                           class="cursor-pointer text-xs text-muted select-none hover:text-fg"
@@ -185,6 +210,22 @@ import { buildTimeline } from './timeline';
               }
             </li>
           }
+          @if (followUp(); as p) {
+            <li class="mt-2 flex items-center gap-3 text-xs text-muted">
+              <span class="h-px flex-1 bg-line"></span>
+              <span>{{ i18n.t('thread.followUp') }}</span>
+              <button
+                type="button"
+                class="jk-btn-ghost px-2 py-1 text-xs"
+                [disabled]="sending() === p.id"
+                (click)="answer(p.id, { kind: 'ask', value: null })"
+              >
+                <jk-icon name="check" [size]="14" />
+                {{ i18n.t('thread.followUp.close') }}
+              </button>
+              <span class="h-px flex-1 bg-line"></span>
+            </li>
+          }
         </ol>
       </div>
     }
@@ -211,6 +252,18 @@ export class Thread {
 
   protected readonly run = signal<RunDetail | null>(null);
   protected readonly missing = signal(false);
+  /** Task diretto, senza workflow di sviluppo: l'uscita si mostra come risposta. */
+  protected readonly direct = computed(() => this.run()?.workflow === DIRECT_WORKFLOW);
+  /** Task diretto in attesa del messaggio seguente (lo scrive l'utente nel composer). */
+  protected readonly followUp = computed(() => {
+    const r = this.run();
+    if (!r || FINAL_STATUSES.includes(r.status)) return null;
+    return (
+      r.prompts.find((p) => p.status === 'pending' && p.prompt.stepId === DIRECT_FOLLOW_UP) ?? null
+    );
+  });
+  private readonly runs = inject(Runs);
+  private readonly router = inject(Router);
   protected readonly sending = signal<string | null>(null);
   protected readonly failed = signal<string | null>(null);
   protected readonly timeline = computed(() => {
@@ -225,6 +278,11 @@ export class Thread {
 
   constructor() {
     effect(() => this.load(this.id()));
+    effect(() => {
+      const p = this.followUp();
+      const r = this.run();
+      this.runs.followUp.set(p && r ? { runId: r.id, promptId: p.id, cwd: r.cwd } : null);
+    });
 
     const rt = inject(Realtime);
     const offMsg = rt.on((msg) => {
@@ -246,6 +304,7 @@ export class Thread {
     inject(DestroyRef).onDestroy(() => {
       offMsg();
       offReconnect();
+      this.runs.followUp.set(null);
     });
 
     // Resta in fondo al filo quando arriva qualcosa di nuovo.
@@ -279,6 +338,18 @@ export class Thread {
         this.failed.set(promptId);
       },
     });
+  }
+
+  /** Elimina il task concluso con la sua storia e torna ai task del progetto. */
+  protected remove(): void {
+    const r = this.run();
+    if (!r) return;
+    const ask = this.i18n.t('tasks.delete.confirm', { request: r.request.slice(0, 80) });
+    if (!globalThis.confirm(ask)) return;
+    this.runs
+      .remove([r.id])
+      .then(() => this.router.navigate(['/']))
+      .catch(() => undefined);
   }
 
   protected cancel(): void {

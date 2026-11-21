@@ -57,3 +57,9 @@ steps:
     title: Approvazione delle modifiche
     level: always
     message: Le modifiche (codice e .jeko/) sono pronte. Le approvi?
+
+  # Chiusura propria del progetto (.jeko/prompts/end-develop.md): chi non la definisce salta il passo.
+  - id: chiusura
+    type: agent
+    title: Chiusura del progetto
+    prompt: end-develop

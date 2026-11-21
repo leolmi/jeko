@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { creationWorkflow, templateIssues } from './creation.js';
+import { directWorkflow } from './direct.js';
 import {
   formatIssue,
   parseWorkflow,
@@ -31,6 +32,23 @@ describe('workflow', () => {
     const r = parseWorkflow(example.replace('kind: develop', 'kind: create'));
     expect(r.ok).toBe(false);
     expect(!r.ok && r.issues[0]).toMatchObject({ path: ['kind'], line: 2 });
+  });
+
+  it('un passo agent vuole istruzioni o un prompt del progetto, non entrambi', () => {
+    const steps = (s: string) => messages(parseWorkflow(base + s));
+    expect(steps('  - { id: a, type: agent, prompt: end-develop }\n')).toEqual([]);
+    for (const bad of [
+      '  - { id: a, type: agent }\n',
+      '  - { id: a, type: agent, prompt: x, instructions: y }\n',
+    ]) {
+      const issues = steps(bad);
+      expect(issues).toHaveLength(1);
+      expect(issues[0]).toContain("un passo agent vuole 'instructions' o 'prompt'");
+    }
+  });
+
+  it('il workflow diretto è valido', () => {
+    expect(messages(validateWorkflow(directWorkflow()))).toEqual([]);
   });
 
   it('costruisce il workflow di creazione da un template', () => {

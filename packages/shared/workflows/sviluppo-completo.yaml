@@ -1,7 +1,7 @@
 name: sviluppo-completo
 kind: develop
 version: 1
-description: Fix e implementazioni, dalla verifica della richiesta fino al rilascio
+description: Fix e implementazioni, dalla verifica della richiesta alla chiusura propria del progetto
 
 policies:
   - match: install
@@ -96,15 +96,9 @@ steps:
       (project.md, commands.yaml, una nota breve in notes/ se serve). Se non c'è niente di nuovo
       non toccare nulla. Scrivi solo in .jeko/ e non fare commit.
 
+  # Chiusura propria del progetto (.jeko/prompts/end-develop.md): bump, commit, push, rilascio…
+  # Chi non la definisce salta il passo.
   - id: chiusura
     type: agent
-    title: Bump della versione, commit e push
-    instructions: |
-      Chiudi il lavoro: aumenta la versione del progetto (patch per un fix, minor per
-      un'implementazione), fai il commit di tutte le modifiche con un messaggio chiaro
-      e fai il push del branch.
-
-  - id: rilascio
-    type: check
-    title: Rilascio
-    commands: [release]
+    title: Chiusura del progetto
+    prompt: end-develop

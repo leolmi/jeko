@@ -61,6 +61,8 @@ export const RunEventSchema = Type.Union([
     type: Type.Literal('step.skipped'),
     stepId: Type.String(),
     title: Type.Optional(Type.String()),
+    /** Perché si salta, se non è la condizione `when` (es. prompt del progetto assente). */
+    note: Type.Optional(Type.String()),
   }),
   Type.Object({
     ...runId,

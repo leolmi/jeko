@@ -15,6 +15,7 @@ import { I18n } from '../core/i18n';
 import { Projects } from '../core/projects';
 import { Icon } from '../ui/icon';
 import { WorkflowPreview } from '../workflows/preview';
+import { ProjectPrompts } from './project-prompts';
 
 /**
  * Opzioni del progetto: il workflow di sviluppo che i suoi task seguono, fissato qui
@@ -22,7 +23,7 @@ import { WorkflowPreview } from '../workflows/preview';
  */
 @Component({
   selector: 'jk-project-settings',
-  imports: [FormsModule, RouterLink, Icon, WorkflowPreview],
+  imports: [FormsModule, RouterLink, Icon, WorkflowPreview, ProjectPrompts],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
   template: `
@@ -86,6 +87,12 @@ import { WorkflowPreview } from '../workflows/preview';
             <jk-workflow-preview [workflow]="wf" />
           </section>
         }
+
+        @if (p.path) {
+          <section class="mt-4 rounded-xl border border-line bg-surface p-4">
+            <jk-project-prompts [projectId]="p.id" [used]="usedPrompts()" />
+          </section>
+        }
       </div>
     } @else if (projects.loaded()) {
       <p class="flex h-full items-center justify-center text-sm text-faint">
@@ -130,6 +137,13 @@ export class ProjectSettings {
     const c = this.check.hasValue() ? this.check.value() : undefined;
     return c?.ok ? c.workflow : undefined;
   });
+
+  /** Prompt del progetto chiamati dal workflow scelto (passi `prompt: <nome>`). */
+  protected readonly usedPrompts = computed(() =>
+    (this.preview()?.steps ?? []).flatMap((s) =>
+      s.type === 'agent' && s.prompt !== undefined ? [s.prompt] : [],
+    ),
+  );
 
   protected known(name: string): boolean {
     return this.develop().some((w) => w.name === name);

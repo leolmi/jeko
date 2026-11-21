@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
+  DIRECT_FOLLOW_UP,
+  DIRECT_WORKFLOW,
   evalExpr,
   orderedVars,
   renderTemplate,
@@ -91,6 +93,8 @@ export interface Host {
   exec(argv: string[], cwd?: string): Promise<ExecResult>;
   /** Comandi del progetto (`.jeko/commands.yaml`) per i check con `commands`. */
   projectCommands?(cwd?: string): Promise<Record<string, string[]>>;
+  /** Prompt del progetto (`.jeko/prompts/<nome>.md`) per i passi agent con `prompt`; null se manca. */
+  projectPrompt?(name: string, cwd?: string): Promise<string | null>;
   functions: Functions;
   emit(event: RunEvent): void;
 }
@@ -199,10 +203,12 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
       state.stepIndex = jump ?? state.stepIndex + 1;
       emit({ type: 'state', state });
     }
+    if (wf.name === DIRECT_WORKFLOW) await followUps();
     return finish('done');
   } catch (e) {
-    if (e instanceof Stop) return finish(e.status, e.message);
+    // Fermata dall'utente: il passo interrotto fallisce, ma la run è annullata, non fallita.
     if (opts.signal?.aborted) return finish('cancelled', 'Run annullata');
+    if (e instanceof Stop) return finish(e.status, e.message);
     return finish('failed', e instanceof Error ? e.message : String(e));
   }
 
@@ -252,12 +258,46 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
     }
   }
 
-  async function agentStep(step: Extract<Step, { type: 'agent' }>): Promise<void> {
-    let instructions = render(step.instructions);
+  /**
+   * Task diretto: dopo la risposta resta aperto. Ogni messaggio dell'utente è un nuovo passo
+   * agent nella stessa sessione di claude; nessun messaggio chiude il task.
+   */
+  async function followUps(): Promise<void> {
+    const base = wf.steps.find((s) => s.type === 'agent');
+    if (!base) return;
+    for (;;) {
+      const text = (
+        await host.ask({ stepId: DIRECT_FOLLOW_UP, question: 'Altro?', required: false })
+      )?.trim();
+      if (!text) return;
+      const n = Object.keys(state.steps).filter((id) => id.startsWith(base.id)).length + 1;
+      const step = { ...base, id: `${base.id}-${n}` };
+      const title = base.title !== undefined && { title: base.title };
+      emit({ type: 'step.started', stepId: step.id, index: state.stepIndex, ...title });
+      // Il messaggio è dell'utente: va a claude così com'è, senza segnaposto.
+      await agentStep(step, text);
+      emit({ type: 'state', state });
+    }
+  }
+
+  async function agentStep(step: Extract<Step, { type: 'agent' }>, raw?: string): Promise<void> {
+    const cwd = step.cwd ? render(step.cwd) : undefined;
+    let instructions: string;
+    if (raw !== undefined) instructions = raw;
+    else if (step.prompt !== undefined) {
+      // Prompt del progetto: il workflow resta generico, chi non lo definisce salta il passo.
+      const text = (await host.projectPrompt?.(step.prompt, cwd)) ?? null;
+      if (!text?.trim()) {
+        const title = step.title !== undefined && { title: step.title };
+        const note = `Prompt "${step.prompt}" non presente`;
+        emit({ type: 'step.skipped', stepId: step.id, note, ...title });
+        return;
+      }
+      instructions = render(text);
+    } else instructions = render(step.instructions ?? '');
     if (state.lastFailure) {
       instructions += `\n\nAttenzione, il controllo precedente è fallito:\n${state.lastFailure}`;
     }
-    const cwd = step.cwd ? render(step.cwd) : undefined;
 
     for (let round = 0; ; round++) {
       // Lo stato si salva a fine passo: dopo un riavvio i turni del passo hanno le stesse chiavi.

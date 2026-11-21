@@ -6,6 +6,7 @@ import {
   validator,
   type Answer,
   type Prompt,
+  type ProjectPrompt,
   type RunEvent,
   type RunnerToServer,
   type RunStart,
@@ -14,6 +15,8 @@ import {
 import { runWorkflow, type Host } from './engine/engine.js';
 import type { Assistant } from './assist.js';
 import type { FolderPicker } from './folder-picker.js';
+import { deletePrompt, listPrompts, savePrompt } from './prompts.js';
+import type { TerminalOpener } from './terminal.js';
 import { Journals } from './journal.js';
 
 /** La parte dell'host che passa dal server: domande, approvazioni, revisioni ed eventi. */
@@ -36,6 +39,8 @@ export interface ClientOptions {
   assist?: Assistant | undefined;
   /** Dialogo di scelta cartella del PC; senza, le richieste ricevono un errore. */
   pickFolder?: FolderPicker | undefined;
+  /** Terminale del PC in una cartella; senza, le richieste ricevono un errore. */
+  openTerminal?: TerminalOpener | undefined;
   log?: Pick<Console, 'info' | 'warn' | 'error'>;
 }
 
@@ -207,6 +212,10 @@ export class RunnerClient {
         return this.sendChecks();
       case 'folder.pick':
         return void this.pickFolder(msg);
+      case 'terminal.open':
+        return void this.openTerminal(msg);
+      case 'prompts.request':
+        return this.projectPrompts(msg);
       case 'assist.request':
         return void this.assist(msg);
       case 'run.ack': {
@@ -256,6 +265,46 @@ export class RunnerClient {
       reply(null, 'Dialogo non riuscito');
     } finally {
       this.picking = false;
+    }
+  }
+
+  // ---------- prompt del progetto ----------
+
+  /** Opera sui prompt in `.jeko/prompts/` e risponde con l'elenco aggiornato. */
+  private projectPrompts(msg: Extract<ServerToRunner, { type: 'prompts.request' }>): void {
+    const reply = (prompts: ProjectPrompt[], error?: string) =>
+      this.raw({
+        type: 'prompts.result',
+        requestId: msg.requestId,
+        prompts,
+        ...(error && { error }),
+      });
+    try {
+      const { op, cwd } = msg;
+      if (op.kind === 'save') savePrompt(cwd, op.name, op.text);
+      if (op.kind === 'delete') deletePrompt(cwd, op.name);
+      reply(listPrompts(cwd));
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      this.log.warn(`prompt del progetto: ${reason}`);
+      reply([], reason);
+    }
+  }
+
+  // ---------- terminale ----------
+
+  private async openTerminal(msg: Extract<ServerToRunner, { type: 'terminal.open' }>) {
+    const reply = (error?: string) =>
+      this.raw({ type: 'terminal.opened', requestId: msg.requestId, ...(error && { error }) });
+    const open = this.opts.openTerminal;
+    if (!open) return reply('Terminale non disponibile su questo sistema');
+    try {
+      await open(msg.cwd);
+      reply();
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      this.log.warn(`terminale: ${reason}`);
+      reply(reason);
     }
   }
 

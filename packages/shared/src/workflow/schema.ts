@@ -62,7 +62,13 @@ export const AgentStepSchema = Type.Object(
   {
     ...stepBase,
     type: Type.Literal('agent'),
-    instructions: TemplateSchema,
+    /** Cosa chiedere a claude; in alternativa `prompt`. */
+    instructions: Type.Optional(TemplateSchema),
+    /**
+     * Prompt del progetto per nome (`.jeko/prompts/<nome>.md`), al posto di `instructions`:
+     * il workflow resta generico e ogni progetto decide cosa fare lì. Se manca, il passo si salta.
+     */
+    prompt: Type.Optional(Type.String({ pattern: '^[a-z][a-z0-9-]*$', maxLength: 80 })),
     cwd: Type.Optional(TemplateSchema),
     tools: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { uniqueItems: true })),
     /** Ragionamento del passo (es. `high` per il piano); senza, quello predefinito di claude. */

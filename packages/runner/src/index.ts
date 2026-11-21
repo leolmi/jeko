@@ -6,6 +6,7 @@ import { RunnerClient } from './client.js';
 import { loadConfig } from './config.js';
 import { runDiagnostics } from './diagnostics.js';
 import { systemFolderPicker } from './folder-picker.js';
+import { systemTerminal } from './terminal.js';
 import { createNodeHost } from './engine/node-host.js';
 import { defaultDataDir } from './journal.js';
 import { createPermissionBridge } from './permissions/bridge.js';
@@ -38,6 +39,7 @@ const client = new RunnerClient({
   version: VERSION,
   dataDir,
   pickFolder: systemFolderPicker(),
+  openTerminal: systemTerminal(),
   assist: claudeAssistant(claude),
   diagnose: () => runDiagnostics({ claude, dataDir, scriptsDir, permissionsEndpoint: true }),
   makeHost: (io, start, { runDir }) =>

@@ -61,6 +61,17 @@ export const SaveTemplateSchema = Type.Object(
 );
 export type SaveTemplate = Static<typeof SaveTemplateSchema>;
 
+/** Prompt del progetto (`.jeko/prompts/<nome>.md`), eseguito dai passi `prompt: <nome>`. */
+export const PromptName = Type.String({ pattern: '^[a-z][a-z0-9-]*$', maxLength: 80 });
+
+export const ProjectPromptSchema = Type.Object({ name: PromptName, text: Type.String() });
+export type ProjectPrompt = Static<typeof ProjectPromptSchema>;
+
+export const SaveProjectPromptSchema = Type.Object(
+  { text: Type.String({ minLength: 1, maxLength: 20_000 }) },
+  { additionalProperties: false },
+);
+
 export const HealthSchema = Type.Object({
   status: Type.Literal('ok'),
   version: Type.String(),

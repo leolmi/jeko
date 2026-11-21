@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -54,6 +54,8 @@ describe('run server ↔ runner', () => {
   let others: RunnerClient[];
   let dataDir: string;
   let agentCalls: AgentRequest[];
+  /** Cartelle in cui il finto runner ha aperto un terminale. */
+  let terminals: string[];
   /** Funzioni dei workflow (exists, fileContains…) del finto host. */
   let functions: Host['functions'];
 
@@ -81,6 +83,10 @@ describe('run server ↔ runner', () => {
       log: { info: () => {}, warn: () => {}, error: () => {} },
       // Finto dialogo: "sceglie" una sottocartella di quella di partenza, o annulla.
       pickFolder: async ({ start }) => (start ? `${start}\\scelta` : null),
+      openTerminal: async (cwd) => {
+        if (cwd.includes('manca')) throw new Error(`Cartella inesistente: ${cwd}`);
+        terminals.push(cwd);
+      },
       // Finto claude: rimette il workflow attuale con una descrizione nuova.
       assist: async (prompt) => {
         const yaml = /Workflow attuale:\n```yaml\n([\s\S]*?)```/.exec(prompt)![1]!;
@@ -103,6 +109,7 @@ describe('run server ↔ runner', () => {
 
   beforeEach(async () => {
     agentCalls = [];
+    terminals = [];
     functions = {};
     others = [];
     dataDir = mkdtempSync(join(tmpdir(), 'jeko-e2e-'));
@@ -197,6 +204,30 @@ describe('run server ↔ runner', () => {
     });
     expect(run.prompts.every((p) => p.status !== 'pending')).toBe(true);
     expect((await api('POST', `/api/runs/${body.id}/cancel`)).status).toBe(409);
+  });
+
+  it('elimina solo i task conclusi, con eventi e richieste', async () => {
+    startRunner();
+    const start = async () =>
+      (
+        await api<RunSummary>('POST', '/api/runs', {
+          workflow: 'demo',
+          request: 'x',
+          mode: 'checkpoint',
+        })
+      ).body;
+    const done = await start();
+    await pendingPrompt(done.id);
+    await api('POST', `/api/runs/${done.id}/cancel`);
+    await until(async () => (await detail(done.id)).status === 'cancelled');
+    const open = await start();
+
+    const remove = await api<{ removed: string[] }>('POST', '/api/runs/remove', {
+      ids: [done.id, open.id],
+    });
+    expect(remove).toEqual({ status: 200, body: { removed: [done.id] } });
+    expect((await api('GET', `/api/runs/${done.id}`)).status).toBe(404);
+    expect((await api('GET', `/api/runs/${open.id}`)).status).toBe(200);
   });
 
   it('sopravvive a una disconnessione del runner mentre attende', async () => {
@@ -324,6 +355,44 @@ describe('run server ↔ runner', () => {
       body: { path: 'C:\\dev\\scelta' },
     });
     expect((await pick({})).body).toEqual({ path: null });
+  });
+
+  it('apre un terminale nella cartella del progetto sul PC del runner', async () => {
+    const add = async (path: string) =>
+      (await api<{ id: string }>('POST', '/api/projects', { name: path, path })).body.id;
+    const open = (id: string) => api('POST', `/api/projects/${id}/terminal`);
+    const ok = await add('C:\\dev\\p');
+    expect((await open(ok)).status).toBe(409);
+
+    startRunner();
+    await until(async () => (await api<{ runner: boolean }>('GET', '/api/health')).body.runner);
+    expect((await open(ok)).status).toBe(204);
+    expect(terminals).toEqual(['C:\\dev\\p']);
+    expect(await open(await add('C:\\manca'))).toMatchObject({
+      status: 502,
+      body: { message: 'Cartella inesistente: C:\\manca' },
+    });
+  });
+
+  it('gestisce i prompt del progetto in .jeko/prompts/ tramite il runner', async () => {
+    const path = mkdtempSync(join(tmpdir(), 'jeko-progetto-'));
+    const { body: p } = await api<{ id: string }>('POST', '/api/projects', { name: 'P', path });
+    const url = `/api/projects/${p.id}/prompts`;
+    expect((await api('GET', url)).status).toBe(409);
+
+    startRunner();
+    await until(async () => (await api<{ runner: boolean }>('GET', '/api/health')).body.runner);
+    expect(await api('GET', url)).toEqual({ status: 200, body: [] });
+    expect((await api('PUT', `${url}/end-develop`, { text: 'Usa {{ boh }}' })).status).toBe(422);
+    expect(await api('PUT', `${url}/end-develop`, { text: 'Chiudi {{ request }}' })).toEqual({
+      status: 200,
+      body: [{ name: 'end-develop', text: 'Chiudi {{ request }}\n' }],
+    });
+    expect(readFileSync(join(path, '.jeko', 'prompts', 'end-develop.md'), 'utf8')).toBe(
+      'Chiudi {{ request }}\n',
+    );
+    expect((await api('PUT', `${url}/Nome%20Brutto`, { text: 'x' })).status).toBe(400);
+    expect(await api('DELETE', `${url}/end-develop`)).toEqual({ status: 200, body: [] });
   });
 
   it('rifiuta un workflow non valido con gli errori', async () => {

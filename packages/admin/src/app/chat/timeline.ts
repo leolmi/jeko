@@ -1,4 +1,5 @@
 import {
+  DIRECT_FOLLOW_UP,
   FINAL_STATUSES,
   type PolicyAction,
   type PromptRecord,
@@ -105,17 +106,28 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
             }
             return;
           }
-          case 'step.skipped':
+          case 'step.skipped': {
+            // Il passo può essere già partito (es. prompt del progetto assente): si chiude lì.
+            const note = event.note !== undefined && { output: event.note };
+            const item = open.get(event.stepId);
+            if (item) {
+              item.state = 'skipped';
+              Object.assign(item, note);
+              open.delete(event.stepId);
+              return;
+            }
             items.push({
               kind: 'step',
               key,
               stepId: event.stepId,
               ...title(event.stepId),
               state: 'skipped',
+              ...note,
               activity: [],
               at,
             });
             return;
+          }
           case 'agent.activity':
             open.get(event.stepId)?.activity.push({
               key,
@@ -157,6 +169,17 @@ export function buildTimeline(run: RunDetail): TimelineItem[] {
       ended && original.status === 'pending'
         ? { ...original, status: 'superseded' as const }
         : original;
+    // Task diretto: il messaggio seguente è una richiesta dell'utente, non una domanda.
+    if (record.prompt.stepId === DIRECT_FOLLOW_UP) {
+      const text = record.answer?.kind === 'ask' ? record.answer.value : null;
+      if (text)
+        entries.push({
+          at: record.createdAt,
+          order: 1,
+          add: () => items.push({ kind: 'request', key: record.id, text, at: record.createdAt }),
+        });
+      continue;
+    }
     entries.push({
       at: record.createdAt,
       order: 1,

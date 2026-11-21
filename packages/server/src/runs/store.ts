@@ -1,15 +1,16 @@
-import type {
-  Answer,
-  Prompt,
-  PromptRecord,
-  RunDetail,
-  RunEvent,
-  RunEventRecord,
-  RunMode,
-  RunRowStatus,
-  RunState,
-  RunSummary,
-  Workflow,
+import {
+  FINAL_STATUSES,
+  type Answer,
+  type Prompt,
+  type PromptRecord,
+  type RunDetail,
+  type RunEvent,
+  type RunEventRecord,
+  type RunMode,
+  type RunRowStatus,
+  type RunState,
+  type RunSummary,
+  type Workflow,
 } from '@jeko/shared';
 import type { Db } from '../db/db.js';
 import { iso, json } from '../db/sql.js';
@@ -71,6 +72,15 @@ export class RunStore {
       [limit],
     );
     return rows;
+  }
+
+  /** Elimina le run concluse fra quelle date (eventi e richieste vanno con loro); gli id tolti. */
+  async remove(ids: string[]): Promise<string[]> {
+    const { rows } = await this.db.query<{ id: string }>(
+      `DELETE FROM runs WHERE id = ANY($1::uuid[]) AND status = ANY($2::text[]) RETURNING id`,
+      [ids, [...FINAL_STATUSES]],
+    );
+    return rows.map((r) => r.id);
   }
 
   async get(id: string): Promise<RunSummary | null> {

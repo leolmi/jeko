@@ -2,10 +2,16 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import {
   CreateProjectSchema,
   Id,
+  IssueSchema,
   PickFolderSchema,
+  ProjectPromptSchema,
   ProjectSchema,
+  PromptName,
+  promptIssues,
+  SaveProjectPromptSchema,
   UpdateProjectSchema,
 } from '@jeko/shared';
+import type { FastifyReply } from 'fastify';
 import { Type } from '@sinclair/typebox';
 import type { ProjectStore } from '../projects/store.js';
 import type { RunnerHub } from '../runs/hub.js';
@@ -60,6 +66,91 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
 
   // Dialogo di scelta cartella sul PC del runner (il browser non dà il percorso completo).
   const Message = Type.Object({ message: Type.String() });
+
+  /** Cartella del progetto: undefined se il progetto non c'è, '' se non ne ha. */
+  const folderOf = async (id: string) => (await projects.list()).find((p) => p.id === id)?.path;
+  /** Richiesta al runner fallita: codice HTTP e messaggio. */
+  const runnerFailure = (e: unknown) => {
+    const r = e instanceof Error ? e.message : String(e);
+    if (r === 'offline') return { code: 409 as const, message: 'Runner non collegato' };
+    if (r === 'timeout') return { code: 504 as const, message: 'Nessuna risposta dal runner' };
+    return { code: 502 as const, message: r };
+  };
+
+  // Terminale sul PC del runner nella cartella del progetto: login, dati sensibili…
+  app.post(
+    '/api/projects/:id/terminal',
+    {
+      schema: {
+        params: Type.Object({ id: Id }),
+        response: { 204: Type.Null(), 409: Message, 422: Message, 502: Message, 504: Message },
+      },
+    },
+    async (req, reply) => {
+      const path = await folderOf(req.params.id);
+      if (path === undefined) return reply.callNotFound();
+      if (!path) return reply.code(422).send({ message: 'Il progetto non ha cartella' });
+      try {
+        await hub.openTerminal(path);
+        return reply.code(204).send(null);
+      } catch (e) {
+        const { code, message } = runnerFailure(e);
+        return reply.code(code).send({ message });
+      }
+    },
+  );
+
+  // Prompt del progetto (.jeko/prompts/): li legge e scrive il runner, nella cartella.
+  const PromptsResponse = {
+    200: Type.Array(ProjectPromptSchema),
+    409: Message,
+    422: Type.Object({ message: Type.String(), issues: Type.Optional(Type.Array(IssueSchema)) }),
+    502: Message,
+    504: Message,
+  };
+  const prompts = async (
+    id: string,
+    op: Parameters<RunnerHub['projectPrompts']>[1],
+    reply: FastifyReply,
+  ) => {
+    const path = await folderOf(id);
+    if (path === undefined) return reply.callNotFound();
+    if (!path) return reply.code(422).send({ message: 'Il progetto non ha cartella' });
+    try {
+      return await hub.projectPrompts(path, op);
+    } catch (e) {
+      const { code, message } = runnerFailure(e);
+      return reply.code(code).send({ message });
+    }
+  };
+  const PromptParams = Type.Object({ id: Id, name: PromptName });
+
+  app.get(
+    '/api/projects/:id/prompts',
+    { schema: { params: Type.Object({ id: Id }), response: PromptsResponse } },
+    (req, reply) => prompts(req.params.id, { kind: 'list' }, reply),
+  );
+
+  // Il prompt usa i segnaposto dei workflow: si verifica prima di salvarlo.
+  app.put(
+    '/api/projects/:id/prompts/:name',
+    { schema: { params: PromptParams, body: SaveProjectPromptSchema, response: PromptsResponse } },
+    async (req, reply) => {
+      const issues = promptIssues(req.body.text);
+      if (issues.length) return reply.code(422).send({ message: 'Prompt non valido', issues });
+      return prompts(
+        req.params.id,
+        { kind: 'save', name: req.params.name, text: req.body.text },
+        reply,
+      );
+    },
+  );
+
+  app.delete(
+    '/api/projects/:id/prompts/:name',
+    { schema: { params: PromptParams, response: PromptsResponse } },
+    (req, reply) => prompts(req.params.id, { kind: 'delete', name: req.params.name }, reply),
+  );
   app.post(
     '/api/projects/pick-folder',
     {

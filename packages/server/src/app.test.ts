@@ -116,6 +116,15 @@ describe('server', () => {
     expect((await start('C:\\altro')).workflow).toBe('a-dev');
     expect((await patch(null)).json()).toMatchObject({ workflow: null });
 
+    // Task diretto: niente workflow di sviluppo, nemmeno quello del progetto.
+    const direct = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: { request: 'fai il push', mode: 'checkpoint', cwd: 'c:/dev/p', direct: true },
+    });
+    expect(direct.statusCode).toBe(201);
+    expect(direct.json()).toMatchObject({ workflow: 'diretto', version: 1 });
+
     // Eliminato: sparisce con le sue versioni e il progetto torna al predefinito.
     expect((await patch('b-dev')).statusCode).toBe(200);
     const del = () => app.inject({ method: 'DELETE', url: '/api/workflows/b-dev' });
