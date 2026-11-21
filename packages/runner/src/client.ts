@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  ajv,
   ServerToRunnerSchema,
   type Check,
   type ContextInventory,
@@ -182,7 +183,20 @@ export class RunnerClient {
     } catch {
       return this.log.warn('messaggio non JSON ignorato');
     }
-    if (!isServerMessage(msg)) return this.log.warn('messaggio non valido ignorato');
+    if (!isServerMessage(msg)) {
+      const reason = ajv.errorsText(isServerMessage.errors);
+      this.log.warn(`messaggio non valido ignorato: ${reason}`);
+      // Un avvio scartato lascerebbe la run "in corso" per sempre: meglio farla fallire.
+      const m = msg as { type?: unknown; runId?: unknown };
+      if (m?.type === 'run.start' && typeof m.runId === 'string' && !this.sessions.has(m.runId))
+        this.emit({
+          type: 'run.finished',
+          runId: m.runId,
+          status: 'failed',
+          error: `Avvio non valido per il runner: ${reason}`,
+        });
+      return;
+    }
 
     switch (msg.type) {
       case 'run.start':

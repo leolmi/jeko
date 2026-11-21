@@ -433,6 +433,31 @@ describe('run server ↔ runner', () => {
     ws.close();
   });
 
+  it('un avvio che il runner non accetta fa fallire la run invece di lasciarla in corso', async () => {
+    const [server, runner] = linkPair();
+    const sent: { type: string; event?: { type: string; status?: string; error?: string } }[] = [];
+    server.on('message', (d) => sent.push(JSON.parse(String(d))));
+    others.push(
+      new RunnerClient({
+        dataDir: mkdtempSync(join(tmpdir(), 'jeko-runner-')),
+        connect: () => runner,
+        runnerId: 'finto',
+        version: '0',
+        reconnectMs: 50,
+        log: { info: () => {}, warn: () => {}, error: () => {} },
+      }),
+    );
+    others.at(-1)!.start();
+    await until(async () => sent.some((m) => m.type === 'hello'));
+    // Opzioni con un campo che questo runner non conosce (es. da una versione più nuova).
+    server.send(
+      JSON.stringify({ type: 'run.start', runId: 'r1', settings: { nuovo: 1 }, request: 'x' }),
+    );
+    const done = await until(async () => sent.find((m) => m.event?.type === 'run.finished'));
+    expect(done.event).toMatchObject({ status: 'failed' });
+    expect(done.event?.error).toMatch(/Avvio non valido/);
+  });
+
   it('dopo un riavvio del runner la run riparte dallo stato salvato', async () => {
     startRunner();
     const { body } = await api<RunSummary>('POST', '/api/runs', {
