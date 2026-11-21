@@ -157,17 +157,28 @@ export class Updater {
     }
   }
 
-  /** Riapre l'app appena questo processo è uscito. */
+  /**
+   * Riapre l'app appena questo processo è uscito. Lo fa uno script PowerShell avviato con
+   * `cmd /c start`: lanciato direttamente da Node, con `detached` PowerShell esce subito senza
+   * far niente, e senza muore insieme al servizio.
+   */
   relaunch(): void {
     const appDir = this.opts.appDir;
     if (!appDir) return;
-    const exe = join(appDir, 'jeko.exe').replaceAll("'", "''");
-    const script = `Wait-Process -Id ${process.pid} -Timeout 120 -ErrorAction SilentlyContinue; Start-Process -FilePath '${exe}' -WorkingDirectory '${appDir.replaceAll("'", "''")}'`;
-    spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-    }).unref();
+    const dir = join(tmpdir(), 'jeko-update');
+    mkdirSync(dir, { recursive: true });
+    const script = join(dir, 'relaunch.ps1');
+    // Con il BOM PowerShell 5.1 legge l'UTF-8 (percorsi con lettere accentate).
+    writeFileSync(script, `\uFEFF${relaunchScript(process.pid, appDir)}`, 'utf8');
+    spawn(
+      'cmd.exe',
+      [
+        '/d',
+        '/c',
+        `start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${script}"`,
+      ],
+      { detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true },
+    ).unref();
   }
 
   /** Toglie i `*.old` lasciati dall'ultimo aggiornamento (quelli ancora in uso restano). */
@@ -183,6 +194,16 @@ export class Updater {
       }
     }
   }
+}
+
+/** Script che aspetta la fine del processo `pid` e poi riapre `jeko.exe` da `appDir`. */
+export function relaunchScript(pid: number, appDir: string): string {
+  const q = (v: string) => `'${v.replaceAll("'", "''")}'`;
+  return [
+    `Wait-Process -Id ${pid} -Timeout 120 -ErrorAction SilentlyContinue`,
+    `Start-Process -FilePath ${q(join(appDir, 'jeko.exe'))} -WorkingDirectory ${q(appDir)}`,
+    '',
+  ].join('\r\n');
 }
 
 /**

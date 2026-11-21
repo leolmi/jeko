@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Lifecycle } from './lifecycle.js';
 import { parseNeutralinoInfo } from './neutralino.js';
-import { compareVersions, replaceEntries, Updater } from './updater.js';
+import { compareVersions, relaunchScript, replaceEntries, Updater } from './updater.js';
 
 describe('vita del servizio desktop', () => {
   afterEach(() => vi.useRealTimers());
@@ -128,5 +128,18 @@ describe('aggiornamento', () => {
     ).toEqual({ nlPort: '5000', nlToken: 't', nlConnectToken: 'c', nlExtensionId: 'e' });
     expect(parseNeutralinoInfo('{}')).toBeNull();
     expect(parseNeutralinoInfo('boh')).toBeNull();
+  });
+});
+
+describe('riavvio dopo l’aggiornamento', () => {
+  it('aspetta il servizio e riapre jeko.exe, con gli apici dei percorsi raddoppiati', () => {
+    const dir = join('app', "d'Leo");
+    const script = relaunchScript(42, dir);
+    const q = (v: string) => `'${v.replaceAll("'", "''")}'`;
+    expect(script).toContain('Wait-Process -Id 42 ');
+    expect(script).toContain(
+      `Start-Process -FilePath ${q(join(dir, 'jeko.exe'))} -WorkingDirectory ${q(dir)}`,
+    );
+    expect(script).toContain("d''Leo");
   });
 });
