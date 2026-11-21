@@ -326,7 +326,8 @@ const it = {
   'update.confirm':
     'Installare la versione {v}? Jeko si chiude e si riapre da solo; i task fermi a una domanda riprendono.',
   'update.hint': 'Jeko si chiuderà e si riaprirà da solo.',
-  'update.busy': 'Ci sono task al lavoro: si può aggiornare quando finiscono.',
+  'update.busy':
+    'Task aperti: {n}. Per aggiornare aspetta che finiscano o chiudili (i task diretti restano aperti finché non li chiudi).',
   'update.blocked.source': 'Jeko gira dai sorgenti: aggiorna con git.',
   'update.blocked.readonly': 'La cartella di Jeko non è scrivibile.',
   'update.desktopOnly': 'Gli aggiornamenti automatici ci sono solo nell’app desktop.',
@@ -707,7 +708,8 @@ const en: Record<I18nKey, string> = {
   'update.confirm':
     'Install version {v}? Jeko closes and reopens by itself; tasks waiting for an answer resume.',
   'update.hint': 'Jeko will close and reopen by itself.',
-  'update.busy': 'Some tasks are working: you can update when they finish.',
+  'update.busy':
+    'Open tasks: {n}. To update, wait for them to finish or close them (direct tasks stay open until you close them).',
   'update.blocked.source': 'Jeko runs from source: update with git.',
   'update.blocked.readonly': 'The Jeko folder is not writable.',
   'update.desktopOnly': 'Automatic updates are only available in the desktop app.',

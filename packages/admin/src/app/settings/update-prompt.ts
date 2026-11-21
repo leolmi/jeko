@@ -39,17 +39,25 @@ const SKIPPED_KEY = 'update.skipped';
               [textContent]="u.notes.trim()"
             ></div>
           }
-          <p class="mt-3 text-xs text-faint">
-            @if (u.blocked; as b) {
-              {{ i18n.t(b === 'source' ? 'update.blocked.source' : 'update.blocked.readonly') }}
-            } @else if ((updates.info()?.active ?? 0) > 0) {
-              {{ i18n.t('update.busy') }}
-            } @else if (updates.error(); as e) {
-              <span class="text-red-600 dark:text-red-400">{{ e }}</span>
-            } @else {
-              {{ i18n.t('update.hint') }}
-            }
-          </p>
+          @if (!u.blocked && (updates.info()?.active ?? 0) > 0) {
+            <p
+              class="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+              role="status"
+            >
+              <jk-icon name="warning" [size]="16" class="mt-0.5 shrink-0 text-amber-500" />
+              {{ i18n.t('update.busy', { n: updates.info()?.active ?? 0 }) }}
+            </p>
+          } @else {
+            <p class="mt-3 text-xs text-faint">
+              @if (u.blocked; as b) {
+                {{ i18n.t(b === 'source' ? 'update.blocked.source' : 'update.blocked.readonly') }}
+              } @else if (updates.error(); as e) {
+                <span class="text-red-600 dark:text-red-400">{{ e }}</span>
+              } @else {
+                {{ i18n.t('update.hint') }}
+              }
+            </p>
+          }
           <div class="mt-4 flex flex-wrap justify-end gap-2">
             <button type="button" class="jk-btn-ghost" (click)="skip()">
               {{ i18n.t('update.skip') }}
