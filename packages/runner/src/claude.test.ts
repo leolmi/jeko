@@ -39,6 +39,12 @@ describe('claude', () => {
       NON_INTERACTIVE_TOOLS.join(','),
     ]);
     expect(claudeArgs({ sessionId: 's1', resume: true })).toContain('--resume');
+    expect(claudeArgs({ sessionId: 's1', resume: true })).not.toContain('--fork-session');
+    expect(claudeArgs({ sessionId: 's1', resume: true, fork: true }).slice(4, 7)).toEqual([
+      '--resume',
+      's1',
+      '--fork-session',
+    ]);
     const tuned = claudeArgs({ sessionId: 's1', resume: true, effort: 'high', model: 'opus' });
     expect(tuned.join(' ')).toContain('--effort high --model opus');
   });

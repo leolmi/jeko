@@ -179,6 +179,10 @@ const it = {
   'composer.busy': 'C’è già un task attivo: questo partirà dopo.',
   'composer.continue': 'Invia',
   'composer.continue.placeholder': 'Continua il task su {name}…',
+  'composer.fork.placeholder':
+    'Questo task è chiuso: scrivi qui per avviarne uno nuovo su {name} che riparte da questa conversazione.',
+  'composer.closed.placeholder':
+    'Questo task è chiuso: scrivi qui per avviarne uno nuovo su {name}.',
   'composer.switch': 'Con o senza workflow',
   'composer.plan': 'Segui workflow',
   'composer.plan.hint':
@@ -194,6 +198,7 @@ const it = {
   'thread.step.skipped': 'saltato',
   'thread.output': 'Uscita',
   'thread.followUp': 'Scrivi sotto per continuare il task',
+  'thread.from': 'Continua da:',
   'thread.followUp.close': 'Chiudi il task',
   'thread.activity': 'Attività',
   'thread.policy': 'Azione sensibile',
@@ -581,6 +586,9 @@ const en: Record<I18nKey, string> = {
   'composer.busy': 'A task is already active: this one will start after it.',
   'composer.continue': 'Send',
   'composer.continue.placeholder': 'Continue the task on {name}…',
+  'composer.fork.placeholder':
+    'This task is closed: write here to start a new one on {name} that picks up this conversation.',
+  'composer.closed.placeholder': 'This task is closed: write here to start a new one on {name}.',
   'composer.switch': 'With or without workflow',
   'composer.plan': 'Follow workflow',
   'composer.plan.hint': 'Workflow task: claude prepares a plan and runs it with gates and checks',
@@ -595,6 +603,7 @@ const en: Record<I18nKey, string> = {
   'thread.step.skipped': 'skipped',
   'thread.output': 'Output',
   'thread.followUp': 'Write below to continue the task',
+  'thread.from': 'Continues from:',
   'thread.followUp.close': 'Close the task',
   'thread.activity': 'Activity',
   'thread.policy': 'Sensitive action',

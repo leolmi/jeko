@@ -15,6 +15,11 @@ export class Runs {
    * invece di avviare un task nuovo.
    */
   readonly followUp = signal<{ runId: string; promptId: string; cwd: string | null } | null>(null);
+  /**
+   * Task chiuso aperto nella pagina: il composer avvisa che ne avvia uno nuovo, che continua
+   * da questo se `fork` (task diretto con una sessione di claude).
+   */
+  readonly closed = signal<{ id: string; cwd: string | null; fork: boolean } | null>(null);
 
   constructor() {
     const rt = inject(Realtime);

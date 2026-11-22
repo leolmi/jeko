@@ -61,6 +61,7 @@ export function createNodeHost(opts: NodeHostOptions): Host {
         prompt: withKnowledge(req.instructions, cwd),
         cwd,
         sessionId: req.sessionId,
+        fork: req.fork,
         allowedTools: req.tools,
         effort: req.effort,
         model: req.model,

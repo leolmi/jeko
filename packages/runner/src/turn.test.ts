@@ -73,6 +73,16 @@ describe('turno di claude staccato', () => {
     expect(second!.stdin).toContain('si è interrotto');
   });
 
+  it('copiando una sessione, anche la ripresa copia di nuovo l’originale', async () => {
+    process.env['FAKE_DIE'] = '1';
+    const res = await turn({ sessionId: 'vecchia', fork: true });
+    expect(res.ok).toBe(true);
+    for (const { args } of invocations()) {
+      expect(args).toEqual(expect.arrayContaining(['--resume', 'vecchia', '--fork-session']));
+    }
+    expect(invocations()).toHaveLength(2);
+  });
+
   it('un secondo runner riaggancia il processo ancora vivo', async () => {
     process.env['FAKE_SLEEP'] = '1500';
     const a = turn();

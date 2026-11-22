@@ -59,6 +59,8 @@ export interface AgentRequest {
   effort?: Effort;
   model?: string;
   sessionId?: string;
+  /** Riparte da una copia di `sessionId` (`--fork-session`) invece di continuarla. */
+  fork?: boolean;
   /** Identifica il turno anche dopo un riavvio del runner: un turno finito non si riesegue. */
   turnKey: string;
   /** Annulla il turno (run annullata). */
@@ -119,6 +121,8 @@ export interface RunOptions {
   settings?: UserSettings;
   /** Ragionamento e modello scelti dall'utente: valgono nei passi agent che non li fissano. */
   agent?: AgentChoice;
+  /** Sessione di claude di un altro task: il primo turno parte da una sua copia. */
+  forkSession?: string;
   /** Annulla la run: si ferma prima del passo successivo o mentre attende l'utente. */
   signal?: AbortSignal;
 }
@@ -326,7 +330,10 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
         ...(step.tools && { tools: step.tools }),
         ...(effort && { effort }),
         ...(model && { model }),
-        ...(state.sessionId !== undefined && { sessionId: state.sessionId }),
+        // Senza sessione propria, il primo turno copia quella del task da cui si continua.
+        ...(state.sessionId !== undefined
+          ? { sessionId: state.sessionId }
+          : opts.forkSession !== undefined && { sessionId: opts.forkSession, fork: true }),
         gates: { policies: wf.policies ?? [], mode },
         authorize: async (tool, input) => {
           const { actions, command } = classifyTool(tool, input);

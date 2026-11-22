@@ -118,6 +118,16 @@ describe('server', () => {
     });
     expect(direct.statusCode).toBe(201);
     expect(direct.json()).toMatchObject({ workflow: 'diretto', version: 1 });
+    // Si continua solo da un task diretto chiuso, con una sessione di claude.
+    const from = (direct.json() as { id: string }).id;
+    const forked = (payload: object) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { request: 'ancora', mode: 'checkpoint', cwd: 'c:/dev/p', from, ...payload },
+      });
+    expect((await forked({ direct: true })).statusCode).toBe(400);
+    expect((await forked({})).statusCode).toBe(400);
 
     // Eliminato: sparisce con le sue versioni e il progetto torna al predefinito.
     expect((await patch('b-dev')).statusCode).toBe(200);

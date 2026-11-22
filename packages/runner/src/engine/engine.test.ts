@@ -354,6 +354,25 @@ steps:
     expect(f.agentCalls[2]!.sessionId).toBe('sess');
   });
 
+  it('continuando un task chiuso, il primo turno copia la sua sessione', async () => {
+    const f = fakeHost({ answers: ['e ora i test', ''] });
+    const out = await runWorkflow(
+      {
+        runId: 'r3',
+        workflow: directWorkflow(),
+        request: 'riprendi',
+        mode: 'checkpoint',
+        forkSession: 'vecchia',
+      },
+      f.host,
+    );
+    expect(out.status).toBe('done');
+    expect(f.agentCalls.map((c) => [c.sessionId, c.fork])).toEqual([
+      ['vecchia', true],
+      ['sess', undefined],
+    ]);
+  });
+
   it('somma tempi e token per passo (con le revisioni) e per run', async () => {
     const w = wf(`
 name: t

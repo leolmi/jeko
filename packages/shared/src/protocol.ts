@@ -169,6 +169,8 @@ export const RunStartSchema = Type.Object({
   exclude: Type.Optional(ContextExclusionsSchema),
   /** Ragionamento e modello scelti dall'utente, per i passi agent che non li fissano. */
   agent: Type.Optional(AgentChoiceSchema),
+  /** Sessione di claude da cui ripartire (copiata) al primo turno: task che continua un altro. */
+  forkSession: Type.Optional(Type.String({ minLength: 1 })),
 });
 export type RunStart = Static<typeof RunStartSchema>;
 
@@ -313,6 +315,8 @@ export const StartRunSchema = Type.Object(
     direct: Type.Optional(Type.Boolean()),
     /** Ragionamento e modello del task; i campi assenti vengono dal progetto della cartella. */
     agent: Type.Optional(AgentChoiceSchema),
+    /** Task diretto chiuso da cui continuare: claude riparte dalla sua conversazione. */
+    from: Type.Optional(Id),
   },
   { additionalProperties: false },
 );
@@ -344,6 +348,8 @@ export const RunSummarySchema = Type.Object({
   usage: Type.Union([AgentUsageSchema, Type.Null()]),
   /** Percorso per l'elenco dei task: passi del workflow o turni del task diretto. */
   path: Type.Array(StepMarkSchema),
+  /** Task da cui questo continua, se c'è. */
+  from: Type.Optional(Id),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });

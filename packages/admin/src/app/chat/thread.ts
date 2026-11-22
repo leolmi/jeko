@@ -60,6 +60,12 @@ import { UsageBar } from './usage-bar';
               <span class="cursor-help" [title]="use.detail">· {{ use.short }}</span>
             }
           </p>
+          @if (origin(); as o) {
+            <p class="truncate text-xs text-muted">
+              {{ i18n.t('thread.from') }}
+              <a class="underline hover:text-fg" [routerLink]="['/runs', o.id]">{{ o.request }}</a>
+            </p>
+          }
         </div>
         <jk-mode-badge [tone]="runTone(r)" />
         <jk-status [status]="r.status" />
@@ -286,6 +292,11 @@ export class Thread {
     );
   });
   private readonly runs = inject(Runs);
+  /** Task da cui questo continua, se esiste ancora. */
+  protected readonly origin = computed(() => {
+    const from = this.run()?.from;
+    return from ? (this.runs.list().find((r) => r.id === from) ?? null) : null;
+  });
   private readonly router = inject(Router);
   protected readonly sending = signal<string | null>(null);
   protected readonly failed = signal<string | null>(null);
@@ -307,6 +318,13 @@ export class Thread {
       const p = this.followUp();
       const r = this.run();
       this.runs.followUp.set(p && r ? { runId: r.id, promptId: p.id, cwd: r.cwd } : null);
+    });
+    effect(() => {
+      const r = this.run();
+      if (!r || !FINAL_STATUSES.includes(r.status)) return this.runs.closed.set(null);
+      // Si continua da un task diretto se claude ha avuto almeno un turno (c'è la sessione).
+      const session = r.events.some((e) => e.event.type === 'state' && !!e.event.state.sessionId);
+      this.runs.closed.set({ id: r.id, cwd: r.cwd, fork: this.direct() && session });
     });
 
     const rt = inject(Realtime);
@@ -337,6 +355,7 @@ export class Thread {
       offMsg();
       offReconnect();
       this.runs.followUp.set(null);
+      this.runs.closed.set(null);
     });
 
     // Resta in fondo al filo quando arriva qualcosa di nuovo.

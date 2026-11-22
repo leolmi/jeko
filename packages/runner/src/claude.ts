@@ -6,6 +6,8 @@ export interface TurnInput {
   /** Sessione di claude: nuova (`--session-id`) o da riprendere (`--resume`). */
   sessionId: string;
   resume: boolean;
+  /** Con `resume`: riparte da una copia della sessione (`--fork-session`), che resta intatta. */
+  fork?: boolean | undefined;
   /** Strumenti ammessi senza chiedere (es. "Read", "Bash(npm test:*)"). */
   allowedTools?: string[] | undefined;
   /** Ragionamento (`--effort`) e modello (`--model`) del turno. */
@@ -58,6 +60,7 @@ export const TURN_NOTE =
 export function claudeArgs(input: Omit<TurnInput, 'prompt' | 'cwd' | 'env'>): string[] {
   const args = ['-p', '--output-format', 'stream-json', '--verbose'];
   args.push(input.resume ? '--resume' : '--session-id', input.sessionId);
+  if (input.resume && input.fork) args.push('--fork-session');
   if (input.allowedTools?.length) args.push('--allowedTools', input.allowedTools.join(','));
   if (input.effort) args.push('--effort', input.effort);
   if (input.model) args.push('--model', input.model);

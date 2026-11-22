@@ -414,6 +414,7 @@ export class RunnerHub {
       settings,
       ...(exclude && !noExclusions(exclude) && { exclude }),
       ...(run.agent && { agent: run.agent }),
+      ...(run.forkSession && { forkSession: run.forkSession }),
     });
     if (!sent) return 'offline';
     await this.setStatus(run.id, 'running');

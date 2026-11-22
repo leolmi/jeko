@@ -2,6 +2,7 @@ import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
+  DIRECT_WORKFLOW,
   FINAL_STATUSES,
   runPath,
   type AgentChoice,
@@ -30,6 +31,9 @@ export interface NewRun {
   definition?: Workflow | undefined;
   /** Ragionamento e modello scelti dall'utente. */
   agent?: AgentChoice | undefined;
+  /** Task da cui continua e sessione di claude da copiare al primo turno. */
+  from?: string | undefined;
+  forkSession?: string | undefined;
 }
 
 /** Dati per (ri)avviare una run sul runner. */
@@ -45,6 +49,7 @@ export interface RunLaunch {
   state: RunState | null;
   definition: Workflow | null;
   agent: AgentChoice | null;
+  forkSession: string | null;
 }
 
 /** Contenuto di `runs/<id>/run.json`: la run con le sue richieste all'utente. */
@@ -54,6 +59,8 @@ export interface RunFile extends Omit<RunSummary, 'usage' | 'path'> {
   definition: Workflow | null;
   /** Assente nelle run nate prima della scelta. */
   agent?: AgentChoice | null;
+  /** Sessione di claude da copiare al primo turno (task che ne continua un altro). */
+  forkSession?: string;
   prompts: (PromptRecord & { answeredAt?: string })[];
 }
 
@@ -69,6 +76,7 @@ const EVENTS = 'events.jsonl';
 const summary = ({
   inputs: _i,
   agent: _a,
+  forkSession: _f,
   state,
   definition,
   prompts,
@@ -121,6 +129,8 @@ export class RunStore {
       state: null,
       definition: run.definition ?? null,
       agent: run.agent && Object.keys(run.agent).length ? run.agent : null,
+      ...(run.from && { from: run.from }),
+      ...(run.forkSession && { forkSession: run.forkSession }),
       prompts: [],
       createdAt: at,
       updatedAt: at,
@@ -156,6 +166,17 @@ export class RunStore {
     return removed;
   }
 
+  /**
+   * Task diretto chiuso da cui se ne può continuare un altro: cartella e sessione di claude.
+   * Null se non esiste, non è diretto, è ancora aperto o non ha mai avuto un turno.
+   */
+  async forkSource(id: string): Promise<{ cwd: string | null; sessionId: string } | null> {
+    const run = this.runs.get(id);
+    const sessionId = run?.state?.sessionId;
+    if (!run || !sessionId || run.workflow !== DIRECT_WORKFLOW) return null;
+    return FINAL_STATUSES.includes(run.status) ? { cwd: run.cwd, sessionId } : null;
+  }
+
   async get(id: string): Promise<RunSummary | null> {
     const run = this.runs.get(id);
     return run ? summary(run) : null;
@@ -187,6 +208,7 @@ export class RunStore {
         state: r.state,
         definition: r.definition,
         agent: r.agent ?? null,
+        forkSession: r.forkSession ?? null,
       }));
   }
 

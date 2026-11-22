@@ -45,9 +45,16 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         [placeholder]="
           !project()
             ? i18n.t('ws.empty')
-            : i18n.t(followUp() ? 'composer.continue.placeholder' : 'composer.placeholder', {
-                name: project()!.name,
-              })
+            : i18n.t(
+                followUp()
+                  ? 'composer.continue.placeholder'
+                  : fork()
+                    ? 'composer.fork.placeholder'
+                    : closed()
+                      ? 'composer.closed.placeholder'
+                      : 'composer.placeholder',
+                { name: project()!.name }
+              )
         "
         [disabled]="!project()?.path"
         [value]="draft()"
@@ -66,7 +73,7 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         <button
           type="button"
           class="inline-flex rounded-lg bg-subtle p-0.5"
-          [class.invisible]="followUp()"
+          [class.invisible]="followUp() || fork()"
           [attr.aria-label]="i18n.t('composer.switch')"
           [attr.aria-pressed]="direct()"
           [title]="i18n.t(direct() ? 'composer.direct.hint' : 'composer.plan.hint')"
@@ -113,7 +120,13 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         >
           <jk-icon name="send" [size]="16" />
           {{
-            i18n.t(followUp() ? 'composer.continue' : busy() ? 'composer.enqueue' : 'composer.send')
+            i18n.t(
+              followUp() || (fork() && !busy())
+                ? 'composer.continue'
+                : busy()
+                  ? 'composer.enqueue'
+                  : 'composer.send'
+            )
           }}
         </button>
       </div>
@@ -160,8 +173,16 @@ export class TaskComposer {
     const path = this.project()?.path;
     return f && path && f.cwd?.toLowerCase() === path.toLowerCase() ? f : null;
   });
+  /** In pagina c'è un task chiuso del progetto: scrivendo se ne avvia uno nuovo. */
+  protected readonly closed = computed(() => {
+    const c = this.runs.closed();
+    const path = this.project()?.path;
+    return c && path && c.cwd?.toLowerCase() === path.toLowerCase() ? c : null;
+  });
+  /** Il task chiuso è diretto: il nuovo, diretto anche lui, riparte dalla sua conversazione. */
+  protected readonly fork = computed(() => (this.closed()?.fork ? this.closed() : null));
   /** Modalità mostrata in alto: continuando, è quella del task (sempre diretto). */
-  protected readonly isDirect = computed(() => !!this.followUp() || this.direct());
+  protected readonly isDirect = computed(() => !!this.followUp() || !!this.fork() || this.direct());
   protected readonly TONES = TONES;
   protected readonly tone = computed(() => (this.isDirect() ? TONES.direct : TONES.plan));
   protected readonly sending = signal(false);
@@ -200,12 +221,14 @@ export class TaskComposer {
       this.runs.continue(f.runId, f.promptId, request).subscribe({ next: done, error });
       return;
     }
+    const from = this.fork()?.id;
     this.runs
       .start({
         request,
         mode: this.mode(),
         cwd: p.path,
-        ...(this.direct() && { direct: true }),
+        ...((this.direct() || from) && { direct: true }),
+        ...(from && { from }),
         ...(Object.keys(this.agent()).length && { agent: this.agent() }),
       })
       .subscribe({

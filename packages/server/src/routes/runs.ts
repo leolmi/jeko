@@ -2,6 +2,7 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import {
   AnswerSchema,
   directWorkflow,
+  folderKey,
   Id,
   RemoveRunsSchema,
   RunSummarySchema,
@@ -36,14 +37,22 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
     {
       schema: {
         body: StartRunSchema,
-        response: { 201: RunSummarySchema, 404: Type.Object({ message: Type.String() }) },
+        response: {
+          201: RunSummarySchema,
+          400: Type.Object({ message: Type.String() }),
+          404: Type.Object({ message: Type.String() }),
+        },
       },
     },
     async (req, reply) => {
-      const { version, direct, agent: choice, ...body } = req.body;
+      const { version, direct, agent: choice, from, ...body } = req.body;
       const project = await projects.byPath(req.body.cwd);
       // Ragionamento e modello: quelli del task, campo per campo, su quelli del progetto.
       const rest = { ...body, agent: { ...project?.agent, ...choice } };
+      // Si continua solo da un task diretto chiuso della stessa cartella, con un task diretto.
+      const source = from ? await runs.forkSource(from) : null;
+      if (from && (!direct || !source || folderKey(source.cwd) !== folderKey(req.body.cwd)))
+        return reply.code(400).send({ message: 'Task di origine non valido' });
       if (direct) {
         const definition = directWorkflow();
         const run = await runs.create({
@@ -51,6 +60,7 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
           workflow: definition.name,
           version: definition.version,
           definition,
+          ...(source && { from, forkSession: source.sessionId }),
         });
         await hub.start();
         return reply.code(201).send((await runs.get(run.id))!);

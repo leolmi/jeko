@@ -32,6 +32,11 @@ export interface DurableTurnOptions {
   cwd?: string | undefined;
   /** Sessione dei turni precedenti della run, da riprendere. */
   sessionId?: string | undefined;
+  /**
+   * Riparte da una copia di `sessionId` (`--fork-session`): vale per ogni avvio finché manca il
+   * risultato, così una ripresa dopo un'interruzione copia di nuovo l'originale.
+   */
+  fork?: boolean | undefined;
   allowedTools?: string[] | undefined;
   /** Ragionamento e modello del passo (`--effort`, `--model`). */
   effort?: string | undefined;
@@ -182,6 +187,7 @@ function spawnTurn(
     const args = claudeArgs({
       sessionId: meta.sessionId,
       resume,
+      fork: o.fork,
       allowedTools: o.allowedTools,
       effort: o.effort,
       model: o.model,
