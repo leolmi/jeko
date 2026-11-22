@@ -1,6 +1,6 @@
 {
   "name": "jeko",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Jeko: tool di SDLC locale e personale",
   "type": "module",
