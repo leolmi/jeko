@@ -10,6 +10,7 @@ import {
   PromptName,
   promptIssues,
   SaveProjectPromptSchema,
+  SetFavoritesSchema,
   UpdateProjectSchema,
 } from '@jeko/shared';
 import type { FastifyReply } from 'fastify';
@@ -41,6 +42,13 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
       if (!project) return reply.code(409).send({ message: 'Cartella già usata da un progetto' });
       return reply.code(201).send(project);
     },
+  );
+
+  // Preferiti: l'elenco ordinato sostituisce quello di prima.
+  app.put(
+    '/api/projects/favorites',
+    { schema: { body: SetFavoritesSchema, response: { 200: Type.Array(ProjectSchema) } } },
+    (req) => projects.setFavorites(req.body.ids),
   );
 
   // Workflow che guida i task del progetto: uno di sviluppo, o null per il predefinito.

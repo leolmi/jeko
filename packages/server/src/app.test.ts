@@ -37,6 +37,47 @@ describe('server', () => {
     expect((await app.inject('/api/projects')).json()).toEqual([]);
   });
 
+  it('salva i preferiti nel loro ordine', async () => {
+    const add = async (name: string) =>
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/projects',
+          payload: { name, path: `C:\\dev\\${name}` },
+        })
+      ).json() as { id: string };
+    const [a, b, c] = [await add('a'), await add('b'), await add('c')];
+    const put = (payload: object) =>
+      app.inject({ method: 'PUT', url: '/api/projects/favorites', payload });
+    const favorites = async () =>
+      Object.fromEntries(
+        ((await app.inject('/api/projects')).json() as { id: string; favorite?: number }[]).map(
+          (p) => [p.id, p.favorite],
+        ),
+      );
+
+    // Un id che non c'è si scarta, i doppioni contano una volta.
+    const ghost = '00000000-0000-4000-8000-000000000000';
+    expect((await put({ ids: [c.id, ghost, a.id, c.id] })).statusCode).toBe(200);
+    expect(await favorites()).toEqual({ [a.id]: 1, [b.id]: undefined, [c.id]: 0 });
+
+    // La nuova lista sostituisce la vecchia: chi non c'è più smette di essere preferito.
+    await put({ ids: [b.id, a.id] });
+    expect(await favorites()).toEqual({ [a.id]: 1, [b.id]: 0, [c.id]: undefined });
+    // Le altre modifiche al progetto non lo tolgono dai preferiti.
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${a.id}`,
+      payload: { agent: { effort: 'low' } },
+    });
+    expect(patched.json()).toMatchObject({ favorite: 1 });
+    await put({ ids: [] });
+    expect(await favorites()).toEqual({ [a.id]: undefined, [b.id]: undefined, [c.id]: undefined });
+
+    expect((await put({ ids: ['x'] })).statusCode).toBe(400);
+    expect((await put({})).statusCode).toBe(400);
+  });
+
   it("salva e rilegge le opzioni dell'utente", async () => {
     expect((await app.inject('/api/settings')).json()).toEqual({});
     const put = (payload: object) => app.inject({ method: 'PUT', url: '/api/settings', payload });

@@ -58,6 +58,10 @@ const it = {
   'ws.empty': 'Nessun progetto: aggiungine uno.',
   'ws.creating': 'In creazione',
   'ws.draft': 'Testo in sospeso',
+  'ws.favorites': 'Preferiti',
+  'ws.favorite.add': 'Aggiungi ai preferiti',
+  'ws.favorite.remove': 'Togli dai preferiti',
+  'ws.favorite.drag': 'Trascina per riordinare',
   'ws.waiting': 'Ti aspettano',
   'ws.inProgress': 'Aperti',
 
@@ -481,6 +485,10 @@ const en: Record<I18nKey, string> = {
   'ws.empty': 'No projects yet: add one.',
   'ws.creating': 'Being created',
   'ws.draft': 'Unsent text',
+  'ws.favorites': 'Favorites',
+  'ws.favorite.add': 'Add to favorites',
+  'ws.favorite.remove': 'Remove from favorites',
+  'ws.favorite.drag': 'Drag to reorder',
   'ws.waiting': 'Waiting for you',
   'ws.inProgress': 'Open',
 

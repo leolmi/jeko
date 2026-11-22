@@ -58,11 +58,20 @@ export const ProjectSchema = Type.Object(
     exclude: Type.Optional(ContextExclusionsSchema),
     /** Ragionamento e modello predefiniti dei task del progetto; assente = quelli di claude. */
     agent: Type.Optional(AgentChoiceSchema),
+    /** Posizione tra i preferiti; assente = non è un preferito. */
+    favorite: Type.Optional(Type.Integer({ minimum: 0 })),
     createdAt: Timestamp,
   },
   { additionalProperties: false },
 );
 export type Project = Static<typeof ProjectSchema>;
+
+/** Progetti preferiti, nell'ordine in cui si mostrano. */
+export const SetFavoritesSchema = Type.Object(
+  { ids: Type.Array(Id, { maxItems: 1000 }) },
+  { additionalProperties: false },
+);
+export type SetFavorites = Static<typeof SetFavoritesSchema>;
 
 export const CreateProjectSchema = Type.Object(
   {

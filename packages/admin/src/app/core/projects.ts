@@ -160,6 +160,46 @@ export class Projects {
     this.list.update((ps) => ps.map((p) => (p.id === id ? project : p)));
   }
 
+  /** Ultima modifica dei preferiti: le risposte di quelle precedenti non contano più. */
+  private favoritesSeq = 0;
+
+  /** Preferiti nell'ordine dato; si vedono subito, il server conferma. */
+  async setFavorites(ids: string[]): Promise<void> {
+    const seq = ++this.favoritesSeq;
+    const pos = new Map(ids.map((id, i) => [id, i]));
+    this.list.update((ps) =>
+      ps.map((p) => {
+        const { favorite: _old, ...rest } = p;
+        const favorite = pos.get(p.id);
+        return favorite === undefined ? rest : { ...rest, favorite };
+      }),
+    );
+    try {
+      const saved = await firstValueFrom(
+        this.http.put<Project[]>('/api/projects/favorites', { ids }),
+      );
+      if (seq === this.favoritesSeq) this.list.set(saved);
+    } catch (e) {
+      // Non salvato: si torna a quello che ha il server.
+      if (seq === this.favoritesSeq) this.reload();
+      throw e;
+    }
+  }
+
+  /** Id dei preferiti, nel loro ordine. */
+  favoriteIds(): string[] {
+    return this.list()
+      .filter((p) => p.favorite !== undefined)
+      .sort((a, b) => (a.favorite ?? 0) - (b.favorite ?? 0))
+      .map((p) => p.id);
+  }
+
+  /** Aggiunge in fondo ai preferiti o li toglie. */
+  toggleFavorite(id: string): Promise<void> {
+    const ids = this.favoriteIds();
+    return this.setFavorites(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  }
+
   /** Toglie il progetto dall'elenco: la cartella resta com'è. */
   async remove(id: string): Promise<void> {
     await firstValueFrom(this.http.delete(`/api/projects/${id}`));

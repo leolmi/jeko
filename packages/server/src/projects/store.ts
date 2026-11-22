@@ -65,6 +65,22 @@ export class ProjectStore {
     this.save(this.items.map((p) => (p.workflow === name ? { ...p, workflow: null } : p)));
   }
 
+  /** Preferiti nell'ordine dato: gli altri progetti smettono di esserlo; gli id ignoti si scartano. */
+  async setFavorites(ids: string[]): Promise<Project[]> {
+    const order = new Map<string, number>();
+    for (const id of ids) {
+      if (!order.has(id) && this.items.some((p) => p.id === id)) order.set(id, order.size);
+    }
+    this.save(
+      this.items.map((p) => {
+        const { favorite: _old, ...rest } = p;
+        const favorite = order.get(p.id);
+        return favorite === undefined ? rest : { ...rest, favorite };
+      }),
+    );
+    return this.list();
+  }
+
   async remove(id: string): Promise<boolean> {
     if (!this.items.some((p) => p.id === id)) return false;
     this.save(this.items.filter((p) => p.id !== id));
