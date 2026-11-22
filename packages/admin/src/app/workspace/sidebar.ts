@@ -10,7 +10,9 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { I18n, type I18nKey } from '../core/i18n';
 import { Projects } from '../core/projects';
 import { storage } from '../core/storage';
+import type { RunSummary } from '@jeko/shared';
 import { Icon } from '../ui/icon';
+import { runTone } from '../ui/mode-tone';
 import { Status } from '../ui/status';
 
 type Sort = 'activity' | 'waiting' | 'name';
@@ -84,26 +86,30 @@ const SORTS: Sort[] = ['activity', 'waiting', 'name'];
           [attr.aria-current]="p.id === projects.active()?.id || null"
           (click)="open(p.id)"
         >
-          <span class="flex items-center gap-2">
+          <span class="flex items-center gap-1.5">
             <span class="flex-1 truncate text-sm" [class.font-medium]="p.open.length">{{
               p.name
             }}</span>
             @if (projects.drafts()[p.id]) {
               <span class="text-xs text-faint" [title]="i18n.t('ws.draft')">✎</span>
             }
-            @if (p.waiting) {
+            <!--
+              Un pallino per task aperto, del colore della sua modalità: pulsa se lavora,
+              ha un cerchio attorno (fermo) se aspetta l'utente, è sbiadito se in coda.
+            -->
+            @for (r of p.open.slice(0, 4); track r.id) {
               <span
-                class="rounded-full bg-amber-500/15 px-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400"
-                [title]="i18n.t('ws.waiting')"
-                >{{ p.waiting }}</span
+                class="flex size-3.5 items-center justify-center rounded-full"
+                [class]="r.status === 'waiting' ? 'border-[1.5px] ' + tone(r).ringBorder : ''"
+                [title]="i18n.t(tone(r).label) + ' · ' + i18n.t(statusLabel(r))"
               >
-            }
-            @if (p.open.length - p.waiting) {
-              <span
-                class="rounded-full bg-subtle px-1.5 text-xs text-muted"
-                [title]="i18n.t('ws.inProgress')"
-                >{{ p.open.length - p.waiting }}</span
-              >
+                <span
+                  class="size-2 rounded-full"
+                  [class]="tone(r).dot"
+                  [class.animate-pulse]="r.status === 'running'"
+                  [class.opacity-40]="r.status === 'queued'"
+                ></span>
+              </span>
             }
           </span>
           <span class="mt-0.5 flex items-center gap-2 text-xs text-faint">
@@ -154,6 +160,12 @@ export class Sidebar {
 
   protected sortLabel(s: Sort): I18nKey {
     return `ws.sort.${s}`;
+  }
+
+  protected readonly tone = runTone;
+
+  protected statusLabel(r: RunSummary): I18nKey {
+    return `status.${r.status}` as I18nKey;
   }
 
   protected open(id: string): void {
