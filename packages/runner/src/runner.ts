@@ -12,6 +12,7 @@ import { defaultDataDir } from './journal.js';
 import type { LinkSocket } from './link.js';
 import { createPermissionBridge } from './permissions/bridge.js';
 import { ApprovalEndpoint, pipePath } from './permissions/endpoint.js';
+import { ProcessRegistry } from './processes.js';
 
 export interface LocalRunner {
   client: RunnerClient;
@@ -46,6 +47,7 @@ export async function startRunner(opts: {
   const scriptsDir = opts.scriptsDir ?? dirname(fileURLToPath(import.meta.url));
   const permissions = createPermissionBridge({ endpoint, scriptsDir });
   const claude = [process.env['JEKO_CLAUDE_BIN'] ?? 'claude'];
+  const processes = new ProcessRegistry(join(dataDir, 'processes'));
 
   const client = new RunnerClient({
     connect: opts.connect,
@@ -61,10 +63,13 @@ export async function startRunner(opts: {
       createNodeHost({
         ...io,
         permissions,
+        startProcess: (p) => processes.start(start.runId, p),
         turnsDir: join(runDir, 'turns'),
         ...(start.cwd !== undefined && { cwd: start.cwd }),
         ...(start.exclude && { exclude: start.exclude }),
       }),
+    onRunFinished: (runId) => processes.stopRun(runId),
+    processes: (runId, stop) => (stop ? processes.stop(runId) : processes.status(runId)),
     ...(opts.log && { log: opts.log }),
   });
   client.start();

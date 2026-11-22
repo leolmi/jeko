@@ -12,6 +12,7 @@ import {
   type RunnerToServer,
   type RunStart,
   type ServerToRunner,
+  type TaskProcess,
 } from '@jeko/shared';
 import { runWorkflow, type Host } from './engine/engine.js';
 import type { Assistant } from './assist.js';
@@ -45,6 +46,10 @@ export interface ClientOptions {
   openTerminal?: TerminalOpener | undefined;
   /** Cosa claude carica all'avvio in una cartella; senza, le richieste ricevono un errore. */
   probeContext?: ContextProbe | undefined;
+  /** Una run è finita (chiusa, annullata, fallita): es. chiude i processi lasciati attivi. */
+  onRunFinished?: (runId: string) => void;
+  /** Processi lasciati attivi da una run: elenco, o chiusura di quelli vivi (`stop`). */
+  processes?: ((runId: string, stop: boolean) => TaskProcess[]) | undefined;
   log?: Pick<Console, 'info' | 'warn' | 'error'>;
 }
 
@@ -172,6 +177,13 @@ export class RunnerClient {
   private emit(event: RunEvent): void {
     const { seq } = this.journals.append(event.runId, event);
     if (this.open) this.raw({ type: 'run.event', seq, event });
+    if (event.type === 'run.finished') {
+      try {
+        this.opts.onRunFinished?.(event.runId);
+      } catch (e) {
+        this.log.warn('chiusura dei processi della run non riuscita', e);
+      }
+    }
   }
 
   // ---------- messaggi dal server ----------
@@ -226,6 +238,8 @@ export class RunnerClient {
         return void this.pickFolder(msg);
       case 'terminal.open':
         return void this.openTerminal(msg);
+      case 'processes.request':
+        return this.taskProcesses(msg);
       case 'context.request':
         return void this.probeContext(msg);
       case 'prompts.request':
@@ -323,6 +337,27 @@ export class RunnerClient {
       const reason = e instanceof Error ? e.message : String(e);
       this.log.warn(`contesto di claude: ${reason}`);
       reply(null, reason);
+    }
+  }
+
+  // ---------- processi lasciati attivi ----------
+
+  private taskProcesses(msg: Extract<ServerToRunner, { type: 'processes.request' }>): void {
+    const reply = (processes: TaskProcess[], error?: string) =>
+      this.raw({
+        type: 'processes.result',
+        requestId: msg.requestId,
+        processes,
+        ...(error && { error }),
+      });
+    const list = this.opts.processes;
+    if (!list) return reply([], 'Processi non disponibili');
+    try {
+      reply(list(msg.runId, msg.stop));
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      this.log.warn(`processi del task: ${reason}`);
+      reply([], reason);
     }
   }
 

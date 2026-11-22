@@ -20,10 +20,30 @@ export type ClaudeDecision =
 export type ApprovalResponse =
   { status: 'pending' } | { status: 'decided'; decision: ClaudeDecision };
 
+/** Avvio di un processo che resta attivo dopo il turno (strumento `start_process`). */
+export interface ProcessRequest {
+  command: string;
+  /** Cartella di lavoro; relativa a quella del turno. */
+  cwd?: string;
+}
+
+export interface ProcessResponse {
+  pid: number;
+  log: string;
+  /** Ancora vivo dopo qualche secondo dall'avvio. */
+  running: boolean;
+  exitCode?: number | null;
+  /** Ultime righe del log. */
+  output: string;
+}
+
 export const APPROVAL_PATH = '/approval';
+export const PROCESS_PATH = '/process';
 export const MCP_SERVER_NAME = 'jeko';
 export const MCP_TOOL_NAME = 'approve';
+export const PROCESS_TOOL_NAME = 'start_process';
 export const PERMISSION_PROMPT_TOOL = `mcp__${MCP_SERVER_NAME}__${MCP_TOOL_NAME}`;
+export const START_PROCESS_TOOL = `mcp__${MCP_SERVER_NAME}__${PROCESS_TOOL_NAME}`;
 /** Strumento con cui claude fa domande all'utente: passa sempre da Jeko. */
 export const ASK_TOOL = 'AskUserQuestion';
 

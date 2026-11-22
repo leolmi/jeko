@@ -7,6 +7,7 @@ import {
   RemoveRunsSchema,
   RunSummarySchema,
   StartRunSchema,
+  TaskProcessSchema,
 } from '@jeko/shared';
 import { Type } from '@sinclair/typebox';
 import type { ProjectStore } from '../projects/store.js';
@@ -115,6 +116,40 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
       return { removed };
     },
   );
+
+  // Processi lasciati attivi dal task (start_process): elenco e chiusura di quelli vivi.
+  const Message = Type.Object({ message: Type.String() });
+  const processesRoute = {
+    params: RunParams,
+    response: {
+      200: Type.Array(TaskProcessSchema),
+      409: Message,
+      502: Message,
+      504: Message,
+    },
+  };
+  const processes = async (id: string, stop: boolean) => {
+    try {
+      return { ok: true as const, list: await hub.taskProcesses(id, stop) };
+    } catch (e) {
+      const r = e instanceof Error ? e.message : String(e);
+      if (r === 'offline')
+        return { ok: false as const, code: 409 as const, message: 'Runner non collegato' };
+      if (r === 'timeout')
+        return { ok: false as const, code: 504 as const, message: 'Nessuna risposta dal runner' };
+      return { ok: false as const, code: 502 as const, message: r };
+    }
+  };
+  app.get('/api/runs/:id/processes', { schema: processesRoute }, async (req, reply) => {
+    if (!(await runs.get(req.params.id))) return reply.callNotFound();
+    const res = await processes(req.params.id, false);
+    return res.ok ? res.list : reply.code(res.code).send({ message: res.message });
+  });
+  app.post('/api/runs/:id/processes/stop', { schema: processesRoute }, async (req, reply) => {
+    if (!(await runs.get(req.params.id))) return reply.callNotFound();
+    const res = await processes(req.params.id, true);
+    return res.ok ? res.list : reply.code(res.code).send({ message: res.message });
+  });
 
   app.post('/api/runs/:id/cancel', { schema: { params: RunParams } }, async (req, reply) => {
     if (!(await runs.get(req.params.id))) return reply.callNotFound();

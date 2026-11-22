@@ -1,6 +1,7 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentQuestion, AgentRequest } from '../engine/engine.js';
+import type { ProcessStarter } from '../processes.js';
 import type { TurnPermissions } from '../turn.js';
 import type { ApprovalEndpoint, Authorizer } from './endpoint.js';
 import type { HookPolicy } from './hook.js';
@@ -82,8 +83,16 @@ export async function answerQuestions(
   return { approved: true, updatedInput: { ...input, answers } };
 }
 
-/** Prepara i permessi di un turno nella sua cartella; con `token` riaggancia un turno esistente. */
-export type PermissionBridge = (req: AgentRequest, dir: string, token?: string) => TurnPermissions;
+/**
+ * Prepara i permessi di un turno nella sua cartella; con `token` riaggancia un turno esistente.
+ * `startProcess` serve allo strumento `start_process` (senza, risponde che non è disponibile).
+ */
+export type PermissionBridge = (
+  req: AgentRequest,
+  dir: string,
+  token?: string,
+  startProcess?: ProcessStarter,
+) => TurnPermissions;
 
 /**
  * Collega un turno di claude ai permessi di Jeko:
@@ -94,14 +103,15 @@ export function createPermissionBridge(opts: BridgeOptions): PermissionBridge {
   const mcp = nodeScript(opts.scriptsDir, 'mcp');
   const hook = nodeScript(opts.scriptsDir, 'hook');
 
-  return (req, dir, existing) => {
+  return (req, dir, existing, startProcess) => {
     const { token, dispose } = opts.endpoint.register(
       async (tool, input) => {
         if (tool !== ASK_TOOL) return { approved: await req.authorize(tool, input) };
         if (!req.askUser) return { approved: false, note: NO_QUESTIONS };
         return answerQuestions(input, req.askUser);
       },
-      ...(existing !== undefined ? [existing] : []),
+      existing,
+      startProcess,
     );
     const mcpConfig = join(dir, 'mcp.json');
     const settings = join(dir, 'settings.json');

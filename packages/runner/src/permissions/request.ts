@@ -2,20 +2,23 @@ import { randomUUID } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import {
   APPROVAL_PATH,
+  PROCESS_PATH,
   type ApprovalRequest,
   type ApprovalResponse,
   type ClaudeDecision,
+  type ProcessRequest,
+  type ProcessResponse,
 } from './protocol.js';
 
 class Unauthorized extends Error {}
 
-function post(pipe: string, token: string, body: ApprovalRequest): Promise<ApprovalResponse> {
+function post<T>(pipe: string, token: string, path: string, body: unknown): Promise<T> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const req = httpRequest(
       {
         socketPath: pipe,
-        path: APPROVAL_PATH,
+        path,
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -28,12 +31,17 @@ function post(pipe: string, token: string, body: ApprovalRequest): Promise<Appro
         res.on('data', (c: Buffer) => chunks.push(c));
         res.on('end', () => {
           if (res.statusCode === 401) return reject(new Unauthorized());
-          if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+          let parsed: unknown;
           try {
-            resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')) as ApprovalResponse);
+            parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
           } catch (e) {
-            reject(e as Error);
+            return reject(e as Error);
           }
+          if (res.statusCode !== 200) {
+            const error = (parsed as { error?: unknown } | null)?.error;
+            return reject(new Error(typeof error === 'string' ? error : `HTTP ${res.statusCode}`));
+          }
+          resolve(parsed as T);
         });
       },
     );
@@ -66,7 +74,7 @@ export async function requestDecision(
   let failingSince: number | null = null;
   for (;;) {
     try {
-      const res = await post(opts.pipe, opts.token, body);
+      const res = await post<ApprovalResponse>(opts.pipe, opts.token, APPROVAL_PATH, body);
       failingSince = null;
       if (res.status === 'decided') return res.decision;
     } catch (e) {
@@ -82,4 +90,14 @@ export async function requestDecision(
       await new Promise((r) => setTimeout(r, retryMs));
     }
   }
+}
+
+/** Chiede al runner di avviare un processo staccato; un solo tentativo (non si avvia due volte). */
+export function requestProcess(
+  opts: RequestOptions,
+  body: ProcessRequest,
+): Promise<ProcessResponse> {
+  return post<ProcessResponse>(opts.pipe, opts.token, PROCESS_PATH, body).catch((e: unknown) => {
+    throw e instanceof Unauthorized ? new Error('Jeko non riconosce questo turno') : e;
+  });
 }

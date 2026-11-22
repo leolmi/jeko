@@ -51,10 +51,11 @@ export const TURN_NOTE =
   'Stai lavorando dentro Jeko, in modalità non interattiva. Il turno finisce con il tuo ' +
   'messaggio finale: dopo, il processo viene chiuso insieme a tutto ciò che hai avviato in ' +
   'background e non riceverai notifiche. Aspetta qui ciò che ti serve prima di rispondere. ' +
-  "Se l'utente vuole lasciare attivi dei processi (server di sviluppo e simili), avviali " +
-  'staccati dalla sessione (es. Start-Process su Windows, nohup/setsid altrove) e controlla ' +
-  'che partano prima di rispondere. Nella risposta indica per ciascuno PID, porta se ce ' +
-  "l'ha, file di log e il comando per fermarlo (es. Stop-Process -Id <PID>).";
+  "Se l'utente vuole lasciare attivi dei processi (server di sviluppo e simili), avviali con " +
+  'lo strumento mcp__jeko__start_process: restano attivi dopo il turno e Jeko li chiude alla ' +
+  'chiusura del task. Non usare run_in_background, Start-Process, nohup o simili. Controlla ' +
+  'che partano (log, porta) prima di rispondere e nella risposta indica per ciascuno PID, ' +
+  "porta se ce l'ha e file di log.";
 
 /** Argomenti per un turno non interattivo; il prompt passa da stdin, l'uscita è stream-json. */
 export function claudeArgs(input: Omit<TurnInput, 'prompt' | 'cwd' | 'env'>): string[] {

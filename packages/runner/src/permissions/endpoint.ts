@@ -3,11 +3,14 @@ import { rmSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { ProcessStarter } from '../processes.js';
 import {
   APPROVAL_PATH,
+  PROCESS_PATH,
   type ApprovalRequest,
   type ApprovalResponse,
   type ClaudeDecision,
+  type ProcessRequest,
 } from './protocol.js';
 
 /**
@@ -22,6 +25,12 @@ export type Authorizer = (
 interface Pending {
   decision?: ClaudeDecision;
   done: Promise<ClaudeDecision>;
+}
+
+interface Turn {
+  authorize: Authorizer;
+  startProcess: ProcessStarter | undefined;
+  requests: Map<string, Pending>;
 }
 
 const MAX_BODY = 1024 * 1024;
@@ -50,16 +59,24 @@ function isRequest(v: unknown): v is ApprovalRequest {
   );
 }
 
+function isProcessRequest(v: unknown): v is ProcessRequest {
+  const r = v as Partial<ProcessRequest> | null;
+  return (
+    typeof r === 'object' &&
+    r !== null &&
+    typeof r.command === 'string' &&
+    r.command.trim().length > 0 &&
+    (r.cwd === undefined || typeof r.cwd === 'string')
+  );
+}
+
 /**
  * Endpoint dei permessi del runner. Ogni turno di claude si registra e riceve un token:
  * le richieste con quel token vanno al suo `Authorizer`, una sola volta per `requestId`.
  */
 export class ApprovalEndpoint {
   private server: Server | undefined;
-  private readonly turns = new Map<
-    string,
-    { authorize: Authorizer; requests: Map<string, Pending> }
-  >();
+  private readonly turns = new Map<string, Turn>();
 
   constructor(
     readonly path: string = pipePath(),
@@ -73,7 +90,8 @@ export class ApprovalEndpoint {
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(body));
       };
-      if (req.method !== 'POST' || req.url !== APPROVAL_PATH) return reply(404);
+      if (req.method !== 'POST' || (req.url !== APPROVAL_PATH && req.url !== PROCESS_PATH))
+        return reply(404);
       const chunks: Buffer[] = [];
       let size = 0;
       req.on('data', (c: Buffer) => {
@@ -88,9 +106,18 @@ export class ApprovalEndpoint {
         } catch {
           return reply(400);
         }
-        if (!isRequest(body)) return reply(400);
         const auth = req.headers.authorization ?? '';
         const turn = this.findTurn(auth.startsWith('Bearer ') ? auth.slice(7) : '');
+        if (req.url === PROCESS_PATH) {
+          if (!isProcessRequest(body)) return reply(400);
+          if (!turn) return reply(401);
+          if (!turn.startProcess) return reply(501, { error: 'Avvio di processi non disponibile' });
+          return void turn.startProcess(body).then(
+            (r) => reply(200, r),
+            (e: unknown) => reply(500, { error: e instanceof Error ? e.message : String(e) }),
+          );
+        }
+        if (!isRequest(body)) return reply(400);
         if (!turn) return reply(401);
         void this.respond(turn, body).then((r) => reply(200, r));
       });
@@ -103,12 +130,16 @@ export class ApprovalEndpoint {
     this.server = server;
   }
 
-  /** Registra un turno (con il suo token, se lo si riaggancia dopo un riavvio); `dispose` lo toglie (le richieste successive ricevono 401). */
+  /**
+   * Registra un turno (con il suo token, se lo si riaggancia dopo un riavvio); `dispose` lo
+   * toglie (le richieste successive ricevono 401). `startProcess` serve a `start_process`.
+   */
   register(
     authorize: Authorizer,
     token: string = randomUUID() + randomBytes(16).toString('hex'),
+    startProcess?: ProcessStarter,
   ): { token: string; dispose: () => void } {
-    this.turns.set(token, { authorize, requests: new Map() });
+    this.turns.set(token, { authorize, startProcess, requests: new Map() });
     return { token, dispose: () => this.turns.delete(token) };
   }
 
@@ -125,10 +156,7 @@ export class ApprovalEndpoint {
     return undefined;
   }
 
-  private async respond(
-    turn: { authorize: Authorizer; requests: Map<string, Pending> },
-    req: ApprovalRequest,
-  ): Promise<ApprovalResponse> {
+  private async respond(turn: Turn, req: ApprovalRequest): Promise<ApprovalResponse> {
     let pending = turn.requests.get(req.requestId);
     if (!pending) {
       const p: Pending = {

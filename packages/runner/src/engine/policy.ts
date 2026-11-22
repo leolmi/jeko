@@ -1,4 +1,5 @@
 import type { GateLevel, Policy, PolicyAction, RunMode } from '@jeko/shared';
+import { START_PROCESS_TOOL } from '../permissions/protocol.js';
 
 interface Rule {
   action: PolicyAction;
@@ -61,7 +62,7 @@ export function classifyTool(
     input && typeof input === 'object' && typeof (input as Record<string, unknown>)[k] === 'string'
       ? ((input as Record<string, unknown>)[k] as string)
       : '';
-  if (tool === 'Bash' || tool === 'PowerShell') {
+  if (tool === 'Bash' || tool === 'PowerShell' || tool === START_PROCESS_TOOL) {
     const command = field('command');
     return { actions: classifyCommand(command), command };
   }

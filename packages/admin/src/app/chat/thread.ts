@@ -1,4 +1,5 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import {
   afterRenderEffect,
   ChangeDetectionStrategy,
@@ -20,6 +21,7 @@ import {
   FINAL_STATUSES,
   type Answer,
   type RunDetail,
+  type TaskProcess,
 } from '@jeko/shared';
 import { I18n, type I18nKey } from '../core/i18n';
 import { Realtime } from '../core/realtime';
@@ -69,6 +71,18 @@ import { UsageBar } from './usage-bar';
         </div>
         <jk-mode-badge [tone]="runTone(r)" />
         <jk-status [status]="r.status" />
+        @if (!final() && alive().length > 0) {
+          <button
+            type="button"
+            class="jk-btn-ghost"
+            [title]="i18n.t('thread.processes.title')"
+            [disabled]="stopping()"
+            (click)="stopProcesses()"
+          >
+            <jk-icon name="terminal" [size]="16" />
+            {{ i18n.t('thread.processes', { n: alive().length }) }}
+          </button>
+        }
         @if (!final()) {
           <button type="button" class="jk-btn-ghost" (click)="cancel()">
             <jk-icon name="stop" [size]="16" />
@@ -311,9 +325,24 @@ export class Thread {
     return !r || FINAL_STATUSES.includes(r.status);
   });
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
+  /** Processi lasciati attivi dal task (strumento start_process di claude). */
+  protected readonly processes = signal<TaskProcess[]>([]);
+  protected readonly alive = computed(() => this.processes().filter((p) => p.alive));
+  protected readonly stopping = signal(false);
 
   constructor() {
     effect(() => this.load(this.id()));
+    // A task aperto si guarda quali processi ha lasciato attivi, a ogni cambio di stato (es. a
+    // fine turno); a task chiuso li ha già chiusi Jeko.
+    const openRun = computed(() => {
+      const r = this.run();
+      return r && !FINAL_STATUSES.includes(r.status) ? `${r.id}|${r.status}` : null;
+    });
+    effect(() => {
+      const key = openRun();
+      if (key) this.loadProcesses(key.split('|')[0]!);
+      else this.processes.set([]);
+    });
     effect(() => {
       const p = this.followUp();
       const r = this.run();
@@ -401,6 +430,43 @@ export class Thread {
       .remove([r.id])
       .then(() => this.router.navigate(['/']))
       .catch(() => undefined);
+  }
+
+  private loadProcesses(id: string): void {
+    this.http.get<TaskProcess[]>(`/api/runs/${id}/processes`).subscribe({
+      next: (list) => {
+        if (this.run()?.id === id) this.processes.set(list);
+      },
+      error: () => undefined,
+    });
+  }
+
+  /** Chiude, dopo conferma, i processi del task ancora attivi (elenco riletto al momento). */
+  protected async stopProcesses(): Promise<void> {
+    const r = this.run();
+    if (!r || this.stopping()) return;
+    const fail = (e: unknown) => {
+      const error = e instanceof HttpErrorResponse ? (e.error?.message ?? e.message) : String(e);
+      globalThis.alert(this.i18n.t('thread.processes.failed', { error }));
+    };
+    this.stopping.set(true);
+    try {
+      const list = await firstValueFrom(
+        this.http.get<TaskProcess[]>(`/api/runs/${r.id}/processes`),
+      );
+      this.processes.set(list);
+      const alive = list.filter((p) => p.alive);
+      if (alive.length === 0) return globalThis.alert(this.i18n.t('thread.processes.none'));
+      const lines = alive.map((p) => `• PID ${p.pid}: ${p.command}`).join('\n');
+      if (!globalThis.confirm(this.i18n.t('thread.processes.confirm', { list: lines }))) return;
+      this.processes.set(
+        await firstValueFrom(this.http.post<TaskProcess[]>(`/api/runs/${r.id}/processes/stop`, {})),
+      );
+    } catch (e) {
+      fail(e);
+    } finally {
+      this.stopping.set(false);
+    }
   }
 
   protected cancel(): void {

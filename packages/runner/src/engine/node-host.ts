@@ -1,8 +1,9 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { knowledgePrompt, type ContextExclusions, type RunEvent } from '@jeko/shared';
 import { loadKnowledge } from '../knowledge.js';
 import { readPrompt } from '../prompts.js';
 import type { PermissionBridge } from '../permissions/bridge.js';
+import type { ProcessRequest, ProcessResponse } from '../permissions/protocol.js';
 import { run } from '../spawn.js';
 import { durableTurn } from '../turn.js';
 import type { Host } from './engine.js';
@@ -24,6 +25,8 @@ export interface NodeHostOptions {
   permissions?: PermissionBridge;
   /** Esclusioni dal contesto di claude, dal progetto della run. */
   exclude?: ContextExclusions;
+  /** Processi che restano attivi dopo il turno (strumento `start_process`), per questa run. */
+  startProcess?: (req: { command: string; cwd: string }) => Promise<ProcessResponse>;
 }
 
 /** Host reale: comandi locali, file system e claude CLI. */
@@ -55,6 +58,11 @@ export function createNodeHost(opts: NodeHostOptions): Host {
     agent: (req) => {
       const permissions = opts.permissions;
       const cwd = req.cwd ?? opts.cwd;
+      const start = opts.startProcess;
+      const startProcess =
+        start &&
+        ((p: ProcessRequest) =>
+          start({ command: p.command, cwd: resolve(cwd ?? process.cwd(), p.cwd ?? '.') }));
       return durableTurn({
         dir: join(opts.turnsDir, req.turnKey),
         command: claude,
@@ -69,7 +77,7 @@ export function createNodeHost(opts: NodeHostOptions): Host {
         signal: req.signal,
         onActivity: req.onActivity,
         ...(permissions && {
-          permissions: (dir: string, token?: string) => permissions(req, dir, token),
+          permissions: (dir: string, token?: string) => permissions(req, dir, token, startProcess),
         }),
       });
     },

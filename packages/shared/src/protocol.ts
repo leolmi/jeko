@@ -89,6 +89,19 @@ export const CheckSchema = Type.Object({
 });
 export type Check = Static<typeof CheckSchema>;
 
+// ---------- processi lasciati attivi da un task ----------
+
+/** Processo avviato da claude con `start_process`: resta attivo fino alla chiusura del task. */
+export const TaskProcessSchema = Type.Object({
+  pid: Type.Integer(),
+  command: Type.String(),
+  cwd: Type.String(),
+  log: Type.String(),
+  startedAt: Timestamp,
+  alive: Type.Boolean(),
+});
+export type TaskProcess = Static<typeof TaskProcessSchema>;
+
 // ---------- WebSocket runner ↔ server ----------
 
 export const RunnerToServerSchema = Type.Union([
@@ -143,6 +156,13 @@ export const RunnerToServerSchema = Type.Union([
   Type.Object({
     type: Type.Literal('terminal.opened'),
     requestId: Type.String({ minLength: 1 }),
+    error: Type.Optional(Type.String()),
+  }),
+  /** Processi del task (dopo l'eventuale chiusura), o l'errore. */
+  Type.Object({
+    type: Type.Literal('processes.result'),
+    requestId: Type.String({ minLength: 1 }),
+    processes: Type.Array(TaskProcessSchema),
     error: Type.Optional(Type.String()),
   }),
   Type.Object({
@@ -220,6 +240,13 @@ export const ServerToRunnerSchema = Type.Union([
     type: Type.Literal('terminal.open'),
     requestId: Type.String({ minLength: 1 }),
     cwd: Type.String({ minLength: 1 }),
+  }),
+  /** Processi lasciati attivi da un task: elenco, o chiusura di quelli vivi e poi l'elenco. */
+  Type.Object({
+    type: Type.Literal('processes.request'),
+    requestId: Type.String({ minLength: 1 }),
+    runId: Type.String({ minLength: 1 }),
+    stop: Type.Boolean(),
   }),
   /** Eventi salvati fino a `seq` compreso: il runner può toglierli dal giornale. */
   Type.Object({

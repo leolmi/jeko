@@ -193,6 +193,12 @@ const it = {
 
   'thread.notFound': 'Richiesta non trovata.',
   'thread.cancel': 'Annulla',
+  'thread.processes': 'Chiudi processi ({n})',
+  'thread.processes.title':
+    'Processi lasciati attivi dal task (server di sviluppo e simili): chiudili tutti',
+  'thread.processes.confirm': 'Chiudere i processi ancora attivi di questo task?\n\n{list}',
+  'thread.processes.none': 'Nessun processo di questo task è ancora attivo.',
+  'thread.processes.failed': 'Operazione non riuscita: {error}',
   'thread.you': 'Tu',
   'thread.step.running': 'In corso',
   'thread.step.skipped': 'saltato',
@@ -598,6 +604,12 @@ const en: Record<I18nKey, string> = {
 
   'thread.notFound': 'Request not found.',
   'thread.cancel': 'Cancel',
+  'thread.processes': 'Stop processes ({n})',
+  'thread.processes.title':
+    'Processes the task left running (dev servers and the like): stop them all',
+  'thread.processes.confirm': 'Stop the processes this task still has running?\n\n{list}',
+  'thread.processes.none': 'No process of this task is still running.',
+  'thread.processes.failed': 'Operation failed: {error}',
   'thread.you': 'You',
   'thread.step.running': 'Running',
   'thread.step.skipped': 'skipped',

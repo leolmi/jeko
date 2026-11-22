@@ -16,6 +16,7 @@ import {
   type RunnerToServer,
   type RunRowStatus,
   type ServerToRunner,
+  type TaskProcess,
 } from '@jeko/shared';
 import type { ProjectStore } from '../projects/store.js';
 import type { ClaudeModelStore } from '../settings/claude-models.js';
@@ -42,6 +43,8 @@ const TERMINAL_TIMEOUT_MS = 15_000;
 const ASSIST_TIMEOUT_MS = 5 * 60_000;
 /** Lettura del contesto: claude parte, carica plugin e server MCP e manda l'elenco. */
 const CONTEXT_TIMEOUT_MS = 90_000;
+/** Controllo dei processi: su Windows serve un PowerShell per processo. */
+const PROCESSES_TIMEOUT_MS = 60_000;
 
 export type AnswerOutcome = 'ok' | 'not-found' | 'already-answered' | 'wrong-kind';
 
@@ -122,6 +125,16 @@ export class RunnerHub {
       type: 'context.request',
       requestId,
       cwd,
+    }));
+  }
+
+  /** Processi lasciati attivi da un task: elenco, o chiusura di quelli vivi (`stop`) e poi l'elenco. */
+  taskProcesses(runId: string, stop: boolean, timeoutMs = PROCESSES_TIMEOUT_MS) {
+    return this.request<TaskProcess[]>(timeoutMs, (requestId) => ({
+      type: 'processes.request',
+      requestId,
+      runId,
+      stop,
     }));
   }
 
@@ -271,6 +284,8 @@ export class RunnerHub {
         return this.settle(msg.requestId, msg.error ? new Error(msg.error) : null);
       case 'prompts.result':
         return this.settle(msg.requestId, msg.error ? new Error(msg.error) : msg.prompts);
+      case 'processes.result':
+        return this.settle(msg.requestId, msg.error ? new Error(msg.error) : msg.processes);
       case 'context.result':
         return this.settle(
           msg.requestId,

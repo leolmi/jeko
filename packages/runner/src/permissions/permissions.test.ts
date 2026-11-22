@@ -8,9 +8,14 @@ import type { AgentRequest } from '../engine/engine.js';
 import { createMcpServer } from '../mcp.js';
 import { answerQuestions, createPermissionBridge, parseQuestions } from './bridge.js';
 import { ApprovalEndpoint, pipePath, type Authorizer } from './endpoint.js';
-import { hookDecision, runHook } from './hook.js';
-import { ENV, PERMISSION_PROMPT_TOOL } from './protocol.js';
-import { requestDecision } from './request.js';
+import { hookDecision, NO_BACKGROUND, runHook } from './hook.js';
+import {
+  ENV,
+  PERMISSION_PROMPT_TOOL,
+  START_PROCESS_TOOL,
+  type ProcessRequest,
+} from './protocol.js';
+import { requestDecision, requestProcess } from './request.js';
 
 const gates = {
   policies: [{ match: 'git.push' as const, gate: 'always' as const }],
@@ -108,13 +113,58 @@ describe('endpoint dei permessi (named pipe)', () => {
     await Promise.all([server.connect(a), client.connect(b)]);
 
     const tools = await client.listTools();
-    expect(tools.tools.map((t) => t.name)).toEqual(['approve']);
+    expect(tools.tools.map((t) => t.name)).toEqual(['approve', 'start_process']);
     const res = await client.callTool({
       name: 'approve',
       arguments: { tool_name: 'Bash', input: { command: 'git push' } },
     });
     const text = (res.content as { type: string; text: string }[])[0]!.text;
     expect(JSON.parse(text)).toEqual({ behavior: 'deny', message: 'Rifiutato da Jeko' });
+    await client.close();
+  });
+
+  it('start_process: il server MCP fa avviare il processo al runner del turno', async () => {
+    const ep = await startEndpoint();
+    const seen: ProcessRequest[] = [];
+    const { token } = ep.register(
+      async () => ({ approved: true }),
+      undefined,
+      async (p) => {
+        seen.push(p);
+        return p.command === 'boom'
+          ? { pid: 2, log: 'b.log', running: false, exitCode: 1, output: 'errore' }
+          : { pid: 1, log: 'a.log', running: true, output: 'in ascolto' };
+      },
+    );
+    const server = createMcpServer({ pipe: ep.path, token });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test', version: '0' });
+    await Promise.all([server.connect(a), client.connect(b)]);
+    const call = async (args: Record<string, unknown>) => {
+      const res = await client.callTool({ name: 'start_process', arguments: args });
+      return { text: (res.content as { text: string }[])[0]!.text, isError: res.isError };
+    };
+
+    const ok = await call({ command: 'npm run dev', cwd: 'web' });
+    expect(ok.isError).toBe(false);
+    expect(ok.text).toContain('PID 1, attivo');
+    expect(ok.text).toContain('in ascolto');
+    expect((await call({ command: 'boom' })).text).toContain('uscito subito (codice 1)');
+    expect(seen).toEqual([{ command: 'npm run dev', cwd: 'web' }, { command: 'boom' }]);
+
+    // Turno senza avvio di processi, o non più registrato
+    const other = ep.register(async () => ({ approved: true }));
+    const bare = await requestProcess(
+      { pipe: ep.path, token: other.token },
+      { command: 'x' },
+    ).catch((e: Error) => e.message);
+    expect(bare).toBe('Avvio di processi non disponibile');
+    other.dispose();
+    const gone = await requestProcess(
+      { pipe: ep.path, token: other.token },
+      { command: 'x' },
+    ).catch((e: Error) => e.message);
+    expect(gone).toBe('Jeko non riconosce questo turno');
     await client.close();
   });
 
@@ -157,9 +207,14 @@ describe('hook PreToolUse', () => {
   it('forza la richiesta solo per le azioni fermate dalle policy', () => {
     expect(hookDecision({ tool_name: 'Bash', tool_input: { command: 'git push' } }, gates)).toEqual(
       {
+        decision: 'ask',
         reason: 'git.push: git push',
       },
     );
+    // start_process passa dalle stesse policy dei comandi
+    expect(
+      hookDecision({ tool_name: START_PROCESS_TOOL, tool_input: { command: 'git push' } }, gates),
+    ).toMatchObject({ decision: 'ask' });
     expect(
       hookDecision({ tool_name: 'Bash', tool_input: { command: 'npm test' } }, gates),
     ).toBeNull();
@@ -170,6 +225,33 @@ describe('hook PreToolUse', () => {
       hookDecision(
         { tool_name: 'Bash', tool_input: { command: 'git push' } },
         { policies: [{ match: 'git.push', gate: 'interactive' }], mode: 'headless' },
+      ),
+    ).toBeNull();
+  });
+
+  it('rifiuta i comandi in background, che morirebbero a fine turno', () => {
+    for (const tool_name of ['Bash', 'PowerShell', 'Agent']) {
+      expect(
+        hookDecision(
+          { tool_name, tool_input: { command: 'npm run dev', run_in_background: true } },
+          gates,
+        ),
+      ).toEqual({ decision: 'deny', reason: NO_BACKGROUND });
+    }
+    const out = JSON.parse(
+      runHook(
+        JSON.stringify({
+          tool_name: 'Bash',
+          tool_input: { command: 'x', run_in_background: true },
+        }),
+        { [ENV.policy]: JSON.stringify(gates) },
+      ),
+    );
+    expect(out.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(
+      hookDecision(
+        { tool_name: 'Bash', tool_input: { command: 'x', run_in_background: false } },
+        gates,
       ),
     ).toBeNull();
   });
