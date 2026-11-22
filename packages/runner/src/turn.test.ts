@@ -35,6 +35,7 @@ beforeEach(() => {
   process.env['FAKE_LOG'] = log;
   delete process.env['FAKE_SLEEP'];
   delete process.env['FAKE_DIE'];
+  delete process.env['FAKE_LINGER'];
 });
 
 describe('turno di claude staccato', () => {
@@ -79,6 +80,15 @@ describe('turno di claude staccato', () => {
     const b = turn(); // come un runner riavviato: stessa cartella, processo vivo
     const [ra, rb] = await Promise.all([a, b]);
     expect(rb).toEqual(ra);
+    expect(invocations()).toHaveLength(1);
+  });
+
+  it('se claude resta vivo dopo il risultato lo chiude e finisce il turno', async () => {
+    process.env['FAKE_LINGER'] = '60000';
+    const started = Date.now();
+    const res = await turn({ resultGraceMs: 200 });
+    expect(res).toMatchObject({ ok: true, output: 'eco: lavora' });
+    expect(Date.now() - started).toBeLessThan(10000);
     expect(invocations()).toHaveLength(1);
   });
 

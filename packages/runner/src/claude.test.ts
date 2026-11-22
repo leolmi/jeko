@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  NON_INTERACTIVE_TOOLS,
+  TURN_NOTE,
   claudeArgs,
   parseActivity,
   parseInit,
@@ -31,6 +33,10 @@ describe('claude', () => {
       'mcp.json',
       '--settings',
       'settings.json',
+      '--append-system-prompt',
+      TURN_NOTE,
+      '--disallowedTools',
+      NON_INTERACTIVE_TOOLS.join(','),
     ]);
     expect(claudeArgs({ sessionId: 's1', resume: true })).toContain('--resume');
     const tuned = claudeArgs({ sessionId: 's1', resume: true, effort: 'high', model: 'opus' });
@@ -116,16 +122,16 @@ describe('esclusioni dal contesto', () => {
     });
     expect(args).toContain('--disable-slash-commands');
     expect(args[args.indexOf('--disallowedTools') + 1]).toBe(
-      'WebSearch,mcp__github,mcp__claude_ai_Gmail',
+      [...NON_INTERACTIVE_TOOLS, 'WebSearch', 'mcp__github', 'mcp__claude_ai_Gmail'].join(','),
     );
   });
 
-  it('senza esclusioni non aggiunge nulla', () => {
+  it('senza esclusioni toglie solo gli strumenti che rimandano a dopo il turno', () => {
     const args = claudeArgs({
       ...base,
       exclude: { tools: [], mcpServers: [], plugins: [], skills: false },
     });
-    expect(args).not.toContain('--disallowedTools');
+    expect(args[args.indexOf('--disallowedTools') + 1]).toBe(NON_INTERACTIVE_TOOLS.join(','));
     expect(args).not.toContain('--disable-slash-commands');
   });
 

@@ -44,6 +44,11 @@ export interface DurableTurnOptions {
   /** Avanzamento del turno (testo e strumenti), letto dall'uscita mentre claude lavora. */
   onActivity?: ((a: Activity) => void) | undefined;
   pollMs?: number;
+  /**
+   * Attesa dopo il risultato prima di chiudere claude: con task in background (server,
+   * monitor) resterebbe vivo e il turno non finirebbe mai.
+   */
+  resultGraceMs?: number;
   /** Avvii al massimo: il primo più le riprese dopo un'interruzione. */
   maxAttempts?: number;
 }
@@ -113,7 +118,10 @@ export async function durableTurn(o: DurableTurnOptions): Promise<TurnOutput> {
   save(o.dir, meta);
   const maxAttempts = o.maxAttempts ?? 2;
   let checkedIdentity = false;
-  const pump = (n: number) => pumpActivity(o, meta, n);
+  const pump = (n: number) => {
+    pumpActivity(o, meta, n);
+    return parseStream(read(files(o.dir, n).out)) !== null;
+  };
 
   try {
     for (;;) {
@@ -198,12 +206,29 @@ function spawnTurn(
   }
 }
 
+/**
+ * `tick` aggiorna l'attività e dice se il risultato è arrivato; se dopo il risultato il processo
+ * resta vivo oltre `resultGraceMs` (task in background), lo chiude. Restituisce il tick da usare.
+ */
+function lingerGuard(pid: number, o: DurableTurnOptions, tick: () => boolean): () => void {
+  let resultAt: number | undefined;
+  let killed = false;
+  return () => {
+    if (!tick() || killed) return;
+    resultAt ??= Date.now();
+    if (Date.now() - resultAt >= (o.resultGraceMs ?? 3000)) {
+      killed = true;
+      killTree(pid);
+    }
+  };
+}
+
 /** Attende la fine del processo avviato qui; annullando la run lo chiude. */
-function waitChild(child: ChildProcess, o: DurableTurnOptions, tick: () => void): Promise<void> {
+function waitChild(child: ChildProcess, o: DurableTurnOptions, tick: () => boolean): Promise<void> {
   return new Promise((resolve) => {
     if (child.exitCode !== null || child.pid === undefined) return resolve();
     const onAbort = () => child.pid !== undefined && killTree(child.pid);
-    const timer = setInterval(tick, o.pollMs ?? 500);
+    const timer = setInterval(lingerGuard(child.pid, o, tick), o.pollMs ?? 500);
     const done = () => {
       clearInterval(timer);
       o.signal?.removeEventListener('abort', onAbort);
@@ -216,10 +241,11 @@ function waitChild(child: ChildProcess, o: DurableTurnOptions, tick: () => void)
 }
 
 /** Attende la fine di un processo riagganciato (non figlio di questo runner). */
-function waitPid(pid: number, o: DurableTurnOptions, tick: () => void): Promise<void> {
+function waitPid(pid: number, o: DurableTurnOptions, tick: () => boolean): Promise<void> {
   return new Promise((resolve) => {
+    const guard = lingerGuard(pid, o, tick);
     const timer = setInterval(() => {
-      tick();
+      guard();
       if (o.signal?.aborted) killTree(pid);
       if (!processAlive(pid)) {
         clearInterval(timer);

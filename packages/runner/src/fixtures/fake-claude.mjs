@@ -1,7 +1,7 @@
 /* global process, setTimeout */
 // claude finto per i test dei turni: scrive stream-json come `claude -p --output-format stream-json`.
 // FAKE_LOG: file in cui annotare ogni avvio; FAKE_SLEEP: ms prima del risultato;
-// FAKE_DIE=1: il primo avvio muore senza risultato.
+// FAKE_DIE=1: il primo avvio muore senza risultato; FAKE_LINGER: vedi in fondo.
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
@@ -28,3 +28,5 @@ out({
 if (process.env.FAKE_DIE === '1' && runs === 0) process.exit(1);
 await new Promise((r) => setTimeout(r, Number(process.env.FAKE_SLEEP ?? 0)));
 out({ type: 'result', result: `eco: ${stdin}`, is_error: false, session_id: session });
+// FAKE_LINGER: ms in cui resta vivo dopo il risultato (come claude con task in background).
+if (process.env.FAKE_LINGER) await new Promise((r) => setTimeout(r, Number(process.env.FAKE_LINGER)));

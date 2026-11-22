@@ -32,6 +32,28 @@ export interface TurnOutput {
   model?: string;
 }
 
+/**
+ * Strumenti che rimandano il lavoro a dopo la fine del turno (risvegli, monitor, cron):
+ * in un turno di Jeko non c'è un "dopo", e claude resterebbe vivo ad aspettarli.
+ */
+export const NON_INTERACTIVE_TOOLS = [
+  'ScheduleWakeup',
+  'Monitor',
+  'CronCreate',
+  'CronDelete',
+  'CronList',
+];
+
+/** Avviso a claude: il turno finisce col messaggio finale e chiude ciò che è in background. */
+export const TURN_NOTE =
+  'Stai lavorando dentro Jeko, in modalità non interattiva. Il turno finisce con il tuo ' +
+  'messaggio finale: dopo, il processo viene chiuso insieme a tutto ciò che hai avviato in ' +
+  'background e non riceverai notifiche. Aspetta qui ciò che ti serve prima di rispondere. ' +
+  "Se l'utente vuole lasciare attivi dei processi (server di sviluppo e simili), avviali " +
+  'staccati dalla sessione (es. Start-Process su Windows, nohup/setsid altrove) e controlla ' +
+  'che partano prima di rispondere. Nella risposta indica per ciascuno PID, porta se ce ' +
+  "l'ha, file di log e il comando per fermarlo (es. Stop-Process -Id <PID>).";
+
 /** Argomenti per un turno non interattivo; il prompt passa da stdin, l'uscita è stream-json. */
 export function claudeArgs(input: Omit<TurnInput, 'prompt' | 'cwd' | 'env'>): string[] {
   const args = ['-p', '--output-format', 'stream-json', '--verbose'];
@@ -42,7 +64,9 @@ export function claudeArgs(input: Omit<TurnInput, 'prompt' | 'cwd' | 'env'>): st
   if (input.mcpConfig) args.push('--mcp-config', input.mcpConfig);
   if (input.permissionPromptTool) args.push('--permission-prompt-tool', input.permissionPromptTool);
   if (input.settings) args.push('--settings', input.settings);
+  args.push('--append-system-prompt', TURN_NOTE);
   const deny = [
+    ...NON_INTERACTIVE_TOOLS,
     ...(input.exclude?.tools ?? []),
     ...(input.exclude?.mcpServers ?? []).map(mcpPrefix),
   ];
