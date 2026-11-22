@@ -179,6 +179,7 @@ const it = {
   'composer.busy': 'C’è già un task attivo: questo partirà dopo.',
   'composer.continue': 'Invia',
   'composer.continue.placeholder': 'Continua il task su {name}…',
+  'composer.fromTask': 'Valgono quelli scelti all’avvio del task',
   'composer.fork.placeholder':
     'Questo task è chiuso: scrivi qui per avviarne uno nuovo su {name} che riparte da questa conversazione.',
   'composer.closed.placeholder':
@@ -592,6 +593,7 @@ const en: Record<I18nKey, string> = {
   'composer.busy': 'A task is already active: this one will start after it.',
   'composer.continue': 'Send',
   'composer.continue.placeholder': 'Continue the task on {name}…',
+  'composer.fromTask': 'Set when the task started',
   'composer.fork.placeholder':
     'This task is closed: write here to start a new one on {name} that picks up this conversation.',
   'composer.closed.placeholder': 'This task is closed: write here to start a new one on {name}.',

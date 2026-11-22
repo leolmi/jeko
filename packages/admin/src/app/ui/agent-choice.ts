@@ -55,19 +55,25 @@ const PANEL = 'rounded-xl border border-line bg-surface p-1 shadow-xl';
     <button
       #trigger
       type="button"
-      class="inline-flex items-center gap-1.5 rounded-lg hover:bg-subtle"
-      [class]="up() ? 'px-2 py-1 text-xs' : 'border border-line bg-surface px-3 py-2 text-sm'"
+      class="inline-flex items-center gap-1.5 rounded-lg"
+      [class]="
+        (up() ? 'px-2 py-1 text-xs' : 'border border-line bg-surface px-3 py-2 text-sm') +
+        (disabled() ? ' pointer-events-none opacity-60' : ' hover:bg-subtle')
+      "
       aria-haspopup="menu"
       [attr.aria-expanded]="!!open()"
       [attr.aria-label]="i18n.t('agent.title')"
       [title]="i18n.t('agent.title')"
+      [disabled]="disabled()"
       (click)="toggle()"
     >
       <span class="font-medium">{{ shown().model }}</span>
       @if (shown().effort; as e) {
         <span class="text-faint">{{ e }}</span>
       }
-      <jk-icon name="expand_more" [size]="14" class="text-faint" />
+      @if (!disabled()) {
+        <jk-icon name="expand_more" [size]="14" class="text-faint" />
+      }
     </button>
 
     @if (open(); as at) {
@@ -174,6 +180,8 @@ export class AgentChoiceSelect {
   readonly defaultModel = input<string | undefined>();
   /** Il menu si apre verso l'alto (es. nel composer in fondo alla pagina). */
   readonly up = input(false);
+  /** Solo da vedere: mostra modello e impegno ma non apre il menu. */
+  readonly disabled = input(false);
 
   protected readonly ITEM = ITEM;
   protected readonly PANEL = PANEL;

@@ -66,6 +66,20 @@ describe('claude', () => {
     });
   });
 
+  it('ignora i risultati delle notifiche dei task in background', () => {
+    const notice = JSON.stringify({
+      type: 'result',
+      result: '',
+      is_error: false,
+      num_turns: 0,
+      origin: { kind: 'task-notification' },
+    });
+    const init = '{"type":"system","subtype":"init","model":"claude-opus-5-5"}';
+    expect(parseStream(`${notice}\n${init}`)).toBeNull();
+    const done = '{"type":"result","result":"fatto","is_error":false,"session_id":"abc"}';
+    expect(parseStream(`${notice}\n${init}\n${done}`)).toMatchObject({ ok: true, output: 'fatto' });
+  });
+
   it('ricava tempi, token e costo dal risultato', () => {
     const line = JSON.stringify({
       type: 'result',

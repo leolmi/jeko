@@ -127,6 +127,13 @@ export function parseInit(line: string, ownMcp: string): ContextInventory | null
   };
 }
 
+/**
+ * Risultato emesso da claude per le notifiche dei task in background (es. quelli rimasti orfani
+ * di un turno precedente, alla ripresa della sessione): non è la fine del turno.
+ */
+const isNotificationResult = (msg: Record<string, unknown>) =>
+  (msg['origin'] as { kind?: unknown } | undefined)?.kind === 'task-notification';
+
 /** Messaggio `result` di un'uscita stream-json (anche parziale); null se il turno non è finito. */
 export function parseStream(text: string): TurnOutput | null {
   let result: TurnOutput | null = null;
@@ -141,7 +148,7 @@ export function parseStream(text: string): TurnOutput | null {
     }
     if (msg.type === 'system' && msg['subtype'] === 'init' && typeof msg['model'] === 'string')
       model = msg['model'];
-    if (msg.type !== 'result') continue;
+    if (msg.type !== 'result' || isNotificationResult(msg)) continue;
     const usage = parseUsage(msg);
     result = {
       ok: msg['is_error'] !== true,

@@ -62,12 +62,14 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         (keydown.control.enter)="submit()"
       ></textarea>
       <div class="flex flex-wrap items-center gap-3 px-3 pt-1 pb-2.5">
-        <!-- Continuando un task, modalità e workflow sono già quelli del task. -->
+        <!-- Continuando un task, modalità, workflow e modello sono quelli del task: si vedono soltanto. -->
         <jk-segmented
           [label]="i18n.t('composer.mode')"
           [options]="modes()"
-          [(value)]="mode"
-          [class.invisible]="followUp()"
+          [value]="followRun()?.mode ?? mode()"
+          (valueChange)="mode.set($event)"
+          [disabled]="!!followUp()"
+          [attr.title]="followUp() ? i18n.t('composer.fromTask') : null"
         />
         <!-- Con o senza workflow: un pulsante, l'icona evidenziata è la modalità attiva. -->
         <button
@@ -95,10 +97,12 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         <!-- Vuoti, valgono quelli del progetto; continuando, quelli del task. -->
         <jk-agent-choice
           [up]="true"
-          [inherited]="project()?.agent"
+          [inherited]="followUp() ? undefined : project()?.agent"
           [defaultModel]="defaultModel()"
-          [(value)]="agent"
-          [class.invisible]="followUp()"
+          [value]="followUp() ? (followRun()?.agent ?? {}) : agent()"
+          (valueChange)="agent.set($event)"
+          [disabled]="!!followUp()"
+          [attr.title]="followUp() ? i18n.t('composer.fromTask') : null"
         />
         <span class="hidden min-w-0 flex-1 truncate text-xs text-faint lg:inline">
           @if (error()) {
@@ -172,6 +176,11 @@ export class TaskComposer {
     const f = this.runs.followUp();
     const path = this.project()?.path;
     return f && path && f.cwd?.toLowerCase() === path.toLowerCase() ? f : null;
+  });
+  /** Il task che si sta continuando: modalità e modello mostrati sono i suoi. */
+  protected readonly followRun = computed(() => {
+    const f = this.followUp();
+    return f ? (this.runs.list().find((r) => r.id === f.runId) ?? null) : null;
   });
   /** In pagina c'è un task chiuso del progetto: scrivendo se ne avvia uno nuovo. */
   protected readonly closed = computed(() => {

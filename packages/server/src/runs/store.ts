@@ -53,7 +53,7 @@ export interface RunLaunch {
 }
 
 /** Contenuto di `runs/<id>/run.json`: la run con le sue richieste all'utente. */
-export interface RunFile extends Omit<RunSummary, 'usage' | 'path'> {
+export interface RunFile extends Omit<RunSummary, 'usage' | 'path' | 'agent'> {
   inputs: Record<string, string> | null;
   state: RunState | null;
   definition: Workflow | null;
@@ -75,7 +75,7 @@ const EVENTS = 'events.jsonl';
 
 const summary = ({
   inputs: _i,
-  agent: _a,
+  agent,
   forkSession: _f,
   state,
   definition,
@@ -83,6 +83,7 @@ const summary = ({
   ...run
 }: RunFile): RunSummary => ({
   ...run,
+  ...(agent && Object.keys(agent).length && { agent }),
   usage: state?.usage ?? null,
   path: runPath({ ...run, definition, state, prompts }),
 });

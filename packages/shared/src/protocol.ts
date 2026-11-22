@@ -377,6 +377,8 @@ export const RunSummarySchema = Type.Object({
   path: Type.Array(StepMarkSchema),
   /** Task da cui questo continua, se c'è. */
   from: Type.Optional(Id),
+  /** Ragionamento e modello scelti all'avvio (task e progetto); assente se nessuno. */
+  agent: Type.Optional(AgentChoiceSchema),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });
