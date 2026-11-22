@@ -8,6 +8,7 @@ import { run } from '../spawn.js';
 import { durableTurn } from '../turn.js';
 import type { Host } from './engine.js';
 import { hostFunctions } from './host-functions.js';
+import { localPackage } from './policy.js';
 
 export interface NodeHostOptions {
   /** Cartella di lavoro predefinita (per WF2 la cartella del progetto). */
@@ -50,6 +51,7 @@ export function createNodeHost(opts: NodeHostOptions): Host {
     exec: (argv, cwd) =>
       run(argv, { ...((cwd ?? opts.cwd) !== undefined && { cwd: cwd ?? opts.cwd }) }),
     projectPrompt: async (name, cwd) => readPrompt(cwd ?? opts.cwd ?? process.cwd(), name),
+    hasPackage: (spec, cwd) => localPackage(cwd ?? opts.cwd ?? process.cwd())(spec),
     projectCommands: async (cwd) => {
       const k = loadKnowledge(cwd ?? opts.cwd ?? process.cwd());
       if (k?.commandsError) throw new Error(k.commandsError);

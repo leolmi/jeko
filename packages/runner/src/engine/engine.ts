@@ -23,7 +23,13 @@ import {
   type UserSettings,
   type Workflow,
 } from '@jeko/shared';
-import { classifyCommand, classifyTool, gateLevel, gateStops } from './policy.js';
+import {
+  classifyCommand,
+  classifyTool,
+  gateStops,
+  policyStops,
+  type LocalCheck,
+} from './policy.js';
 
 // ---------- host: tutto ciò che il motore non fa da sé ----------
 
@@ -104,6 +110,8 @@ export interface Host {
   projectCommands?(cwd?: string): Promise<Record<string, string[]>>;
   /** Prompt del progetto (`.jeko/prompts/<nome>.md`) per i passi agent con `prompt`; null se manca. */
   projectPrompt?(name: string, cwd?: string): Promise<string | null>;
+  /** Il pacchetto npm è già installato? (`npx eslint` non è un'installazione). */
+  hasPackage?(spec: string, cwd?: string): boolean;
   functions: Functions;
   emit(event: RunEvent): void;
 }
@@ -174,8 +182,7 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
 
   /** Applica le policy a un comando: true se si può procedere. */
   const authorize = async (stepId: string, actions: PolicyAction[], command: string) => {
-    const level = gateLevel(actions, wf.policies);
-    if (!level || !gateStops(level, mode)) return true;
+    if (!policyStops(actions, wf.policies, mode)) return true;
     const { approved } = await host.approve({
       stepId,
       message: `Il passo vuole eseguire: ${command}`,
@@ -185,6 +192,9 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
     emit({ type: 'policy.gate', stepId, actions, command, approved });
     return approved;
   };
+
+  const local = (cwd?: string): LocalCheck | undefined =>
+    host.hasPackage && ((spec) => host.hasPackage!(spec, cwd));
 
   const finish = (status: RunStatus, error?: string): RunOutcome => {
     emit({ type: 'run.finished', status, ...(error !== undefined && { error }) });
@@ -336,7 +346,7 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
           : opts.forkSession !== undefined && { sessionId: opts.forkSession, fork: true }),
         gates: { policies: wf.policies ?? [], mode },
         authorize: async (tool, input) => {
-          const { actions, command } = classifyTool(tool, input);
+          const { actions, command } = classifyTool(tool, input, local(cwd));
           return authorize(step.id, actions, command);
         },
         // In headless la run si ferma solo ai gate `always`: claude decide da sé.
@@ -437,7 +447,7 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
     for (const cmd of step.exec ?? []) argvs.push(cmd.map(render));
     for (const argv of argvs) {
       const line = argv.join(' ');
-      if (!(await authorize(step.id, classifyCommand(line), line))) {
+      if (!(await authorize(step.id, classifyCommand(line, local(cwd)), line))) {
         throw new Stop('rejected', `Comando non approvato: ${line}`);
       }
       const res = await host.exec(argv, cwd);

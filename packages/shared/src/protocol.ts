@@ -11,8 +11,13 @@ import {
 } from './contract.js';
 import { StepMarkSchema, type StepMark } from './workflow/path.js';
 import { AgentChoiceSchema } from './workflow/schema.js';
-import { AgentUsageSchema, RunEventSchema, RunModeSchema, RunStateSchema } from './workflow/run.js';
-import { PolicyActionSchema, WorkflowKindSchema, WorkflowSchema } from './workflow/schema.js';
+import { AgentUsageSchema, RunEventSchema, RunStateSchema } from './workflow/run.js';
+import {
+  PolicyActionSchema,
+  RunModeSchema,
+  WorkflowKindSchema,
+  WorkflowSchema,
+} from './workflow/schema.js';
 
 // ---------- richieste all'utente durante una run ----------
 

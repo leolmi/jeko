@@ -1,5 +1,5 @@
 import type { Policy, RunMode } from '@jeko/shared';
-import { classifyTool, gateLevel, gateStops } from '../engine/policy.js';
+import { classifyTool, localPackage, policyStops } from '../engine/policy.js';
 import { ASK_TOOL, ENV, START_PROCESS_TOOL } from './protocol.js';
 
 /** Ciò che l'hook di un turno sa del workflow: arriva nella variabile JEKO_POLICY. */
@@ -9,6 +9,8 @@ export interface HookPolicy {
 }
 
 export interface HookInput {
+  /** Cartella di lavoro di claude. */
+  cwd?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
 }
@@ -39,9 +41,9 @@ export function hookDecision(input: HookInput, policy: HookPolicy): HookDecision
   if (input.tool_input?.['run_in_background'] === true)
     return { decision: 'deny', reason: NO_BACKGROUND };
   if (tool === ASK_TOOL) return { decision: 'ask', reason: "domanda per l'utente" };
-  const { actions, command } = classifyTool(tool, input.tool_input ?? {});
-  const level = gateLevel(actions, policy.policies);
-  if (!level || !gateStops(level, policy.mode)) return null;
+  const local = localPackage(input.cwd ?? process.cwd());
+  const { actions, command } = classifyTool(tool, input.tool_input ?? {}, local);
+  if (!policyStops(actions, policy.policies, policy.mode)) return null;
   return { decision: 'ask', reason: `${actions.join(', ')}: ${command}` };
 }
 

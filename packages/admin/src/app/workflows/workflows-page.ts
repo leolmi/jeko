@@ -13,7 +13,9 @@ import {
 } from '@angular/core';
 import {
   formatIssue,
+  setPolicies,
   type Issue,
+  type Policy,
   type Workflow,
   type WorkflowCheck,
   type WorkflowProposal,
@@ -153,7 +155,12 @@ const CHECK_DELAY_MS = 300;
             </div>
             <div class="min-h-0 overflow-y-auto">
               @if (proposedWorkflow(); as w) {
-                <jk-workflow-preview [workflow]="w" />
+                <jk-workflow-preview
+                  [workflow]="w"
+                  [editable]="true"
+                  [locked]="issues().length > 0"
+                  (policiesChange)="setPolicies($event)"
+                />
               }
             </div>
           </div>
@@ -261,7 +268,12 @@ const CHECK_DELAY_MS = 300;
                 @if (issues().length) {
                   <p class="mb-2 text-xs text-faint">{{ i18n.t('wf.previewStale') }}</p>
                 }
-                <jk-workflow-preview [workflow]="w" />
+                <jk-workflow-preview
+                  [workflow]="w"
+                  [editable]="true"
+                  [locked]="issues().length > 0"
+                  (policiesChange)="setPolicies($event)"
+                />
               }
             </div>
           </div>
@@ -463,6 +475,11 @@ export class WorkflowsPage {
       if (key !== NEW && yaml === this.base()) delete next[key];
       return next;
     });
+  }
+
+  /** Le spunte delle policy riscrivono solo quella parte dello YAML. */
+  protected setPolicies(policies: Policy[]): void {
+    this.setText(setPolicies(this.text(), policies));
   }
 
   protected discard(): void {

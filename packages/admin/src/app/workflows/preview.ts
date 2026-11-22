@@ -1,5 +1,24 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import type { Step, StepType, Workflow } from '@jeko/shared';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  linkedSignal,
+  output,
+} from '@angular/core';
+import {
+  matrixPolicies,
+  POLICY_ACTIONS,
+  policyMatrix,
+  RUN_MODES,
+  type Policy,
+  type PolicyAction,
+  type RunMode,
+  type Step,
+  type StepType,
+  type Workflow,
+} from '@jeko/shared';
 import { I18n, type I18nKey } from '../core/i18n';
 import { Icon, type IconName } from '../ui/icon';
 
@@ -67,18 +86,52 @@ function detail(s: Step): string {
       </ul>
     }
 
-    @if (wf.policies?.length) {
+    @if (editable() || wf.policies?.length) {
       <p class="jk-label mt-4">{{ i18n.t('wf.policies') }}</p>
-      <div class="mt-1 flex flex-wrap gap-1.5">
-        @for (p of wf.policies; track $index) {
-          <span
-            class="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 font-mono text-xs text-amber-700 dark:text-amber-400"
-          >
-            <jk-icon name="shield" [size]="12" />
-            {{ matchOf(p.match) }} · {{ i18n.t(gateLabel(p.gate)) }}
-          </span>
-        }
-      </div>
+      <p class="text-xs text-faint">
+        {{ i18n.t(locked() ? 'wf.policies.locked' : 'wf.policies.hint') }}
+      </p>
+      <table class="mt-1.5 text-xs">
+        <thead>
+          <tr class="text-faint">
+            <th></th>
+            @for (m of modes; track m) {
+              <th class="px-2 pb-1 text-center font-normal">{{ i18n.t(modeLabel(m)) }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (a of actions; track a) {
+            <tr>
+              <td class="pr-3">
+                <span class="inline-flex items-center gap-1.5">
+                  <jk-icon
+                    name="shield"
+                    [size]="13"
+                    [class]="
+                      matrix()[a].length ? 'text-amber-600 dark:text-amber-400' : 'text-faint'
+                    "
+                  />
+                  {{ i18n.t(actionLabel(a)) }}
+                  <span class="font-mono text-faint">{{ a }}</span>
+                </span>
+              </td>
+              @for (m of modes; track m) {
+                <td class="px-2 py-0.5 text-center">
+                  <input
+                    type="checkbox"
+                    class="size-4 accent-accent align-middle"
+                    [attr.aria-label]="i18n.t(actionLabel(a)) + ' · ' + i18n.t(modeLabel(m))"
+                    [checked]="matrix()[a].includes(m)"
+                    [disabled]="!editable() || locked()"
+                    (change)="toggle(a, m, $any($event.target).checked)"
+                  />
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
     }
 
     <p class="jk-label mt-4">{{ i18n.t('wf.steps') }}</p>
@@ -139,6 +192,16 @@ function detail(s: Step): string {
 export class WorkflowPreview {
   protected readonly i18n = inject(I18n);
   readonly workflow = input.required<Workflow>();
+  /** Le policy si possono cambiare con le spunte. */
+  readonly editable = input(false);
+  /** Lo YAML ha errori: le spunte riscriverebbero un testo che non si legge. */
+  readonly locked = input(false);
+  readonly policiesChange = output<Policy[]>();
+
+  protected readonly actions = POLICY_ACTIONS;
+  protected readonly modes = RUN_MODES;
+  /** Segue il workflow, ma tiene subito le spunte: la verifica dello YAML arriva dopo. */
+  protected readonly matrix = linkedSignal(() => policyMatrix(this.workflow().policies));
   protected readonly inputs = computed(() =>
     Object.entries(this.workflow().inputs ?? {}).map(([name, i]) => ({ name, ...i })),
   );
@@ -153,13 +216,20 @@ export class WorkflowPreview {
   protected tuneOf(s: Step): string {
     return s.type === 'agent' ? [s.model, s.effort].filter(Boolean).join(' · ') : '';
   }
-  protected matchOf(m: string | string[]): string {
-    return Array.isArray(m) ? m.join(', ') : m;
+  protected toggle(action: PolicyAction, mode: RunMode, on: boolean): void {
+    const m = this.matrix();
+    const modes = on ? [...m[action], mode] : m[action].filter((x) => x !== mode);
+    const next = { ...m, [action]: modes };
+    this.matrix.set(next);
+    this.policiesChange.emit(matrixPolicies(next));
+  }
+  protected actionLabel(a: PolicyAction): I18nKey {
+    return `policy.${a}`;
+  }
+  protected modeLabel(m: RunMode): I18nKey {
+    return `composer.mode.${m}`;
   }
   protected kindLabel(kind: Workflow['kind']): I18nKey {
     return `composer.kind.${kind}`;
-  }
-  protected gateLabel(level: 'always' | 'interactive'): I18nKey {
-    return `wf.gate.${level}`;
   }
 }

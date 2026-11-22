@@ -35,13 +35,31 @@ export type PolicyAction = Static<typeof PolicyActionSchema>;
 export const GateLevelSchema = Type.Union([Type.Literal('always'), Type.Literal('interactive')]);
 export type GateLevel = Static<typeof GateLevelSchema>;
 
+/**
+ * Modalità di esecuzione:
+ * - headless: si ferma solo ai gate `always` (e se manca un input obbligatorio);
+ * - checkpoint: si ferma a tutti i gate e ai passi `ask`;
+ * - interactive: come checkpoint, e dopo ogni passo `agent` chiede una revisione.
+ */
+export const RUN_MODES = ['headless', 'checkpoint', 'interactive'] as const;
+export const RunModeSchema = Type.Union([
+  Type.Literal('headless'),
+  Type.Literal('checkpoint'),
+  Type.Literal('interactive'),
+]);
+export type RunMode = Static<typeof RunModeSchema>;
+
 export const PolicySchema = Type.Object(
   {
     match: Type.Union([
       PolicyActionSchema,
       Type.Array(PolicyActionSchema, { minItems: 1, uniqueItems: true }),
     ]),
-    gate: GateLevelSchema,
+    /** `always` = tutte le modalità; `interactive` = checkpoint e interactive; o l'elenco. */
+    gate: Type.Union([
+      GateLevelSchema,
+      Type.Array(RunModeSchema, { minItems: 1, uniqueItems: true }),
+    ]),
   },
   { additionalProperties: false },
 );

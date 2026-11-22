@@ -1,18 +1,5 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { PolicyActionSchema } from './schema.js';
-
-/**
- * Modalità di esecuzione:
- * - headless: si ferma solo ai gate `always` (e se manca un input obbligatorio);
- * - checkpoint: si ferma a tutti i gate e ai passi `ask`;
- * - interactive: come checkpoint, e dopo ogni passo `agent` chiede una revisione.
- */
-export const RunModeSchema = Type.Union([
-  Type.Literal('headless'),
-  Type.Literal('checkpoint'),
-  Type.Literal('interactive'),
-]);
-export type RunMode = Static<typeof RunModeSchema>;
+import { PolicyActionSchema, RunModeSchema } from './schema.js';
 
 export const RunStatusSchema = Type.Union([
   Type.Literal('done'),
