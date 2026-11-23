@@ -541,6 +541,66 @@ pre {
   background: var(--tone-active);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
+/* Modello e impegno (come jk-agent-choice): il pulsante nella barra, il pannello sopra al testo. */
+button.agent {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 8px;
+  font: 12px/1.25 var(--font-sans);
+  color: var(--fg);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+button.agent:hover:not(:disabled) {
+  background: var(--subtle);
+}
+button.agent span {
+  color: var(--faint);
+}
+button.agent:not(:disabled)::after {
+  content: '▾';
+  color: var(--faint);
+}
+button.agent:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.agent-panel {
+  display: grid;
+  gap: 6px;
+  margin: 8px 10px 4px;
+  padding: 10px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.chips button {
+  padding: 6px 10px;
+  font: 13px/1.25 var(--font-sans);
+  color: var(--fg);
+  background: var(--subtle);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chips button small {
+  color: var(--faint);
+}
+.chips button[aria-checked='true'] {
+  background: var(--surface);
+  border-color: var(--tone-active);
+}
 .btn.send {
   margin-left: auto;
   color: #fff;

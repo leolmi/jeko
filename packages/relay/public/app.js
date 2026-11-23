@@ -61,6 +61,20 @@ function modelLabel(m) {
     ? `${cap(name)} ${nums.join('.')}`
     : m;
 }
+/** Alias dei modelli, come MODEL_ALIASES in @jeko/shared. */
+const MODEL_ALIASES = ['opus', 'sonnet', 'fable', 'haiku'];
+const effortLabel = (e) => EFFORTS[e] ?? e;
+/** Modelli da scegliere: gli alias (con la versione se è quella del predefinito) più quelli fuori elenco. */
+function modelChoices(defaultModel, ...extra) {
+  const known = defaultModel ? modelLabel(defaultModel) : '';
+  const list = MODEL_ALIASES.map((id) => ({
+    id,
+    label: known.startsWith(`${cap(id)} `) ? known : cap(id),
+  }));
+  for (const m of extra)
+    if (m && !list.some((x) => x.id === m)) list.push({ id: m, label: modelLabel(m) });
+  return list;
+}
 /** Modello e impegno con cui lavora il task (vuoto se non si sa). */
 const agentText = (r) =>
   [
@@ -85,11 +99,8 @@ function pairing() {
   const hash = new URLSearchParams(location.hash.slice(1));
   if (hash.get('c') && hash.get('d') && hash.get('k')) {
     const p = { c: hash.get('c'), d: hash.get('d'), k: hash.get('k') };
-    try {
-      localStorage.setItem(STORE, JSON.stringify(p));
-    } catch {
-      /* senza archivio: vale finché la pagina resta aperta */
-    }
+    // Senza archivio vale finché la pagina resta aperta; la chiave poi passa in IndexedDB.
+    savePairing(p);
     history.replaceState(null, '', location.pathname);
     return p;
   }
@@ -100,12 +111,58 @@ function pairing() {
   }
 }
 
+function savePairing(p) {
+  try {
+    localStorage.setItem(STORE, JSON.stringify(p));
+  } catch {
+    /* niente */
+  }
+}
+
 function forget() {
   try {
     localStorage.removeItem(STORE);
   } catch {
     /* niente */
   }
+  void keyDb('readwrite', (s) => s.delete('key')).catch(() => {});
+}
+
+// La chiave sta in IndexedDB come CryptoKey non estraibile: nemmeno uno script nella pagina può
+// leggerla. Nel localStorage restano solo canale e dispositivo.
+function keyDb(mode, fn) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(STORE, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('keys');
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      const tx = db.transaction('keys', mode);
+      const r = fn(tx.objectStore('keys'));
+      tx.oncomplete = () => (db.close(), resolve(r.result));
+      tx.onerror = tx.onabort = () => (db.close(), reject(tx.error));
+    };
+  });
+}
+
+/** Chiave del dispositivo: dal link appena aperto (e salvata), o quella salvata. */
+async function loadKey(pair) {
+  if (pair.k) {
+    const key = await importKey(pair.k);
+    try {
+      await keyDb('readwrite', (s) => s.put({ d: pair.d, key }, 'key'));
+      delete pair.k;
+      savePairing(pair);
+    } catch {
+      /* senza IndexedDB la chiave resta nel localStorage, come prima */
+    }
+    return key;
+  }
+  const saved = await keyDb('readonly', (s) => s.get('key')).catch(() => {
+    throw Object.assign(new Error('IndexedDB non disponibile'), { retry: true });
+  });
+  if (saved?.d !== pair.d || !(saved.key instanceof CryptoKey)) throw new Error('Chiave assente');
+  return saved.key;
 }
 
 function deviceName() {
@@ -147,8 +204,11 @@ const state = {
   at: null,
   view: { name: 'home' },
   detail: null,
-  /** Scelte della chat in fondo al progetto: controllo e con/senza workflow. */
-  composer: { mode: 'checkpoint', direct: false },
+  /**
+   * Scelte della chat in fondo al progetto: controllo, con/senza workflow, modello e impegno
+   * (`agent`, vuoto = quelli del progetto; si riparte da vuoto cambiando progetto) e pannello aperto.
+   */
+  composer: { mode: 'checkpoint', direct: false, agent: {}, agentOf: null, picking: false },
   error: '',
   ended: '',
 };
@@ -164,8 +224,13 @@ async function connect() {
     return render();
   }
   try {
-    state.key ??= await importKey(state.pair.k);
-  } catch {
+    state.key ??= await loadKey(state.pair);
+  } catch (e) {
+    // IndexedDB non disponibile adesso: l'abbinamento resta, si riprova ricaricando.
+    if (e.retry) {
+      state.ended = 'Non riesco a leggere la chiave salvata: ricarica la pagina.';
+      return render();
+    }
     forget();
     state.pair = null;
     return render();
@@ -429,11 +494,46 @@ function composer(project, task = null) {
         ? `Questo task è chiuso: scrivi qui per avviarne uno nuovo su ${name}.`
         : `Cosa facciamo su ${name}?`;
   const send = follow || (fork && !busy) ? 'Invia' : busy ? 'Metti in coda' : 'Avvia';
+  if (state.composer.agentOf !== project.id)
+    Object.assign(state.composer, { agent: {}, agentOf: project.id, picking: false });
+  // Continuando valgono modello e impegno del task; altrimenti la scelta, poi il progetto.
+  const chosen = follow ? {} : state.composer.agent;
+  const inherited = follow ? {} : (project.agent ?? {});
+  const model = follow ? task.model : (chosen.model ?? inherited.model);
+  const effort = follow ? task.effort : (chosen.effort ?? inherited.effort);
+  const models = modelChoices(project.defaultModel, chosen.model, inherited.model);
+  const labelOf = (m) => models.find((x) => x.id === m)?.label ?? modelLabel(m);
+  const shownModel = model
+    ? labelOf(model)
+    : project.defaultModel
+      ? modelLabel(project.defaultModel)
+      : 'Modello predefinito';
+  const fromProject = (v) => `progetto: ${v}`;
+  const option = (field, value, label, note = '') =>
+    `<button type="button" role="radio" aria-checked="${(chosen[field] ?? '') === value}" data-agent-${field}="${esc(value)}">${esc(label)}${note ? ` <small>${esc(note)}</small>` : ''}</button>`;
+  const picker =
+    state.composer.picking && !follow
+      ? `<div class="agent-panel">
+          <div class="muted">Modello</div>
+          <div class="chips" role="radiogroup" aria-label="Modello">
+            ${option('model', '', 'Predefinito', inherited.model ? fromProject(labelOf(inherited.model)) : project.defaultModel ? modelLabel(project.defaultModel) : '')}
+            ${models.map((m) => option('model', m.id, m.label)).join('')}
+          </div>
+          <div class="muted">Impegno</div>
+          <div class="chips" role="radiogroup" aria-label="Impegno">
+            ${option('effort', '', 'Predefinito', inherited.effort ? fromProject(effortLabel(inherited.effort)) : '')}
+            ${Object.keys(EFFORTS)
+              .map((e) => option('effort', e, effortLabel(e)))
+              .join('')}
+          </div>
+        </div>`
+      : '';
   return `
     <div class="composer ${tone}">
       <div class="composer-head">
         <span class="mode-badge">${icon(tone)} ${direct ? 'Richiesta libera' : 'Segui workflow'}</span>
       </div>
+      ${picker}
       <textarea id="req" data-keep rows="2" aria-label="Richiesta" placeholder="${placeholder}"></textarea>
       ${state.error ? `<p class="error">${esc(state.error)}</p>` : ''}
       <div class="composer-bar">
@@ -448,6 +548,10 @@ function composer(project, task = null) {
         <button type="button" class="switch${follow || fork ? ' invisible' : ''}" data-act="switch" aria-label="Con o senza workflow" aria-pressed="${direct}"
           title="${direct ? 'Task diretto: claude esegue la richiesta così com’è' : 'Task con workflow: piano, gate e controlli'}">
           <span class="${direct ? '' : 'on'}">${icon('plan')}</span><span class="${direct ? 'on' : ''}">${icon('direct')}</span>
+        </button>
+        <button type="button" class="agent" data-act="agent" aria-label="Modello e impegno" aria-expanded="${state.composer.picking && !follow}"
+          ${follow ? 'disabled title="Valgono quelli scelti all’avvio del task"' : 'title="Modello e impegno"'}>
+          <b>${esc(shownModel)}</b>${effort ? ` <span>${esc(effortLabel(effort))}</span>` : ''}
         </button>
         <button type="button" class="btn send" data-act="start">${icon('send')} ${send}</button>
       </div>
@@ -654,6 +758,17 @@ function onClick(e) {
     state.composer.direct = !state.composer.direct;
     return render();
   }
+  if (d.act === 'agent') {
+    state.composer.picking = !state.composer.picking;
+    return render();
+  }
+  for (const field of ['model', 'effort']) {
+    const v = d[`agent${cap(field)}`];
+    if (v === undefined) continue;
+    const { [field]: _, ...rest } = state.composer.agent;
+    state.composer.agent = v ? { ...rest, [field]: v } : rest;
+    return render();
+  }
   if (d.goProject) return go({ name: 'project', id: d.goProject });
   if (d.goTask) return go({ name: 'task', id: d.goTask });
   if (d.act === 'start')
@@ -681,8 +796,10 @@ function onClick(e) {
         cwd: p.path,
         ...((state.composer.direct || from) && { direct: true }),
         ...(from && { from }),
+        ...(Object.keys(state.composer.agent).length && { agent: state.composer.agent }),
       });
       $('req').value = '';
+      state.composer.picking = false;
       state.runs = [run, ...state.runs];
       go({ name: 'task', id: run.id });
     });

@@ -325,11 +325,13 @@ export class RemoteLink {
       t: 'state',
       confirmed: true,
       at: new Date().toISOString(),
-      projects: (projects ?? []).map(({ id, name, path, favorite }) => ({
+      projects: (projects ?? []).map(({ id, name, path, favorite, agent }) => ({
         id,
         name,
         path,
         favorite,
+        agent,
+        defaultModel: this.opts.defaultModel?.(path) ?? null,
       })),
       runs: stateRuns(runs ?? []).map((r) => this.withAgent(r)),
     };
