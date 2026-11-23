@@ -18,6 +18,7 @@ export const remoteRoutes: FastifyPluginAsyncTypebox<{
     return {
       enabled: store.enabled,
       relayUrl: store.relayUrl,
+      hasSecret: store.secret !== '',
       status: link.status,
       devices: store.publicDevices().map((d) => ({ ...d, online: online.has(d.id) })),
     };
@@ -28,7 +29,7 @@ export const remoteRoutes: FastifyPluginAsyncTypebox<{
   app.put('/api/remote', { schema: { body: RemoteConfigSchema } }, async (req, reply) => {
     if (req.body.enabled && !req.body.relayUrl)
       return reply.code(400).send({ message: 'Indirizzo del relay mancante' });
-    store.configure(req.body.enabled, req.body.relayUrl);
+    store.configure(req.body.enabled, req.body.relayUrl, req.body.secret);
     link.start();
     return info();
   });

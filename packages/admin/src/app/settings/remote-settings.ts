@@ -28,7 +28,9 @@ import { Icon } from '../ui/icon';
                 ? 'bg-emerald-500'
                 : r.status === 'off'
                   ? 'bg-line'
-                  : 'bg-amber-500'
+                  : r.status === 'rejected'
+                    ? 'bg-red-500'
+                    : 'bg-amber-500'
             "
           ></span>
           {{ statusLabel(r.status) }}
@@ -56,6 +58,27 @@ import { Icon } from '../ui/icon';
       <button class="jk-btn-primary shrink-0" type="submit" [disabled]="busy()">
         <jk-icon name="save" [size]="16" /> {{ i18n.t('remote.save') }}
       </button>
+      <div class="flex w-full items-center gap-2">
+        <input
+          class="jk-input min-w-0 flex-1 font-mono"
+          type="password"
+          autocomplete="new-password"
+          [attr.aria-label]="i18n.t('remote.secret')"
+          [placeholder]="
+            info()?.hasSecret && !clearSecret()
+              ? i18n.t('remote.secret.set')
+              : i18n.t('remote.secret.placeholder')
+          "
+          [value]="secret()"
+          (input)="secret.set($any($event.target).value); clearSecret.set(false)"
+        />
+        @if (info()?.hasSecret && !clearSecret() && !secret()) {
+          <button type="button" class="jk-btn-ghost shrink-0" (click)="clearSecret.set(true)">
+            <jk-icon name="close" [size]="16" /> {{ i18n.t('remote.secret.remove') }}
+          </button>
+        }
+      </div>
+      <p class="w-full text-xs text-faint">{{ i18n.t('remote.secret.hint') }}</p>
     </form>
     @if (error(); as e) {
       <p class="mt-2 text-xs text-red-600 dark:text-red-400">{{ e }}</p>
@@ -134,6 +157,9 @@ export class RemoteSettings {
   protected readonly info = signal<RemoteInfo | null>(null);
   protected readonly url = signal('');
   protected readonly enabled = signal(false);
+  /** Segreto nuovo da salvare; vuoto = resta quello di prima (salvo `clearSecret`). */
+  protected readonly secret = signal('');
+  protected readonly clearSecret = signal(false);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly pairing = signal<{ id: string; link: string; qr: string } | null>(null);
@@ -158,6 +184,7 @@ export class RemoteSettings {
       connecting: 'remote.status.connecting',
       online: 'remote.status.online',
       offline: 'remote.status.offline',
+      rejected: 'remote.status.rejected',
     } as const;
     return this.i18n.t(keys[s]);
   }
@@ -184,8 +211,13 @@ export class RemoteSettings {
         this.http.put<RemoteInfo>('/api/remote', {
           enabled: this.enabled(),
           relayUrl: this.url().trim().replace(/\/+$/, ''),
+          ...(this.clearSecret()
+            ? { secret: '' }
+            : this.secret().trim() && { secret: this.secret().trim() }),
         }),
       );
+      this.secret.set('');
+      this.clearSecret.set(false);
       this.set(r, true);
     });
   }

@@ -469,7 +469,8 @@ export type AdminMessage =
 
 // ---------- accesso remoto ----------
 
-export type RemoteStatus = 'off' | 'connecting' | 'online' | 'offline';
+/** `rejected`: il relay non accetta Jeko (segreto sbagliato o mancante); non si riprova da soli. */
+export type RemoteStatus = 'off' | 'connecting' | 'online' | 'offline' | 'rejected';
 
 export interface RemoteDeviceInfo {
   id: string;
@@ -487,6 +488,8 @@ export interface RemoteDeviceInfo {
 export interface RemoteInfo {
   enabled: boolean;
   relayUrl: string;
+  /** C'è un segreto del relay salvato (il valore non torna mai indietro). */
+  hasSecret: boolean;
   status: RemoteStatus;
   devices: RemoteDeviceInfo[];
 }
@@ -498,6 +501,8 @@ export const RemoteConfigSchema = Type.Object(
       Type.Literal(''),
       Type.String({ pattern: '^https?://[^\\s/?#]+(/[^\\s?#]*)?$', maxLength: 300 }),
     ]),
+    /** Segreto del relay (`RELAY_SECRET`): assente = invariato, '' = nessuno. */
+    secret: Type.Optional(Type.String({ maxLength: 200 })),
   },
   { additionalProperties: false },
 );

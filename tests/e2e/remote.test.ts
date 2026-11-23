@@ -223,3 +223,33 @@ describe('accesso remoto: Jeko ↔ relay ↔ dispositivo', () => {
     expect(await until(() => code)).toBe(4401);
   });
 });
+
+describe('relay con segreto (RELAY_SECRET)', () => {
+  it('apre il canale solo con il segreto, che non torna indietro', async () => {
+    const relay = await buildRelay({
+      dataDir: mkdtempSync(join(tmpdir(), 'jeko-relay-')),
+      secret: 'segreto-del-relay',
+    });
+    await relay.listen({ host: '127.0.0.1', port: 0 });
+    const relayUrl = `http://127.0.0.1:${(relay.server.address() as AddressInfo).port}`;
+    const app = await buildApp({ dataDir: mkdtempSync(join(tmpdir(), 'jeko-remote-')) });
+    const put = async (body: object) =>
+      (await app.inject({ method: 'PUT', url: '/api/remote', payload: body })).json<RemoteInfo>();
+    try {
+      expect((await put({ enabled: true, relayUrl })).hasSecret).toBe(false);
+      await until(() => app.jeko.remote.status === 'rejected');
+
+      const info = await put({ enabled: true, relayUrl, secret: 'segreto-del-relay' });
+      expect(info.hasSecret).toBe(true);
+      expect(JSON.stringify(info)).not.toContain('segreto-del-relay');
+      await until(() => app.jeko.remote.status === 'online');
+
+      // Senza `secret` resta quello salvato; '' lo toglie.
+      expect((await put({ enabled: true, relayUrl })).hasSecret).toBe(true);
+      expect((await put({ enabled: false, relayUrl, secret: '' })).hasSecret).toBe(false);
+    } finally {
+      await app.close();
+      await relay.close();
+    }
+  });
+});

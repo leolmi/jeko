@@ -131,14 +131,24 @@ export class RemoteLink {
     this.socket = socket;
     this.setStatus('connecting');
     socket.onopen = () =>
-      socket.send(JSON.stringify({ relay: 'auth', token: this.opts.store.token }));
+      socket.send(
+        JSON.stringify({
+          relay: 'auth',
+          token: this.opts.store.token,
+          ...(this.opts.store.secret && { secret: this.opts.store.secret }),
+        }),
+      );
     socket.onmessage = (e) => void this.onFrame(String(e.data));
     socket.onclose = (e) => {
       if (this.socket !== socket) return;
       this.socket = null;
       this.online.clear();
+      // Rifiutato: riprovare non serve finché non cambiano segreto o relay (start()).
+      if (e.code === 4401) {
+        this.opts.log.warn('relay: accesso rifiutato (segreto o token)');
+        return this.setStatus('rejected');
+      }
       this.setStatus('offline');
-      if (e.code === 4401) this.opts.log.warn('relay: canale rifiutato (token)');
       this.retry = setTimeout(() => this.connect(), this.backoff);
       this.backoff = Math.min(this.backoff * 2, 30_000);
     };

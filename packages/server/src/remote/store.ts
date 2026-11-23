@@ -20,6 +20,8 @@ export interface RemoteDevice {
 interface RemoteFile {
   enabled: boolean;
   relayUrl: string;
+  /** Segreto del relay (`RELAY_SECRET`) per aprire il canale la prima volta; '' = nessuno. */
+  secret?: string;
   /** Canale sul relay e token che lo apre: si generano una volta. */
   channel: string;
   token: string;
@@ -51,6 +53,9 @@ export class RemoteStore {
   get relayUrl(): string {
     return this.data.relayUrl;
   }
+  get secret(): string {
+    return this.data.secret ?? '';
+  }
   get channel(): string {
     return this.data.channel;
   }
@@ -58,8 +63,14 @@ export class RemoteStore {
     return this.data.token;
   }
 
-  configure(enabled: boolean, relayUrl: string): void {
-    this.data = { ...this.data, enabled, relayUrl: relayUrl.trim().replace(/\/+$/, '') };
+  /** `secret` assente: resta quello di prima. */
+  configure(enabled: boolean, relayUrl: string, secret?: string): void {
+    this.data = {
+      ...this.data,
+      enabled,
+      relayUrl: relayUrl.trim().replace(/\/+$/, ''),
+      ...(secret !== undefined && { secret: secret.trim() }),
+    };
     this.save();
   }
 
