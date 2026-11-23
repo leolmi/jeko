@@ -1,6 +1,6 @@
 {
   "name": "@jeko/relay",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "private": true,
   "type": "module",
   "description": "Relay di Jeko: ponte cifrato tra Jeko e i dispositivi remoti",
