@@ -1,0 +1,22 @@
+{
+  "name": "@jeko/relay",
+  "version": "0.1.13",
+  "private": true,
+  "type": "module",
+  "description": "Relay di Jeko: ponte cifrato tra Jeko e i dispositivi remoti",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/relay.ts",
+    "dev": "node --watch src/relay.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^11.3.7",
+    "fastify": "^5.12.8"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
+  }
+}

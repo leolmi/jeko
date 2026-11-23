@@ -8,6 +8,7 @@ import { ProjectStore } from './projects/store.js';
 import { TemplateStore, type TemplateFile } from './projects/templates.js';
 import { appRoutes, type AppControl } from './routes/app.js';
 import { projectRoutes } from './routes/projects.js';
+import { remoteRoutes } from './routes/remote.js';
 import { runRoutes } from './routes/runs.js';
 import { settingsRoutes } from './routes/settings.js';
 import { setupRoutes } from './routes/setup.js';
@@ -15,6 +16,8 @@ import { staticRoutes } from './routes/static.js';
 import { statsRoutes } from './routes/stats.js';
 import { templateRoutes } from './routes/templates.js';
 import { workflowRoutes } from './routes/workflows.js';
+import { RemoteLink } from './remote/link.js';
+import { RemoteStore } from './remote/store.js';
 import { RunnerHub } from './runs/hub.js';
 import { RunStore } from './runs/store.js';
 import { ClaudeModelStore } from './settings/claude-models.js';
@@ -37,7 +40,9 @@ export interface AppOptions {
 /** Origini ammesse: solo pagine servite dal PC stesso (l'app, `ng serve`). */
 const LOCAL_ORIGIN = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/;
 
-export type JekoApp = FastifyInstance & { jeko: { hub: RunnerHub; runs: RunStore } };
+export type JekoApp = FastifyInstance & {
+  jeko: { hub: RunnerHub; runs: RunStore; remote: RemoteLink };
+};
 
 export async function buildApp({
   dataDir,
@@ -93,9 +98,28 @@ export async function buildApp({
   await app.register(settingsRoutes, { settings });
   await app.register(appRoutes, { control, runs, version: VERSION });
 
+  // Accesso remoto: le richieste dei dispositivi passano di qui (`inject`), solo quelle ammesse.
+  const remoteStore = new RemoteStore(dataDir);
+  const remote = new RemoteLink({
+    store: remoteStore,
+    inject: async (req) => {
+      const res = await app.inject({
+        method: req.method as 'GET',
+        url: req.url,
+        ...(req.payload !== undefined && { payload: req.payload as object }),
+      });
+      return { status: res.statusCode, body: res.body };
+    },
+    subscribe: (fn) => hub.onBroadcast(fn),
+    changed: () => hub.remoteChanged(),
+    log: { info: (m) => app.log.info(m), warn: (m) => app.log.warn(m) },
+  });
+  await app.register(remoteRoutes, { store: remoteStore, link: remote, hub });
+  app.addHook('onClose', async () => remote.stop());
+
   app.get('/ws/admin', { websocket: true }, (socket) => hub.attachAdmin(socket));
 
   if (adminDir) await app.register(staticRoutes, { root: adminDir });
 
-  return Object.assign(app, { jeko: { hub, runs } }) as unknown as JekoApp;
+  return Object.assign(app, { jeko: { hub, runs, remote } }) as unknown as JekoApp;
 }

@@ -61,6 +61,7 @@ export class RunnerHub {
   /** Ultime verifiche dell'ambiente ricevute dal runner collegato. */
   private checks: { list: Check[]; at: string } | null = null;
   private readonly admins = new Set<WebSocket>();
+  private readonly listeners = new Set<(msg: AdminMessage) => void>();
   private pumping: Promise<void> = Promise.resolve();
   /** Richieste al runner (dialogo della cartella, assistenza) in attesa della risposta. */
   private readonly requests = new Map<
@@ -463,7 +464,18 @@ export class RunnerHub {
     if (ids.length) this.broadcast({ type: 'runs.removed', ids });
   }
 
+  /** Chi riceve anche i messaggi per le pagine admin (es. l'accesso remoto). */
+  onBroadcast(fn: (msg: AdminMessage) => void): void {
+    this.listeners.add(fn);
+  }
+
+  /** Accesso remoto cambiato (dispositivi, collegamento): le pagine admin lo rileggono. */
+  remoteChanged(): void {
+    this.broadcast({ type: 'remote' });
+  }
+
   private broadcast(msg: AdminMessage): void {
     for (const s of this.admins) this.sendTo(s, msg);
+    for (const fn of this.listeners) fn(msg);
   }
 }

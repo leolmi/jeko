@@ -42,6 +42,33 @@ export default tseslint.config(
     languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
   },
   {
+    // Pagina remota servita dal relay: gira nel browser (e seal.js anche nei test in Node).
+    files: ['packages/relay/public/**/*.js'],
+    languageOptions: {
+      globals: Object.fromEntries(
+        [
+          'atob',
+          'btoa',
+          'confirm',
+          'crypto',
+          'document',
+          'history',
+          'localStorage',
+          'location',
+          'navigator',
+          'scrollTo',
+          'addEventListener',
+          'setTimeout',
+          'clearTimeout',
+          'TextDecoder',
+          'TextEncoder',
+          'URLSearchParams',
+          'WebSocket',
+        ].map((g) => [g, 'readonly']),
+      ),
+    },
+  },
+  {
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',

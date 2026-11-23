@@ -5,11 +5,12 @@ import { Setup } from '../core/setup';
 import { Icon } from '../ui/icon';
 import { UserSettings } from '../ui/user-settings';
 import { FormatSettings } from './format-settings';
+import { RemoteSettings } from './remote-settings';
 
 /** Pagina Opzioni: le opzioni dell'utente, modificabili in ogni momento. */
 @Component({
   selector: 'jk-settings-page',
-  imports: [UserSettings, FormatSettings, Icon],
+  imports: [UserSettings, FormatSettings, RemoteSettings, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
   template: `
@@ -19,6 +20,8 @@ import { FormatSettings } from './format-settings';
       <div class="mt-8"><jk-user-settings /></div>
 
       <jk-format-settings class="mt-8" />
+
+      <jk-remote-settings class="mt-4" />
 
       <section class="mt-8 rounded-xl border border-line bg-surface p-4">
         <div class="flex items-center gap-3">

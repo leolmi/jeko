@@ -463,7 +463,45 @@ export type AdminMessage =
   /** Task conclusi eliminati dall'utente. */
   | { type: 'runs.removed'; ids: string[] }
   /** Modelli predefiniti di claude visti nei task: per cartella e l'ultimo in assoluto. */
-  | { type: 'claude.models'; models: ClaudeModels };
+  | { type: 'claude.models'; models: ClaudeModels }
+  /** Accesso remoto cambiato: dispositivi o collegamento col relay. */
+  | { type: 'remote' };
+
+// ---------- accesso remoto ----------
+
+export type RemoteStatus = 'off' | 'connecting' | 'online' | 'offline';
+
+export interface RemoteDeviceInfo {
+  id: string;
+  name: string | null;
+  createdAt: string;
+  confirmed: boolean;
+  seenAt: string | null;
+  /** Non confermato: entro quando va aperto e confermato. */
+  expiresAt: string | null;
+  /** Pagina aperta adesso. */
+  online: boolean;
+}
+
+/** `GET /api/remote`. */
+export interface RemoteInfo {
+  enabled: boolean;
+  relayUrl: string;
+  status: RemoteStatus;
+  devices: RemoteDeviceInfo[];
+}
+
+export const RemoteConfigSchema = Type.Object(
+  {
+    enabled: Type.Boolean(),
+    relayUrl: Type.Union([
+      Type.Literal(''),
+      Type.String({ pattern: '^https?://[^\\s/?#]+(/[^\\s?#]*)?$', maxLength: 300 }),
+    ]),
+  },
+  { additionalProperties: false },
+);
+export type RemoteConfig = Static<typeof RemoteConfigSchema>;
 
 /** Modello predefinito di claude per cartella (`folderKey`), e l'ultimo visto. */
 export interface ClaudeModels {

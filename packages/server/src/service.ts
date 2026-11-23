@@ -198,6 +198,8 @@ export async function runService({ desktop }: { desktop: boolean }): Promise<voi
     log: { info: log('info'), warn: log('warn'), error: log('error') },
   });
 
+  app.jeko.remote.start();
+
   let closing = false;
   shutdown = async () => {
     if (closing) return;
@@ -212,7 +214,8 @@ export async function runService({ desktop }: { desktop: boolean }): Promise<voi
 
   if (desktop) {
     lifecycle = new Lifecycle({
-      windows: () => app.jeko.hub.adminCount,
+      // Con dispositivi remoti confermati il servizio resta acceso, come con una finestra.
+      windows: () => app.jeko.hub.adminCount + (app.jeko.remote.keepsAlive ? 1 : 0),
       activeRuns: () => app.jeko.runs.activeCount,
       onIdle: () => void shutdown(),
     });
