@@ -11,6 +11,8 @@ lang: it
 
 Segui e gestisci i task di Jeko dal telefono (o da un altro computer), anche fuori casa. Si apre una pagina nel browser, senza app da installare. Ogni installazione di Jeko ha il suo accesso: canale, chiavi e QR si generano sul tuo PC.
 
+La pagina remota usa la lingua scelta in Jeko (italiano o inglese).
+
 ## Cosa si può fare da remoto
 
 - vedere progetti e task: in home quelli da rispondere, poi i preferiti nel loro ordine e gli altri progetti;

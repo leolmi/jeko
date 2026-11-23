@@ -2,6 +2,7 @@ import { createHash, type webcrypto } from 'node:crypto';
 import {
   folderKey,
   type AdminMessage,
+  type Lang,
   type Project,
   type RemoteStatus,
   type RunSummary,
@@ -26,6 +27,8 @@ export interface RemoteLinkOptions {
   log: { info: (m: string) => void; warn: (m: string) => void };
   /** Modello predefinito di claude nella cartella (per i task senza modello scelto). */
   defaultModel?: (cwd: string | null) => string | null;
+  /** Lingua scelta in Jeko: anche la pagina remota usa quella. */
+  lang?: () => Promise<Lang | undefined>;
   /** Indirizzo a cui collegarsi, se non è quello del QR (es. il relay su questo PC). */
   hostUrl?: () => string;
   /** Solo per i test. */
@@ -52,6 +55,12 @@ const FORWARD: Partial<Record<AdminMessage['type'], boolean>> = {
   'runs.removed': true,
   'claude.models': true,
 };
+/** Errori mandati ai dispositivi, nella lingua di Jeko. */
+const ERRORS = {
+  toConfirm: { it: 'Dispositivo da confermare sul PC', en: 'Device to be confirmed on the PC' },
+  notAllowed: { it: 'Richiesta non ammessa da remoto', en: 'Request not allowed remotely' },
+  notProject: { it: 'Cartella non di un progetto', en: 'Folder is not a project' },
+} satisfies Record<string, Record<Lang, string>>;
 const MAX_SKEW_MS = 2 * 60_000;
 const STATE_DEBOUNCE_MS = 1500;
 /** Task conclusi nello stato salvato sul relay (quelli aperti ci sono tutti). */
@@ -241,23 +250,25 @@ export class RemoteLink {
       this.opts.store.update(d, { name, seenAt: new Date().toISOString() });
       this.opts.changed();
       if (device.confirmed) await this.pushState([d]);
-      else await this.sendTo(d, { t: 'state', confirmed: false });
+      else await this.sendTo(d, { t: 'state', confirmed: false, lang: await this.lang() });
       return;
     }
     if (body.t !== 'req' || typeof body.id !== 'string') return;
     const reply = (status: number, res: unknown) =>
       this.sendTo(d, { t: 'res', id: body.id, status, body: res });
-    if (!device.confirmed) return reply(403, { message: 'Dispositivo da confermare sul PC' });
+    const error = async (status: number, key: keyof typeof ERRORS) =>
+      reply(status, { message: ERRORS[key][await this.lang()] });
+    if (!device.confirmed) return error(403, 'toConfirm');
     const method = String(body.method).toUpperCase();
     const path = String(body.path);
     if (!ALLOWED.some(([mm, re]) => mm === method && re.test(path)))
-      return reply(403, { message: 'Richiesta non ammessa da remoto' });
+      return error(403, 'notAllowed');
     // Da remoto i task si avviano solo nella cartella di un progetto.
     if (method === 'POST' && path === '/api/runs') {
       const cwd = (body.body as { cwd?: unknown } | undefined)?.cwd;
       const projects = await this.get<Project[]>('/api/projects');
       if (typeof cwd !== 'string' || !projects?.some((p) => folderKey(p.path) === folderKey(cwd)))
-        return reply(400, { message: 'Cartella non di un progetto' });
+        return error(400, 'notProject');
     }
     const res = await this.opts.inject({
       method,
@@ -282,6 +293,10 @@ export class RemoteLink {
       model: r.agent?.model ?? this.opts.defaultModel?.(r.cwd) ?? null,
       effort: r.agent?.effort ?? null,
     };
+  }
+
+  private async lang(): Promise<Lang> {
+    return (await this.opts.lang?.().catch(() => undefined)) ?? 'it';
   }
 
   private async get<T>(url: string): Promise<T | null> {
@@ -317,14 +332,16 @@ export class RemoteLink {
     if (this._status !== 'online') return;
     const devices = this.opts.store.devices().filter((dev) => !only || only.includes(dev.id));
     if (devices.length === 0) return;
-    const [projects, runs] = await Promise.all([
+    const [projects, runs, lang] = await Promise.all([
       this.get<Project[]>('/api/projects'),
       this.get<RunSummary[]>('/api/runs'),
+      this.lang(),
     ]);
     const state = {
       t: 'state',
       confirmed: true,
       at: new Date().toISOString(),
+      lang,
       projects: (projects ?? []).map(({ id, name, path, favorite, agent }) => ({
         id,
         name,
@@ -337,7 +354,8 @@ export class RemoteLink {
     };
     for (const dev of devices) {
       if (dev.confirmed) await this.sendTo(dev.id, state, true);
-      else if (this.online.has(dev.id)) await this.sendTo(dev.id, { t: 'state', confirmed: false });
+      else if (this.online.has(dev.id))
+        await this.sendTo(dev.id, { t: 'state', confirmed: false, lang });
     }
   }
 }

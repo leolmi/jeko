@@ -33,6 +33,7 @@ const CLIENT_RATE = { burst: 30, perSecond: 3 };
 const PUBLIC: Record<string, string> = {
   '/': 'index.html',
   '/app.js': 'app.js',
+  '/i18n.js': 'i18n.js',
   '/seal.js': 'seal.js',
   '/style.css': 'style.css',
   '/fonts/lato-400.woff2': 'fonts/lato-400.woff2',

@@ -10,12 +10,12 @@ description: Follow and manage Jeko tasks from your phone
 
 Follow and manage Jeko tasks from your phone (or another computer), even away from home. It opens as a page in the browser, with no app to install. Every Jeko installation has its own access: channel, keys and QR codes are generated on your PC.
 
-The remote page is currently in Italian only.
+The remote page uses the language chosen in Jeko (Italian or English).
 
 ## What you can do remotely
 
 - see projects and tasks: on the home page, the ones waiting for an answer, then your favorites in their order, then the other projects;
-- follow a task's activity: long messages are partly shown, with **Mostra tutto** (show all) to open them;
+- follow a task's activity: long messages are partly shown, with **Show all** to open them;
 - start a task from the chat at the bottom of the page, as in the web app:
   - **with or without a workflow** (direct task: the Agent carries out the request as it is);
   - **Autonomous**, **Checkpoint** or **Interactive** control;

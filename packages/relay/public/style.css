@@ -401,8 +401,11 @@ pre {
 .feed .more:not(.open) p {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: var(--lines);
+  -webkit-line-clamp: 6;
   overflow: hidden;
+}
+.feed .more.lines-2:not(.open) p {
+  -webkit-line-clamp: 2;
 }
 .feed .more button.link {
   width: fit-content;

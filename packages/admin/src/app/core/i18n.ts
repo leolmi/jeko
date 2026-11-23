@@ -1,9 +1,10 @@
-import { effect, inject, Injectable, signal } from '@angular/core';
-import type { AgentUsage } from '@jeko/shared';
+import { effect, inject, Injectable, signal, untracked } from '@angular/core';
+import type { AgentUsage, Lang } from '@jeko/shared';
 import { formatDate, formatDayMonth, Formats, formatTime } from './formats';
+import { Settings } from './settings';
 import { storage } from './storage';
 
-export type Lang = 'it' | 'en';
+export type { Lang } from '@jeko/shared';
 
 const it = {
   'app.tagline': 'SDLC locale',
@@ -939,11 +940,28 @@ function initialLang(): Lang {
 export class I18n {
   readonly lang = signal<Lang>(initialLang());
   readonly formats = inject(Formats);
+  private readonly settings = inject(Settings);
+  /** Ultima lingua letta dalle opzioni del server (`null`: non ancora lette). */
+  private serverLang: Lang | undefined | null = null;
 
   constructor() {
     effect(() => {
       document.documentElement.lang = this.lang();
       storage.set('lang', this.lang());
+    });
+    // La lingua sta anche nelle opzioni del server, per la pagina remota: quella del server vale
+    // quando arriva o cambia; una scelta fatta qui la aggiorna.
+    effect(() => {
+      const s = this.settings.value();
+      const lang = this.lang();
+      if (!s) return;
+      untracked(() => {
+        if (s.lang !== this.serverLang) {
+          this.serverLang = s.lang;
+          if (s.lang && s.lang !== lang) return this.lang.set(s.lang);
+        }
+        if (s.lang !== lang) void this.settings.save({ ...s, lang }).catch(() => undefined);
+      });
     });
   }
 

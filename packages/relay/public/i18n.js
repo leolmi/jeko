@@ -1,0 +1,237 @@
+// Testi della pagina remota in italiano e inglese: vale la lingua scelta in Jeko, che arriva con
+// lo stato; finché non arriva, l'ultima ricevuta o quella del browser.
+
+const STORE = 'jeko-remote-lang';
+
+const it = {
+  'app.title': 'Jeko remoto',
+  back: 'Indietro',
+  'status.queued': 'In coda',
+  'status.running': 'Al lavoro',
+  'status.waiting': 'In attesa',
+  'status.done': 'Completato',
+  'status.failed': 'Fallito',
+  'status.rejected': 'Respinto',
+  'status.cancelled': 'Annullato',
+  'mode.headless': 'Autonomo',
+  'mode.checkpoint': 'Checkpoint',
+  'mode.interactive': 'Interattivo',
+  'effort.low': 'Basso',
+  'effort.medium': 'Medio',
+  'effort.high': 'Alto',
+  'effort.xhigh': 'Molto alto',
+  'effort.max': 'Massimo',
+  'agent.effort': 'impegno {e}',
+  'err.https': 'Serve una pagina sicura (HTTPS) per la cifratura.',
+  'err.key': 'Non riesco a leggere la chiave salvata: ricarica la pagina.',
+  'err.lost': 'Collegamento perso',
+  'err.dropped': 'Questo dispositivo è stato scollegato da Jeko.',
+  'err.offline': 'Non collegato',
+  'err.timeout': 'Nessuna risposta da Jeko',
+  'err.status': 'Errore {n}',
+  'err.request': 'Scrivi la richiesta',
+  'err.answer': 'Serve una risposta',
+  'err.feedback': 'Scrivi cosa cambiare',
+  'project.waiting': '{n} in attesa',
+  'project.active': '{n} al lavoro',
+  'home.waiting': 'Da rispondere',
+  'home.favorites': 'Preferiti',
+  'home.projects': 'Progetti',
+  'home.empty': 'Nessun progetto.',
+  'project.empty': 'Nessun task.',
+  'project.title': 'Progetto',
+  'project.notFound': 'Progetto non trovato.',
+  'task.title': 'Task',
+  'composer.placeholder': 'Cosa facciamo su {name}?',
+  'composer.continue.placeholder': 'Continua il task su {name}…',
+  'composer.fork.placeholder':
+    'Questo task è chiuso: scrivi qui per avviarne uno nuovo su {name} che riparte da questa conversazione.',
+  'composer.closed.placeholder':
+    'Questo task è chiuso: scrivi qui per avviarne uno nuovo su {name}.',
+  'composer.continue': 'Invia',
+  'composer.enqueue': 'Metti in coda',
+  'composer.send': 'Avvia',
+  'composer.request': 'Richiesta',
+  'composer.control': 'Controllo',
+  'composer.fromTask': 'Valgono quelli scelti all’avvio del task',
+  'composer.switch': 'Con o senza workflow',
+  'composer.plan': 'Segui workflow',
+  'composer.plan.hint': 'Task con workflow: piano, gate e controlli',
+  'composer.direct': 'Richiesta libera',
+  'composer.direct.hint': 'Task diretto: claude esegue la richiesta così com’è',
+  'agent.title': 'Modello e impegno',
+  'agent.model': 'Modello',
+  'agent.effortLabel': 'Impegno',
+  'agent.default': 'Predefinito',
+  'agent.defaultModel': 'Modello predefinito',
+  'agent.fromProject': 'progetto: {v}',
+  'prompt.default': 'Predefinito: {value}',
+  'prompt.other': 'Altro…',
+  'prompt.send': 'Invia',
+  'prompt.skip': 'Salta',
+  'prompt.note': 'Nota (facoltativa)',
+  'prompt.approve': 'Approva',
+  'prompt.reject': 'Rifiuta',
+  'prompt.review': 'Revisione del risultato',
+  'prompt.feedback': 'Cosa cambiare (per chiedere modifiche)',
+  'prompt.ok': 'Va bene',
+  'prompt.changes': 'Chiedi modifiche',
+  'feed.you': 'Tu',
+  'feed.more': 'Mostra tutto',
+  'feed.less': 'Mostra meno',
+  'feed.stepFailed': 'Passo fallito',
+  'feed.end': 'Fine: {status}',
+  'task.loading': 'Carico…',
+  'task.from': 'Continua da: {request}',
+  'task.cancel': 'Annulla task',
+  'task.cancel.confirm': 'Annullare il task?',
+  'task.prompts': 'Da rispondere',
+  'task.activity': 'Attività',
+  'task.nothing': 'Ancora niente.',
+  'task.follow': 'Scrivi sotto per continuare il task',
+  'task.close': 'Chiudi il task',
+  'pair.none':
+    'Questo browser non è collegato a Jeko.<br/>Sul PC apri Opzioni → Accesso remoto → Collega un dispositivo e inquadra il QR.',
+  'pair.toConfirm':
+    'In attesa di conferma.<br/>Sul PC, in Opzioni → Accesso remoto, conferma «{name}».',
+  'pair.connecting': 'Collegamento…',
+  'status.host': 'Jeko collegato',
+  'status.hostOff': 'Jeko spento',
+  'status.dataAt': 'dati delle {at}',
+  'status.relayOff': 'Relay non raggiungibile',
+};
+
+/** @type {typeof it} */
+const en = {
+  'app.title': 'Jeko remote',
+  back: 'Back',
+  'status.queued': 'Queued',
+  'status.running': 'Running',
+  'status.waiting': 'Needs you',
+  'status.done': 'Done',
+  'status.failed': 'Failed',
+  'status.rejected': 'Rejected',
+  'status.cancelled': 'Cancelled',
+  'mode.headless': 'Autonomous',
+  'mode.checkpoint': 'Checkpoint',
+  'mode.interactive': 'Interactive',
+  'effort.low': 'Low',
+  'effort.medium': 'Medium',
+  'effort.high': 'High',
+  'effort.xhigh': 'Extra high',
+  'effort.max': 'Max',
+  'agent.effort': '{e} effort',
+  'err.https': 'A secure page (HTTPS) is needed for encryption.',
+  'err.key': 'Could not read the saved key: reload the page.',
+  'err.lost': 'Connection lost',
+  'err.dropped': 'This device was disconnected from Jeko.',
+  'err.offline': 'Not connected',
+  'err.timeout': 'No answer from Jeko',
+  'err.status': 'Error {n}',
+  'err.request': 'Write the request',
+  'err.answer': 'An answer is needed',
+  'err.feedback': 'Write what should change',
+  'project.waiting': '{n} need you',
+  'project.active': '{n} running',
+  'home.waiting': 'Needs you',
+  'home.favorites': 'Favorites',
+  'home.projects': 'Projects',
+  'home.empty': 'No projects.',
+  'project.empty': 'No tasks.',
+  'project.title': 'Project',
+  'project.notFound': 'Project not found.',
+  'task.title': 'Task',
+  'composer.placeholder': 'What are we doing on {name}?',
+  'composer.continue.placeholder': 'Continue the task on {name}…',
+  'composer.fork.placeholder':
+    'This task is closed: write here to start a new one on {name} that picks up this conversation.',
+  'composer.closed.placeholder': 'This task is closed: write here to start a new one on {name}.',
+  'composer.continue': 'Send',
+  'composer.enqueue': 'Queue',
+  'composer.send': 'Start',
+  'composer.request': 'Request',
+  'composer.control': 'Control',
+  'composer.fromTask': 'Set when the task started',
+  'composer.switch': 'With or without workflow',
+  'composer.plan': 'Follow workflow',
+  'composer.plan.hint': 'Workflow task: plan, gates and checks',
+  'composer.direct': 'Free request',
+  'composer.direct.hint': 'Direct task: claude runs the request as is',
+  'agent.title': 'Model and effort',
+  'agent.model': 'Model',
+  'agent.effortLabel': 'Effort',
+  'agent.default': 'Default',
+  'agent.defaultModel': 'Default model',
+  'agent.fromProject': 'project: {v}',
+  'prompt.default': 'Default: {value}',
+  'prompt.other': 'Something else…',
+  'prompt.send': 'Send',
+  'prompt.skip': 'Skip',
+  'prompt.note': 'Note (optional)',
+  'prompt.approve': 'Approve',
+  'prompt.reject': 'Reject',
+  'prompt.review': 'Review of the result',
+  'prompt.feedback': 'What should change (to request changes)',
+  'prompt.ok': 'Looks good',
+  'prompt.changes': 'Request changes',
+  'feed.you': 'You',
+  'feed.more': 'Show all',
+  'feed.less': 'Show less',
+  'feed.stepFailed': 'Step failed',
+  'feed.end': 'End: {status}',
+  'task.loading': 'Loading…',
+  'task.from': 'Continues from: {request}',
+  'task.cancel': 'Cancel task',
+  'task.cancel.confirm': 'Cancel the task?',
+  'task.prompts': 'Needs you',
+  'task.activity': 'Activity',
+  'task.nothing': 'Nothing yet.',
+  'task.follow': 'Write below to continue the task',
+  'task.close': 'Close the task',
+  'pair.none':
+    'This browser is not connected to Jeko.<br/>On the PC open Options → Remote access → Connect a device and scan the QR code.',
+  'pair.toConfirm':
+    'Waiting for confirmation.<br/>On the PC, in Options → Remote access, confirm “{name}”.',
+  'pair.connecting': 'Connecting…',
+  'status.host': 'Jeko connected',
+  'status.hostOff': 'Jeko off',
+  'status.dataAt': 'data from {at}',
+  'status.relayOff': 'Relay unreachable',
+};
+
+const DICT = { it, en };
+
+function initial() {
+  try {
+    const saved = localStorage.getItem(STORE);
+    if (saved && saved in DICT) return saved;
+  } catch {
+    /* niente */
+  }
+  return navigator.language?.toLowerCase().startsWith('it') ? 'it' : 'en';
+}
+
+let current = initial();
+document.documentElement.lang = current;
+
+export const lang = () => current;
+
+/** Cambia lingua (quella di Jeko): true se è cambiata, e la pagina va ridisegnata. */
+export function setLang(l) {
+  if (!(l in DICT) || l === current) return false;
+  current = l;
+  document.documentElement.lang = l;
+  try {
+    localStorage.setItem(STORE, l);
+  } catch {
+    /* niente */
+  }
+  return true;
+}
+
+/** Testo nella lingua attuale; i parametri non sono escapati (lo fa chi chiama, se serve). */
+export function t(key, params = {}) {
+  let text = DICT[current][key] ?? it[key] ?? key;
+  for (const [k, v] of Object.entries(params)) text = text.replaceAll(`{${k}}`, String(v));
+  return text;
+}

@@ -190,6 +190,26 @@ describe('accesso remoto: Jeko ↔ relay ↔ dispositivo', () => {
     expect(await until(() => dev.closed())).toBe(4403);
   });
 
+  it('la pagina remota riceve la lingua scelta in Jeko, anche quando cambia', async () => {
+    const pair = await api<{ id: string; link: string }>('POST', '/api/remote/devices');
+    const dev = await device(pair.body.link);
+    await dev.send({ t: 'hello', name: 'Telefono' });
+    // Senza scelta salvata: italiano, anche prima della conferma.
+    await until(() => dev.inbox.find((m) => m['confirmed'] === false && m['lang'] === 'it'));
+    await seen(dev.id);
+    expect((await dev.req('GET', '/api/projects')).body).toEqual({
+      message: 'Dispositivo da confermare sul PC',
+    });
+    await api('POST', `/api/remote/devices/${dev.id}/confirm`);
+    await until(() => dev.inbox.find((m) => m['confirmed'] === true && m['lang'] === 'it'));
+
+    expect((await api('PUT', '/api/settings', { lang: 'en' })).status).toBe(200);
+    await until(() => dev.inbox.find((m) => m['confirmed'] === true && m['lang'] === 'en'));
+    expect((await dev.req('GET', '/api/settings')).body).toEqual({
+      message: 'Request not allowed remotely',
+    });
+  });
+
   it('il relay tiene lo stato cifrato per chi si collega a Jeko spento', async () => {
     const pair = await api<{ id: string; link: string }>('POST', '/api/remote/devices');
     const first = await device(pair.body.link);

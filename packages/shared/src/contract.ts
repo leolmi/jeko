@@ -190,11 +190,16 @@ export type Formats = Static<typeof FormatsSchema>;
 export type DateFormat = NonNullable<Formats['date']>;
 export type TimeFormat = NonNullable<Formats['time']>;
 
+/** Lingua dell'interfaccia: la web-app e la pagina remota. */
+export const LangSchema = Type.Union([Type.Literal('it'), Type.Literal('en')]);
+export type Lang = Static<typeof LangSchema>;
+
 export const UserSettingsSchema = Type.Object(
   {
     /** Cartella in cui nascono i progetti nuovi (`jeko.projectsDir` nei workflow). */
     projectsDir: Type.Optional(Type.String({ minLength: 1, maxLength: 260 })),
     formats: Type.Optional(FormatsSchema),
+    lang: Type.Optional(LangSchema),
   },
   { additionalProperties: false },
 );

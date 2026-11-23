@@ -125,15 +125,21 @@ export async function buildApp({
       const key = folderKey(cwd);
       return (key && m.byFolder[key]) || m.last;
     },
+    lang: async () => (await settings.get()).lang,
   });
   await app.register(remoteRoutes, { store: remoteStore, link: remote, relay, hub });
   app.addHook('onClose', async () => {
     remote.stop();
     await relay.stop();
   });
-  // Progetti cambiati (preferiti, nomi, eliminazioni): i dispositivi remoti li rivedono.
+  // Progetti cambiati (preferiti, nomi, eliminazioni) o opzioni (lingua): i dispositivi remoti
+  // li rivedono.
   app.addHook('onResponse', async (req, reply) => {
-    if (req.method !== 'GET' && req.url.startsWith('/api/projects') && reply.statusCode < 400)
+    if (
+      req.method !== 'GET' &&
+      (req.url.startsWith('/api/projects') || req.url === '/api/settings') &&
+      reply.statusCode < 400
+    )
       remote.refresh();
   });
 
