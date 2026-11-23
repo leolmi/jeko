@@ -2,38 +2,40 @@
 layout: default
 ---
 
-Jeko è un'app desktop per Windows che gestisce i tuoi progetti e ci lavora sopra con **Claude Code**, seguendo workflow di sviluppo che scegli tu. Tutto resta sul tuo computer: niente cloud, niente account.
+**English** · [Italiano](./it/)
 
-[Scarica l'ultima versione](https://github.com/leolmi/jeko/releases/latest)
+Jeko is a Windows desktop app that manages your projects and works on them with your **Agent** (currently Claude Code), following development workflows of your choice. Everything stays on your computer: no cloud, no account.
+
+[Download the latest version](https://github.com/leolmi/jeko/releases/latest)
 
 <video src="./jeko-demo.webm" poster="./jeko-progetti.png" controls muted playsinline style="width:100%"></video>
 
-## Cosa fa
+## What it does
 
-- **Progetti**: l'elenco dei progetti seguiti, ognuno con il suo workflow, modello e impegno di Claude.
-- **Workflow**: passi di sviluppo in YAML (agenti, controlli, gate di approvazione), versionati.
-- **Run**: Claude lavora un turno alla volta; quando serve ti fa una domanda o si ferma a un gate e aspetta.
-- **Nuovi progetti**: li crea l'AI partendo da un template, poi entrano da soli nell'elenco.
-- **Conoscenza del progetto**: in `.jeko/` di ogni progetto (descrizione, comandi, note), aggiornata dai workflow.
-- **Accesso remoto**: segui e gestisci i task dal telefono, con messaggi cifrati ([come si configura](./accesso-remoto.html)).
-- **Aggiornamenti automatici** dalle release di GitHub.
+- **Projects**: the list of projects you follow, each with its own workflow and the Agent's model and effort.
+- **Workflows**: development steps in YAML (agents, checks, approval gates), versioned.
+- **Runs**: the Agent works one turn at a time; when needed it asks you a question or stops at a gate and waits.
+- **New projects**: the AI creates them from a template, then they join the list by themselves.
+- **Project knowledge**: in each project's `.jeko/` (description, commands, notes), kept up to date by the workflows.
+- **Remote access**: follow and manage tasks from your phone, with encrypted messages ([how to set it up](./remote-access.html)).
+- **Automatic updates** from GitHub releases.
 
 ![Workflow](./jeko-workflow.png)
 
-## Installazione
+## Installation
 
-1. Servono **Node ≥ 22**, **Git** e **Claude Code** nel PATH.
-2. Scarica lo zip dall'[ultima release](https://github.com/leolmi/jeko/releases/latest) ed estrailo in una cartella.
-3. Avvia `jeko.exe`. Non c'è nient'altro da installare.
+1. You need **Node ≥ 22**, **Git** and an **Agent** on the PATH (currently Claude Code).
+2. Download the zip from the [latest release](https://github.com/leolmi/jeko/releases/latest) and extract it to a folder.
+3. Run `jeko.exe`. There is nothing else to install.
 
-Le versioni successive arrivano da sole (Opzioni → Versione e aggiornamenti).
+Later versions arrive on their own (Options → Version and updates).
 
-![Statistiche](./jeko-statistiche.png)
+![Statistics](./jeko-statistiche.png)
 
-## Dati
+## Data
 
-Stanno in `%LOCALAPPDATA%\jeko\data`. Per il backup basta copiare la cartella a Jeko chiuso.
+It lives in `%LOCALAPPDATA%\jeko\data`. To back it up, just copy the folder while Jeko is closed.
 
-## Per sviluppatori
+## For developers
 
-Pacchetti, comandi e struttura sono nel [README](https://github.com/leolmi/jeko#readme).
+Packages, commands and structure are in the [README](https://github.com/leolmi/jeko#readme).

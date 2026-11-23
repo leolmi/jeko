@@ -1,7 +1,11 @@
 ---
 layout: default
 title: Accesso remoto
+description: Segui e gestisci i task di Jeko dal telefono
+lang: it
 ---
+
+[English](../remote-access.html) · **Italiano** · [Jeko](./)
 
 # Accesso remoto
 
@@ -12,12 +16,12 @@ Segui e gestisci i task di Jeko dal telefono (o da un altro computer), anche fuo
 - vedere progetti e task: in home quelli da rispondere, poi i preferiti nel loro ordine e gli altri progetti;
 - seguire l'attività di un task: i messaggi lunghi si vedono in parte, con **Mostra tutto** per aprirli;
 - avviare un task dalla chat in fondo alla pagina, come nella web-app:
-  - **con o senza workflow** (task diretto: Claude esegue la richiesta così com'è);
+  - **con o senza workflow** (task diretto: l'Agent esegue la richiesta così com'è);
   - controllo **Autonomo**, **Checkpoint** o **Interattivo**;
-  - **modello e impegno** di Claude (predefiniti: quelli del progetto);
+  - **modello e impegno** dell'Agent (predefiniti: quelli del progetto);
   - se è già al lavoro un task sullo stesso progetto, il nuovo si **mette in coda**;
 - continuare un task diretto che aspetta il seguito, o ripartire dalla conversazione di uno concluso;
-- rispondere alle domande di Claude, approvare o rifiutare i gate e le revisioni;
+- rispondere alle domande dell'Agent, approvare o rifiutare i gate e le revisioni;
 - annullare un task.
 
 Il resto (opzioni, workflow, progetti nuovi) resta sul PC.

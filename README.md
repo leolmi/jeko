@@ -1,95 +1,107 @@
 # Jeko
 
-Tool di SDLC locale e personale: app desktop per Windows ([Neutralino](https://neutralino.js.org)) con un servizio Node che lancia Claude Code.
+**English** · [Italiano](./README.it.md)
 
-**Pagina del progetto, con il video dimostrativo:** [leolmi.github.io/jeko](https://leolmi.github.io/jeko/)
+A local, personal SDLC tool: a Windows desktop app ([Neutralino](https://neutralino.js.org)) with a Node service that runs your Agent.
+
+- **Your agent, your PC.** A complete development cycle that runs entirely on your machine with your own Agent: no cloud, no account, your projects stay where they are.
+- **Always up to date, on its own.** New versions come from GitHub releases: one click and Jeko updates and restarts.
+- **Your work in your pocket, at zero cost.** Follow tasks from your phone, answer questions, approve gates and start new ones wherever you are. Just scan a QR code: messages are end-to-end encrypted and no paid server is needed.
+- **Workflows made to measure.** Plans, checks and approval gates in YAML, versioned. Or, when that's all you need, a free request and off it goes.
+- **You decide how much to let go.** Autonomous, Checkpoint or Interactive, with the Agent's model and effort chosen per project or per task.
+- **New projects in no time.** The AI creates them from a template and adds them to the list by itself.
+- **Project memory.** Each project's `.jeko/` holds its description, commands and notes, kept up to date by the workflows.
+- **Zero installation.** A portable folder and a `jeko.exe`: all you need is Node, Git and an Agent (currently Claude Code).
+
+**Project page, with the demo video:** [leolmi.github.io/jeko](https://leolmi.github.io/jeko/)
 
 [![jeko](./docs/jeko-progetti.png)](https://leolmi.github.io/jeko/)
 
-## Pacchetti
+## Packages
 
-| Pacchetto         | Contenuto                                                                                |
-| ----------------- | ---------------------------------------------------------------------------------------- |
-| `packages/shared` | Contratto e validazione (TypeBox + Ajv)                                                  |
-| `packages/server` | Servizio: API Fastify 5, dati su file, runner nello stesso processo, aggiornamenti       |
-| `packages/runner` | Motore dei workflow, server MCP e hook dei permessi, lancia `claude` una volta per turno |
-| `packages/admin`  | Web-app Angular 22 zoneless, Tailwind 4, Lato e IBM Plex Mono                            |
-| `desktop/`        | Pagina d'avvio della finestra Neutralino (`resources.neu`)                               |
+| Package           | Contents                                                                      |
+| ----------------- | ----------------------------------------------------------------------------- |
+| `packages/shared` | Contract and validation (TypeBox + Ajv)                                       |
+| `packages/server` | Service: Fastify 5 API, file-based data, in-process runner, updates           |
+| `packages/runner` | Workflow engine, MCP server and permission hooks, runs `claude` once per turn |
+| `packages/admin`  | Angular 22 zoneless web app, Tailwind 4, Lato and IBM Plex Mono               |
+| `packages/relay`  | Relay for remote access, with the remote page                                 |
+| `desktop/`        | Startup page of the Neutralino window (`resources.neu`)                       |
 
-## Requisiti
+## Requirements
 
-Node ≥ 22, Git e Claude Code nel PATH. Nient'altro da installare.
+Node ≥ 22, Git and an Agent on the PATH (currently Claude Code). Nothing else to install.
 
-## App desktop
+## Desktop app
 
-Cartella portabile (`release/jeko/`, nessuna installazione):
+Portable folder (`release/jeko/`, no installation):
 
 ```
 jeko.exe          Neutralino
-resources.neu     pagina d'avvio
-server/jeko.js    servizio: un solo file (API, runner, server MCP e hook dei permessi)
-server/admin/     web-app
-server/relay/     pagina remota, per il relay su questo PC
+resources.neu     startup page
+server/jeko.js    service: a single file (API, runner, MCP server and permission hooks)
+server/admin/     web app
+server/relay/     remote page, for the relay on this PC
 ```
 
-- `jeko.exe` avvia il servizio come estensione Neutralino (`node server/jeko.js --desktop`): si stacca dalla finestra, ascolta su `127.0.0.1:4310` e serve la web-app, che la finestra apre appena il servizio risponde.
-- Chiusa la finestra, il servizio esce quando non ha task attivi; se ce ne sono, resta acceso finché non finiscono o si fermano a una domanda o a un gate, poi esce. I task fermi riprendono al prossimo avvio. Riaprendo Jeko mentre il servizio è ancora acceso, la finestra usa quello.
-- Registro: `%LOCALAPPDATA%\jeko\logs\jeko.log`.
-- **Aggiornamenti** (Opzioni → Versione e aggiornamenti; controllo anche all'avvio e ogni 6 ore): l'ultima release GitHub di `leolmi/jeko` ha `manifest.json` e uno zip con exe, `resources.neu` e `server/`. Il servizio scarica lo zip, verifica lo SHA-256, rinomina i file attuali in `*.old`, copia i nuovi e riapre l'app. Solo senza task al lavoro e non dai sorgenti. La prima versione si installa a mano.
+- `jeko.exe` starts the service as a Neutralino extension (`node server/jeko.js --desktop`): it detaches from the window, listens on `127.0.0.1:4310` and serves the web app, which the window opens as soon as the service responds.
+- Once the window is closed, the service exits when it has no active tasks; if there are some, it stays on until they finish or stop at a question or a gate, then exits. Paused tasks resume at the next start. Reopening Jeko while the service is still running, the window uses it.
+- Log: `%LOCALAPPDATA%\jeko\logs\jeko.log`.
+- **Updates** (Options → Version and updates; also checked at startup and every 6 hours): the latest GitHub release of `leolmi/jeko` has `manifest.json` and a zip with the exe, `resources.neu` and `server/`. The service downloads the zip, checks its SHA-256, renames the current files to `*.old`, copies the new ones and restarts the app. Only with no tasks at work, and not when running from source. The first version is installed by hand.
 
-## Accesso remoto
+## Remote access
 
-Task seguiti e gestiti dal telefono attraverso un relay, con messaggi cifrati e dispositivi collegati col QR. Il relay può girare dentro Jeko ed essere esposto con Tailscale Funnel: vedi **[Accesso remoto](./docs/accesso-remoto.md)**.
+Tasks followed and managed from your phone through a relay, with encrypted messages and devices paired with a QR code. The relay can run inside Jeko and be exposed with Tailscale Funnel: see **[Remote access](./docs/remote-access.md)**.
 
-## Dati
+## Data
 
-In `%LOCALAPPDATA%\jeko\data` (o `JEKO_DATA_DIR`); per il backup basta copiare la cartella a Jeko chiuso.
+In `%LOCALAPPDATA%\jeko\data` (or `JEKO_DATA_DIR`); to back it up, just copy the folder while Jeko is closed.
 
 ```
-settings.json             opzioni dell'utente, primo avvio, workflow e template di serie già caricati
-projects.json             progetti
-templates.json            template per creare i progetti
-workflows.json            indice delle versioni dei workflow
-workflows/<nome>/<n>.yaml una versione
-runs/<id>/run.json        run con stato e richieste all'utente
-runs/<id>/events.jsonl    eventi della run
-remote.json               accesso remoto: relay, canale, dispositivi collegati
-relay/channels.json       relay su questo PC: hash dei token dei canali
+settings.json             user options, first start, built-in workflows and templates already loaded
+projects.json             projects
+templates.json            templates for creating projects
+workflows.json            index of workflow versions
+workflows/<name>/<n>.yaml one version
+runs/<id>/run.json        run with its state and questions to the user
+runs/<id>/events.jsonl    run events
+remote.json               remote access: relay, channel, paired devices
+relay/channels.json       relay on this PC: hashes of the channel tokens
 ```
 
-Il servizio tiene tutto in memoria tranne YAML ed eventi, letti quando servono; ogni scrittura è atomica (file temporaneo, fsync, rinomina). Il runner ha i suoi file in `%LOCALAPPDATA%\jeko\runner` (giornali delle run e turni di claude).
+The service keeps everything in memory except YAML and events, which are read when needed; every write is atomic (temporary file, fsync, rename). The runner keeps its own files in `%LOCALAPPDATA%\jeko\runner` (run journals and claude turns).
 
-Dalle versioni con PGlite: `npm run migrate:pglite` copia i dati da `%LOCALAPPDATA%\jeko\db` (lasciandolo com'è) a `%LOCALAPPDATA%\jeko\data`.
+From the PGlite versions: `npm run migrate:pglite` copies the data from `%LOCALAPPDATA%\jeko\db` (leaving it as it is) to `%LOCALAPPDATA%\jeko\data`.
 
-## Comandi
+## Commands
 
 ```sh
 npm install
 npm run build          # shared → admin → server (dist/jeko.js)
-npm test               # Vitest (shared, server, runner, e2e) + test di admin
+npm test               # Vitest (shared, server, runner, e2e) + admin tests
 npm run lint
 npm run format
-npm run dev:server     # servizio dai sorgenti, http://127.0.0.1:4310
-npm run dev:admin      # http://localhost:4200, /api e /ws in proxy sul servizio
-npm run dev:desktop    # finestra Neutralino (con dev:server già acceso)
-npm run package        # build + neu build + release/jeko e pacchetto di aggiornamento
-npm run release        # pubblica il pacchetto come release GitHub v<versione> (GitHub CLI)
+npm run dev:server     # service from source, http://127.0.0.1:4310
+npm run dev:admin      # http://localhost:4200, /api and /ws proxied to the service
+npm run dev:desktop    # Neutralino window (with dev:server already running)
+npm run package        # build + neu build + release/jeko and update package
+npm run release        # publishes the package as GitHub release v<version> (GitHub CLI)
 ```
 
-La versione è quella di `package.json` (da tenere uguale in `neutralino.config.json`). Variabili d'ambiente: vedi `.env.example`.
+The version is the one in `package.json` (keep it the same in `neutralino.config.json`). Environment variables: see `.env.example`.
 
-## Conoscenza del progetto (`.jeko/`)
+## Project knowledge (`.jeko/`)
 
-Alla radice di ogni progetto gestito da Jeko:
+At the root of every project managed by Jeko:
 
-- `project.md`: cos'è, stack, convenzioni;
-- `commands.yaml`: `nome: comando` senza shell (es. `test: npm test`), usati dai check con `commands: [typecheck, lint, test]`;
-- `notes/*.md`: cose imparate lavorando.
+- `project.md`: what it is, stack, conventions;
+- `commands.yaml`: `name: command` without a shell (e.g. `test: npm test`), used by checks with `commands: [typecheck, lint, test]`;
+- `notes/*.md`: things learned while working.
 
-Il runner la passa a claude nel primo turno di ogni run. La creazione di un progetto la prepara, i workflow di sviluppo la aggiornano prima della chiusura.
+The runner passes it to claude in the first turn of every run. Creating a project prepares it; the development workflows update it before closing.
 
-## Progetti e workflow
+## Projects and workflows
 
-- I workflow sono solo di sviluppo (`kind: develop`). Ogni progetto ne fissa uno nelle sue opzioni (⚙ accanto al nome), altrimenti vale il predefinito, cioè il primo per nome. Si usa sempre l'ultima versione.
-- Nei passi `agent`, `effort` (`low`…`max`) e `model` (es. `opus`) diventano `claude --effort/--model`. Esempio: `sviluppo-completo.yaml`.
-- I progetti nuovi li crea l'AI, partendo da un template, cioè un prompt già pronto con un nome, che si gestisce in "Nuovo progetto". Nel prompt valgono `{{ name }}`, `{{ dir }}` e `{{ request }}`. Al termine il progetto entra da solo nell'elenco.
+- Workflows are development-only (`kind: develop`). Each project pins one in its options (⚙ next to the name), otherwise the default applies, i.e. the first by name. The latest version is always used.
+- In `agent` steps, `effort` (`low`…`max`) and `model` (e.g. `opus`) become `claude --effort/--model`. Example: `sviluppo-completo.yaml`.
+- New projects are created by the AI, starting from a template, i.e. a ready-made prompt with a name, managed in "New project". The prompt can use `{{ name }}`, `{{ dir }}` and `{{ request }}`. When done, the project joins the list by itself.
