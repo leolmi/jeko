@@ -3,6 +3,7 @@
 //   resources.neu   pagina d'avvio della finestra
 //   server/jeko.js  servizio (bundle unico: API, runner, script dei permessi)
 //   server/admin/   web-app, servita dal servizio
+//   server/relay/   pagina remota, servita dal relay su questo PC
 // Scrive anche il pacchetto di aggiornamento pubblicato come release GitHub (npm run release):
 // release/jeko-<versione>-win-x64.zip con tutto quanto sopra e release/manifest.json.
 import { execFileSync } from 'node:child_process';
@@ -34,6 +35,7 @@ const files = [
   ['dist/jeko/resources.neu', 'resources.neu'],
   ['packages/server/dist/jeko.js', 'server/jeko.js'],
   ['packages/admin/dist/admin/browser', 'server/admin'],
+  ['packages/relay/public', 'server/relay'],
 ];
 for (const [from] of files)
   if (!existsSync(join(root, from)))

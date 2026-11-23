@@ -29,12 +29,17 @@ jeko.exe          Neutralino
 resources.neu     pagina d'avvio
 server/jeko.js    servizio: un solo file (API, runner, server MCP e hook dei permessi)
 server/admin/     web-app
+server/relay/     pagina remota, per il relay su questo PC
 ```
 
 - `jeko.exe` avvia il servizio come estensione Neutralino (`node server/jeko.js --desktop`): si stacca dalla finestra, ascolta su `127.0.0.1:4310` e serve la web-app, che la finestra apre appena il servizio risponde.
 - Chiusa la finestra, il servizio esce quando non ha task attivi; se ce ne sono, resta acceso finché non finiscono o si fermano a una domanda o a un gate, poi esce. I task fermi riprendono al prossimo avvio. Riaprendo Jeko mentre il servizio è ancora acceso, la finestra usa quello.
 - Registro: `%LOCALAPPDATA%\jeko\logs\jeko.log`.
 - **Aggiornamenti** (Opzioni → Versione e aggiornamenti; controllo anche all'avvio e ogni 6 ore): l'ultima release GitHub di `leolmi/jeko` ha `manifest.json` e uno zip con exe, `resources.neu` e `server/`. Il servizio scarica lo zip, verifica lo SHA-256, rinomina i file attuali in `*.old`, copia i nuovi e riapre l'app. Solo senza task al lavoro e non dai sorgenti. La prima versione si installa a mano.
+
+## Accesso remoto
+
+Task seguiti e gestiti dal telefono attraverso un relay, con messaggi cifrati e dispositivi collegati col QR. Il relay può girare dentro Jeko ed essere esposto con Tailscale Funnel: vedi **[Accesso remoto](./docs/accesso-remoto.md)**.
 
 ## Dati
 
@@ -48,6 +53,8 @@ workflows.json            indice delle versioni dei workflow
 workflows/<nome>/<n>.yaml una versione
 runs/<id>/run.json        run con stato e richieste all'utente
 runs/<id>/events.jsonl    eventi della run
+remote.json               accesso remoto: relay, canale, dispositivi collegati
+relay/channels.json       relay su questo PC: hash dei token dei canali
 ```
 
 Il servizio tiene tutto in memoria tranne YAML ed eventi, letti quando servono; ogni scrittura è atomica (file temporaneo, fsync, rinomina). Il runner ha i suoi file in `%LOCALAPPDATA%\jeko\runner` (giornali delle run e turni di claude).

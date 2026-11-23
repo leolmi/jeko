@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
@@ -16,6 +17,7 @@ import { staticRoutes } from './routes/static.js';
 import { statsRoutes } from './routes/stats.js';
 import { templateRoutes } from './routes/templates.js';
 import { workflowRoutes } from './routes/workflows.js';
+import { LocalRelay } from './remote/local-relay.js';
 import { RemoteLink } from './remote/link.js';
 import { RemoteStore } from './remote/store.js';
 import { RunnerHub } from './runs/hub.js';
@@ -35,13 +37,15 @@ export interface AppOptions {
   control?: AppControl | undefined;
   /** Workflow e template di serie da caricare la prima volta. */
   seed?: { workflows: string[]; templates: TemplateFile[] } | undefined;
+  /** Relay su questo PC: pagina remota da servire (nel bundle) e porta (0 nei test). */
+  relay?: { publicDir?: string | undefined; port?: number } | undefined;
 }
 
 /** Origini ammesse: solo pagine servite dal PC stesso (l'app, `ng serve`). */
 const LOCAL_ORIGIN = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/;
 
 export type JekoApp = FastifyInstance & {
-  jeko: { hub: RunnerHub; runs: RunStore; remote: RemoteLink };
+  jeko: { hub: RunnerHub; runs: RunStore; remote: RemoteLink; relay: LocalRelay };
 };
 
 export async function buildApp({
@@ -50,6 +54,7 @@ export async function buildApp({
   adminDir,
   control,
   seed,
+  relay: relayOptions,
 }: AppOptions): Promise<JekoApp> {
   const app = Fastify({ logger }).withTypeProvider<TypeBoxTypeProvider>();
 
@@ -94,8 +99,16 @@ export async function buildApp({
 
   // Accesso remoto: le richieste dei dispositivi passano di qui (`inject`), solo quelle ammesse.
   const remoteStore = new RemoteStore(dataDir);
+  const relay = new LocalRelay({
+    store: remoteStore,
+    dataDir: join(dataDir, 'relay'),
+    publicDir: relayOptions?.publicDir,
+    ...(relayOptions?.port !== undefined && { port: relayOptions.port }),
+    log: { info: (m) => app.log.info(m), warn: (m) => app.log.warn(m) },
+  });
   const remote = new RemoteLink({
     store: remoteStore,
+    hostUrl: () => (remoteStore.localRelay ? relay.url : remoteStore.relayUrl),
     inject: async (req) => {
       const res = await app.inject({
         method: req.method as 'GET',
@@ -113,8 +126,11 @@ export async function buildApp({
       return (key && m.byFolder[key]) || m.last;
     },
   });
-  await app.register(remoteRoutes, { store: remoteStore, link: remote, hub });
-  app.addHook('onClose', async () => remote.stop());
+  await app.register(remoteRoutes, { store: remoteStore, link: remote, relay, hub });
+  app.addHook('onClose', async () => {
+    remote.stop();
+    await relay.stop();
+  });
   // Progetti cambiati (preferiti, nomi, eliminazioni): i dispositivi remoti li rivedono.
   app.addHook('onResponse', async (req, reply) => {
     if (req.method !== 'GET' && req.url.startsWith('/api/projects') && reply.statusCode < 400)
@@ -125,5 +141,5 @@ export async function buildApp({
 
   if (adminDir) await app.register(staticRoutes, { root: adminDir });
 
-  return Object.assign(app, { jeko: { hub, runs, remote } }) as unknown as JekoApp;
+  return Object.assign(app, { jeko: { hub, runs, remote, relay } }) as unknown as JekoApp;
 }

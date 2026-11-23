@@ -490,6 +490,10 @@ export interface RemoteInfo {
   relayUrl: string;
   /** C'è un segreto del relay salvato (il valore non torna mai indietro). */
   hasSecret: boolean;
+  /** Relay su questo PC (avviato da Jeko su 127.0.0.1). */
+  localRelay: boolean;
+  /** Perché il relay su questo PC non è partito. */
+  localRelayError: string | null;
   status: RemoteStatus;
   devices: RemoteDeviceInfo[];
 }
@@ -503,6 +507,8 @@ export const RemoteConfigSchema = Type.Object(
     ]),
     /** Segreto del relay (`RELAY_SECRET`): assente = invariato, '' = nessuno. */
     secret: Type.Optional(Type.String({ maxLength: 200 })),
+    /** Relay su questo PC: assente = invariato. */
+    localRelay: Type.Optional(Type.Boolean()),
   },
   { additionalProperties: false },
 );

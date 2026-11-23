@@ -3,6 +3,7 @@ import { RemoteConfigSchema, type RemoteInfo } from '@jeko/shared';
 import { Type } from '@sinclair/typebox';
 import type { RunnerHub } from '../runs/hub.js';
 import type { RemoteLink } from '../remote/link.js';
+import type { LocalRelay } from '../remote/local-relay.js';
 import type { RemoteStore } from '../remote/store.js';
 
 const DeviceParams = Type.Object({ id: Type.String({ pattern: '^[A-Za-z0-9_-]{8,64}$' }) });
@@ -11,14 +12,17 @@ const DeviceParams = Type.Object({ id: Type.String({ pattern: '^[A-Za-z0-9_-]{8,
 export const remoteRoutes: FastifyPluginAsyncTypebox<{
   store: RemoteStore;
   link: RemoteLink;
+  relay: LocalRelay;
   hub: RunnerHub;
-}> = async (app, { store, link, hub }) => {
+}> = async (app, { store, link, relay, hub }) => {
   const info = (): RemoteInfo => {
     const online = new Set(link.onlineDevices);
     return {
       enabled: store.enabled,
       relayUrl: store.relayUrl,
-      hasSecret: store.secret !== '',
+      hasSecret: store.ownSecret !== '',
+      localRelay: store.localRelay,
+      localRelayError: relay.error,
       status: link.status,
       devices: store.publicDevices().map((d) => ({ ...d, online: online.has(d.id) })),
     };
@@ -29,7 +33,8 @@ export const remoteRoutes: FastifyPluginAsyncTypebox<{
   app.put('/api/remote', { schema: { body: RemoteConfigSchema } }, async (req, reply) => {
     if (req.body.enabled && !req.body.relayUrl)
       return reply.code(400).send({ message: 'Indirizzo del relay mancante' });
-    store.configure(req.body.enabled, req.body.relayUrl, req.body.secret);
+    store.configure(req.body.enabled, req.body.relayUrl, req.body.secret, req.body.localRelay);
+    await relay.sync();
     link.start();
     return info();
   });

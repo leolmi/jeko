@@ -8,8 +8,8 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "start": "node src/relay.ts",
-    "dev": "node --watch src/relay.ts",
+    "start": "node src/main.ts",
+    "dev": "node --watch src/main.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

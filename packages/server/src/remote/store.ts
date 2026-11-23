@@ -22,6 +22,9 @@ interface RemoteFile {
   relayUrl: string;
   /** Segreto del relay (`RELAY_SECRET`) per aprire il canale la prima volta; '' = nessuno. */
   secret?: string;
+  /** Relay su questo PC: Jeko lo avvia da sé, col segreto `localSecret` (generato qui). */
+  localRelay?: boolean;
+  localSecret?: string;
   /** Canale sul relay e token che lo apre: si generano una volta. */
   channel: string;
   token: string;
@@ -53,8 +56,24 @@ export class RemoteStore {
   get relayUrl(): string {
     return this.data.relayUrl;
   }
-  get secret(): string {
+  get localRelay(): boolean {
+    return this.data.localRelay === true;
+  }
+  /** Segreto scritto nelle opzioni (per un relay esterno). */
+  get ownSecret(): string {
     return this.data.secret ?? '';
+  }
+  /** Segreto con cui aprire il canale: quello del relay locale, se è quello in uso. */
+  get secret(): string {
+    return this.localRelay ? this.localSecret : this.ownSecret;
+  }
+  /** Segreto del relay locale: si genera la prima volta che serve. */
+  get localSecret(): string {
+    if (!this.data.localSecret) {
+      this.data = { ...this.data, localSecret: newId(32) };
+      this.save();
+    }
+    return this.data.localSecret!;
   }
   get channel(): string {
     return this.data.channel;
@@ -63,13 +82,14 @@ export class RemoteStore {
     return this.data.token;
   }
 
-  /** `secret` assente: resta quello di prima. */
-  configure(enabled: boolean, relayUrl: string, secret?: string): void {
+  /** `secret` o `localRelay` assenti: restano quelli di prima. */
+  configure(enabled: boolean, relayUrl: string, secret?: string, localRelay?: boolean): void {
     this.data = {
       ...this.data,
       enabled,
       relayUrl: relayUrl.trim().replace(/\/+$/, ''),
       ...(secret !== undefined && { secret: secret.trim() }),
+      ...(localRelay !== undefined && { localRelay }),
     };
     this.save();
   }

@@ -63,6 +63,11 @@ function adminDir(): string | undefined {
   return existsSync(join(dir, 'index.html')) ? dir : undefined;
 }
 
+/** Pagina remota del relay su questo PC: accanto al bundle, o `packages/relay/public`. */
+function relayPublicDir(): string {
+  return bundled ? join(here, 'relay') : join(here, '..', '..', 'relay', 'public');
+}
+
 /** Cartella dell'app (con `jeko.exe`), solo se il servizio gira dal bundle installato. */
 function appDir(): string | null {
   const dir = dirname(here);
@@ -171,7 +176,14 @@ export async function runService({ desktop }: { desktop: boolean }): Promise<voi
     if (nl) attachWindow(nl);
   }
 
-  app = await buildApp({ dataDir, logger, adminDir: adminDir(), control, seed: builtins() });
+  app = await buildApp({
+    dataDir,
+    logger,
+    adminDir: adminDir(),
+    control,
+    seed: builtins(),
+    relay: { publicDir: relayPublicDir() },
+  });
   try {
     await app.listen({ host: '127.0.0.1', port });
   } catch (e) {
@@ -198,6 +210,7 @@ export async function runService({ desktop }: { desktop: boolean }): Promise<voi
     log: { info: log('info'), warn: log('warn'), error: log('error') },
   });
 
+  await app.jeko.relay.sync();
   app.jeko.remote.start();
 
   let closing = false;

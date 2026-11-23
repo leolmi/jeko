@@ -26,6 +26,8 @@ export interface RemoteLinkOptions {
   log: { info: (m: string) => void; warn: (m: string) => void };
   /** Modello predefinito di claude nella cartella (per i task senza modello scelto). */
   defaultModel?: (cwd: string | null) => string | null;
+  /** Indirizzo a cui collegarsi, se non è quello del QR (es. il relay su questo PC). */
+  hostUrl?: () => string;
   /** Solo per i test. */
   WebSocketImpl?: typeof WebSocket;
 }
@@ -122,7 +124,7 @@ export class RemoteLink {
 
   private connect(): void {
     const Impl = this.opts.WebSocketImpl ?? WebSocket;
-    const base = this.opts.store.relayUrl.replace(/^http/, 'ws');
+    const base = (this.opts.hostUrl?.() ?? this.opts.store.relayUrl).replace(/^http/, 'ws');
     let socket: WebSocket;
     try {
       socket = new Impl(`${base}/ws/host?c=${encodeURIComponent(this.opts.store.channel)}`);

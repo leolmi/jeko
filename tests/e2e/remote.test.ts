@@ -257,3 +257,38 @@ describe('relay con segreto (RELAY_SECRET)', () => {
     }
   });
 });
+
+describe('relay su questo PC', () => {
+  it('Jeko avvia il relay da sé, col suo segreto, e lo spegne con l’accesso remoto', async () => {
+    const app = await buildApp({
+      dataDir: mkdtempSync(join(tmpdir(), 'jeko-remote-')),
+      relay: { port: 0 },
+    });
+    const put = async (body: object) =>
+      (await app.inject({ method: 'PUT', url: '/api/remote', payload: body })).json<RemoteInfo>();
+    // L'indirizzo pubblico (Funnel) va nel QR; Jeko si collega al relay sul PC.
+    const relayUrl = 'https://jeko.example.ts.net';
+    try {
+      const info = await put({ enabled: true, relayUrl, localRelay: true });
+      expect(info).toMatchObject({ localRelay: true, localRelayError: null, hasSecret: false });
+      await until(() => app.jeko.remote.status === 'online');
+      const local = app.jeko.relay.url;
+      expect((await fetch(`${local}/health`)).ok).toBe(true);
+      expect((await fetch(`${local}/`)).headers.get('content-type')).toContain('text/html');
+      const pair = await app.inject({ method: 'POST', url: '/api/remote/devices' });
+      expect(pair.json<{ link: string }>().link.startsWith(`${relayUrl}/#`)).toBe(true);
+
+      // Un altro Jeko senza segreto non apre canali nuovi sul relay locale.
+      let code: number | null = null;
+      const ws = new WebSocket(`${local.replace('http', 'ws')}/ws/host?c=altrocanale1`);
+      ws.onclose = (e) => (code = e.code);
+      ws.onopen = () => ws.send(JSON.stringify({ relay: 'auth', token: 'x'.repeat(40) }));
+      expect(await until(() => code)).toBe(4401);
+
+      await put({ enabled: false, relayUrl, localRelay: true });
+      await expect(fetch(`${local}/health`)).rejects.toThrow();
+    } finally {
+      await app.close();
+    }
+  });
+});

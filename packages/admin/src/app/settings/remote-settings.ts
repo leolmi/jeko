@@ -58,27 +58,44 @@ import { Icon } from '../ui/icon';
       <button class="jk-btn-primary shrink-0" type="submit" [disabled]="busy()">
         <jk-icon name="save" [size]="16" /> {{ i18n.t('remote.save') }}
       </button>
-      <div class="flex w-full items-center gap-2">
+      <label class="flex w-full items-center gap-2 text-sm">
         <input
-          class="jk-input min-w-0 flex-1 font-mono"
-          type="password"
-          autocomplete="new-password"
-          [attr.aria-label]="i18n.t('remote.secret')"
-          [placeholder]="
-            info()?.hasSecret && !clearSecret()
-              ? i18n.t('remote.secret.set')
-              : i18n.t('remote.secret.placeholder')
-          "
-          [value]="secret()"
-          (input)="secret.set($any($event.target).value); clearSecret.set(false)"
+          type="checkbox"
+          [checked]="localRelay()"
+          (change)="localRelay.set($any($event.target).checked)"
         />
-        @if (info()?.hasSecret && !clearSecret() && !secret()) {
-          <button type="button" class="jk-btn-ghost shrink-0" (click)="clearSecret.set(true)">
-            <jk-icon name="close" [size]="16" /> {{ i18n.t('remote.secret.remove') }}
-          </button>
+        {{ i18n.t('remote.local') }}
+      </label>
+      @if (localRelay()) {
+        <p class="w-full text-xs text-faint">{{ i18n.t('remote.local.hint') }}</p>
+        @if (info()?.localRelayError; as e) {
+          <p class="w-full text-xs text-red-600 dark:text-red-400">
+            {{ i18n.t('remote.local.error', { e }) }}
+          </p>
         }
-      </div>
-      <p class="w-full text-xs text-faint">{{ i18n.t('remote.secret.hint') }}</p>
+      } @else {
+        <div class="flex w-full items-center gap-2">
+          <input
+            class="jk-input min-w-0 flex-1 font-mono"
+            type="password"
+            autocomplete="new-password"
+            [attr.aria-label]="i18n.t('remote.secret')"
+            [placeholder]="
+              info()?.hasSecret && !clearSecret()
+                ? i18n.t('remote.secret.set')
+                : i18n.t('remote.secret.placeholder')
+            "
+            [value]="secret()"
+            (input)="secret.set($any($event.target).value); clearSecret.set(false)"
+          />
+          @if (info()?.hasSecret && !clearSecret() && !secret()) {
+            <button type="button" class="jk-btn-ghost shrink-0" (click)="clearSecret.set(true)">
+              <jk-icon name="close" [size]="16" /> {{ i18n.t('remote.secret.remove') }}
+            </button>
+          }
+        </div>
+        <p class="w-full text-xs text-faint">{{ i18n.t('remote.secret.hint') }}</p>
+      }
     </form>
     @if (error(); as e) {
       <p class="mt-2 text-xs text-red-600 dark:text-red-400">{{ e }}</p>
@@ -157,6 +174,7 @@ export class RemoteSettings {
   protected readonly info = signal<RemoteInfo | null>(null);
   protected readonly url = signal('');
   protected readonly enabled = signal(false);
+  protected readonly localRelay = signal(false);
   /** Segreto nuovo da salvare; vuoto = resta quello di prima (salvo `clearSecret`). */
   protected readonly secret = signal('');
   protected readonly clearSecret = signal(false);
@@ -199,6 +217,7 @@ export class RemoteSettings {
     if (form) {
       this.url.set(r.relayUrl);
       this.enabled.set(r.enabled);
+      this.localRelay.set(r.localRelay);
     }
     // Il dispositivo del QR si è collegato: il QR non serve più.
     const p = this.pairing();
@@ -211,6 +230,7 @@ export class RemoteSettings {
         this.http.put<RemoteInfo>('/api/remote', {
           enabled: this.enabled(),
           relayUrl: this.url().trim().replace(/\/+$/, ''),
+          localRelay: this.localRelay(),
           ...(this.clearSecret()
             ? { secret: '' }
             : this.secret().trim() && { secret: this.secret().trim() }),

@@ -366,6 +366,10 @@ const it = {
   'remote.status.online': 'Collegato al relay',
   'remote.status.offline': 'Relay non raggiungibile',
   'remote.status.rejected': 'Relay: accesso rifiutato (segreto?)',
+  'remote.local': 'Relay su questo PC',
+  'remote.local.hint':
+    'Jeko avvia il relay su 127.0.0.1:8787, col suo segreto. Rendilo raggiungibile in HTTPS all’indirizzo sopra (es. tailscale funnel --bg 8787).',
+  'remote.local.error': 'Relay su questo PC non avviato: {e}',
   'remote.secret': 'Segreto del relay',
   'remote.secret.placeholder': 'Segreto del relay (facoltativo)',
   'remote.secret.set': 'Segreto impostato: lascia vuoto per non cambiarlo',
@@ -820,6 +824,10 @@ const en: Record<I18nKey, string> = {
   'remote.status.online': 'Connected to the relay',
   'remote.status.offline': 'Relay unreachable',
   'remote.status.rejected': 'Relay: access refused (secret?)',
+  'remote.local': 'Relay on this PC',
+  'remote.local.hint':
+    'Jeko starts the relay on 127.0.0.1:8787, with its own secret. Make it reachable over HTTPS at the address above (e.g. tailscale funnel --bg 8787).',
+  'remote.local.error': 'Relay on this PC not started: {e}',
   'remote.secret': 'Relay secret',
   'remote.secret.placeholder': 'Relay secret (optional)',
   'remote.secret.set': 'Secret set: leave empty to keep it',

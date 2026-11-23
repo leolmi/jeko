@@ -14,12 +14,11 @@
  * Il canale è di chi lo usa per primo (token salvato come hash in `channels.json`); con
  * `RELAY_SECRET` impostato, solo chi lo conosce può aprirne di nuovi.
  *
- *   node src/relay.ts      (PORT=8787, HOST=0.0.0.0, RELAY_DATA=./data, RELAY_SECRET)
+ * Da solo: `node src/main.ts`; oppure dentro a Jeko (Opzioni → Accesso remoto → relay su questo PC).
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import websocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
@@ -213,16 +212,4 @@ export async function buildRelay({
   );
 
   return app;
-}
-
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const app = await buildRelay({
-    dataDir: process.env['RELAY_DATA'] ?? join(process.cwd(), 'data'),
-    secret: process.env['RELAY_SECRET'],
-    logger: true,
-  });
-  await app.listen({
-    host: process.env['HOST'] ?? '0.0.0.0',
-    port: Number(process.env['PORT'] ?? 8787),
-  });
 }

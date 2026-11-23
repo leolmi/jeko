@@ -15,6 +15,7 @@ Jeko è un'app desktop per Windows che gestisce i tuoi progetti e ci lavora sopr
 - **Run**: Claude lavora un turno alla volta; quando serve ti fa una domanda o si ferma a un gate e aspetta.
 - **Nuovi progetti**: li crea l'AI partendo da un template, poi entrano da soli nell'elenco.
 - **Conoscenza del progetto**: in `.jeko/` di ogni progetto (descrizione, comandi, note), aggiornata dai workflow.
+- **Accesso remoto**: segui e gestisci i task dal telefono, con messaggi cifrati ([come si configura](./accesso-remoto.html)).
 - **Aggiornamenti automatici** dalle release di GitHub.
 
 ![Workflow](./jeko-workflow.png)

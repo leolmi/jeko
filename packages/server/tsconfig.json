@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "noEmit": true, "types": ["node"] },
-  "include": ["src", "../runner/src"]
+  "include": ["src", "../runner/src", "../relay/src/relay.ts"]
 }
