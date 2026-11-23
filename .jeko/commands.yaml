@@ -1,0 +1,8 @@
+# Comandi dalla radice del repo
+build-shared: npm run build -w @jeko/shared   # necessario prima del typecheck dell'admin se cambia contract.ts
+typecheck: npm run typecheck
+lint: npx eslint .
+format-check: npx prettier --check .
+test: npm test          # vitest (server, shared, runner) + ng test dell'admin
+build-admin: npm run build -w @jeko/admin   # controlla anche i template (il typecheck no)
+build: npm run build
