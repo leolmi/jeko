@@ -166,8 +166,12 @@ describe('accesso remoto: Jeko ↔ relay ↔ dispositivo', () => {
       mode: 'headless',
       direct: true,
       cwd: project.path,
+      agent: { model: 'claude-opus-5-5', effort: 'high' },
     });
     expect(started.status).toBe(201);
+    // Il dettaglio dice con che modello e impegno lavora il task.
+    const detail = await dev.req('GET', `/api/runs/${(started.body as { id: string }).id}`);
+    expect(detail.body).toMatchObject({ model: 'claude-opus-5-5', effort: 'high', session: false });
 
     // Lo stesso messaggio rimandato non si esegue due volte.
     const m = await page.seal(

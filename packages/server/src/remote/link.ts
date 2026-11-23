@@ -24,6 +24,8 @@ export interface RemoteLinkOptions {
   /** Avvisa le pagine admin: dispositivi o stato del collegamento cambiati. */
   changed: () => void;
   log: { info: (m: string) => void; warn: (m: string) => void };
+  /** Modello predefinito di claude nella cartella (per i task senza modello scelto). */
+  defaultModel?: (cwd: string | null) => string | null;
   /** Solo per i test. */
   WebSocketImpl?: typeof WebSocket;
 }
@@ -46,6 +48,7 @@ const FORWARD: Partial<Record<AdminMessage['type'], boolean>> = {
   'run.event': false,
   'project.added': true,
   'runs.removed': true,
+  'claude.models': true,
 };
 const MAX_SKEW_MS = 2 * 60_000;
 const STATE_DEBOUNCE_MS = 1500;
@@ -265,8 +268,18 @@ export class RemoteLink {
     } catch {
       parsed = res.body;
     }
-    if (method === 'GET' && /^\/api\/runs\/[\w-]+$/.test(path)) parsed = trimDetail(parsed);
+    if (method === 'GET' && /^\/api\/runs\/[\w-]+$/.test(path) && res.status === 200)
+      parsed = this.withAgent(trimDetail(parsed) as RunSummary);
     await reply(res.status, parsed);
+  }
+
+  /** Modello e impegno del task: quelli scelti, o il modello predefinito di claude lì. */
+  private withAgent<T extends RunSummary>(r: T): RemoteRun<T> {
+    return {
+      ...r,
+      model: r.agent?.model ?? this.opts.defaultModel?.(r.cwd) ?? null,
+      effort: r.agent?.effort ?? null,
+    };
   }
 
   private async get<T>(url: string): Promise<T | null> {
@@ -281,6 +294,11 @@ export class RemoteLink {
       if (this.opts.store.device(d)?.confirmed) void this.sendTo(d, { t: 'event', msg });
     }
     if (updatesState) this.scheduleState();
+  }
+
+  /** Qualcosa è cambiato senza un messaggio alle pagine (es. preferiti): stato da rimandare. */
+  refresh(): void {
+    if (this._status === 'online') this.scheduleState();
   }
 
   private scheduleState(): void {
@@ -311,7 +329,7 @@ export class RemoteLink {
         path,
         favorite,
       })),
-      runs: stateRuns(runs ?? []),
+      runs: stateRuns(runs ?? []).map((r) => this.withAgent(r)),
     };
     for (const dev of devices) {
       if (dev.confirmed) await this.sendTo(dev.id, state, true);
@@ -319,6 +337,11 @@ export class RemoteLink {
     }
   }
 }
+
+type RemoteRun<T extends RunSummary = RunSummary> = T & {
+  model: string | null;
+  effort: string | null;
+};
 
 function stateRuns(runs: RunSummary[]): RunSummary[] {
   const open = runs.filter((r) => ['queued', 'running', 'waiting'].includes(r.status));
@@ -329,11 +352,19 @@ function stateRuns(runs: RunSummary[]): RunSummary[] {
   return [...open, ...final].map((r) => ({ ...r, request: r.request.slice(0, 400) }));
 }
 
-/** Dettaglio di un task alleggerito per il telefono: ultimi eventi, testi accorciati. */
+/**
+ * Dettaglio di un task alleggerito per il telefono: ultimi eventi, testi accorciati, e
+ * `session` se claude ha avuto almeno un turno (un task diretto chiuso può ripartire da lì).
+ */
 function trimDetail(detail: unknown): unknown {
   if (!detail || typeof detail !== 'object') return detail;
   const d = detail as { events?: { event: Record<string, unknown> }[] };
   if (!Array.isArray(d.events)) return detail;
+  // Gli stati non vanno al telefono: basta sapere se claude ha una sessione da cui ripartire.
+  const session = d.events.some(
+    (e) =>
+      e.event['type'] === 'state' && !!(e.event['state'] as { sessionId?: unknown })?.sessionId,
+  );
   const events = d.events
     .filter((e) => e.event['type'] !== 'state')
     .slice(-EVENTS_IN_DETAIL)
@@ -344,5 +375,5 @@ function trimDetail(detail: unknown): unknown {
           ev[k] = `${(ev[k] as string).slice(0, 4000)}…`;
       return { ...e, event: ev };
     });
-  return { ...d, events };
+  return { ...d, events, session };
 }

@@ -4,17 +4,23 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="referrer" content="no-referrer" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#151518" />
     <title>Jeko remoto</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <header class="bar">
-      <button id="back" class="icon" type="button" aria-label="Indietro" hidden>‹</button>
+      <button id="back" class="icon" type="button" aria-label="Indietro" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+        </svg>
+      </button>
       <h1 id="title">Jeko</h1>
       <span id="status" class="status" role="status"></span>
     </header>
     <main id="main"></main>
+    <footer id="dock" hidden></footer>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

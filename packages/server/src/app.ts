@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
-import { HealthSchema } from '@jeko/shared';
+import { folderKey, HealthSchema } from '@jeko/shared';
 import { SettingsFile } from './data/files.js';
 import { ProjectStore } from './projects/store.js';
 import { TemplateStore, type TemplateFile } from './projects/templates.js';
@@ -74,14 +74,8 @@ export async function buildApp({
     await workflows.seed(seed.workflows);
     await templates.seed(seed.templates);
   }
-  const hub = new RunnerHub(
-    runs,
-    workflows,
-    settings,
-    projects,
-    app.log,
-    new ClaudeModelStore(settingsFile),
-  );
+  const claudeModels = new ClaudeModelStore(settingsFile);
+  const hub = new RunnerHub(runs, workflows, settings, projects, app.log, claudeModels);
 
   // La pagina d'avvio dell'app (servita da Neutralino) aspetta il servizio leggendo qui.
   app.get('/api/health', { schema: { response: { 200: HealthSchema } } }, async (_req, reply) => {
@@ -113,9 +107,19 @@ export async function buildApp({
     subscribe: (fn) => hub.onBroadcast(fn),
     changed: () => hub.remoteChanged(),
     log: { info: (m) => app.log.info(m), warn: (m) => app.log.warn(m) },
+    defaultModel: (cwd) => {
+      const m = claudeModels.get();
+      const key = folderKey(cwd);
+      return (key && m.byFolder[key]) || m.last;
+    },
   });
   await app.register(remoteRoutes, { store: remoteStore, link: remote, hub });
   app.addHook('onClose', async () => remote.stop());
+  // Progetti cambiati (preferiti, nomi, eliminazioni): i dispositivi remoti li rivedono.
+  app.addHook('onResponse', async (req, reply) => {
+    if (req.method !== 'GET' && req.url.startsWith('/api/projects') && reply.statusCode < 400)
+      remote.refresh();
+  });
 
   app.get('/ws/admin', { websocket: true }, (socket) => hub.attachAdmin(socket));
 

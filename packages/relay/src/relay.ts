@@ -36,11 +36,16 @@ const PUBLIC: Record<string, string> = {
   '/app.js': 'app.js',
   '/seal.js': 'seal.js',
   '/style.css': 'style.css',
+  '/fonts/lato-400.woff2': 'fonts/lato-400.woff2',
+  '/fonts/lato-700.woff2': 'fonts/lato-700.woff2',
+  '/fonts/plex-mono-400.woff2': 'fonts/plex-mono-400.woff2',
+  '/fonts/plex-mono-600.woff2': 'fonts/plex-mono-600.woff2',
 };
 const TYPES: Record<string, string> = {
   html: 'text/html; charset=utf-8',
   js: 'text/javascript; charset=utf-8',
   css: 'text/css; charset=utf-8',
+  woff2: 'font/woff2',
 };
 
 interface Channel {
@@ -115,7 +120,10 @@ export async function buildRelay({
       const ext = file.split('.').pop()!;
       return reply
         .header('content-type', TYPES[ext]!)
-        .header('cache-control', 'no-cache')
+        .header(
+          'cache-control',
+          ext === 'woff2' ? 'public, max-age=31536000, immutable' : 'no-cache',
+        )
         .header('referrer-policy', 'no-referrer')
         .header(
           'content-security-policy',

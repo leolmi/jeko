@@ -3,6 +3,9 @@ import { importKey, open, seal } from './seal.js';
 
 const STORE = 'jeko-remote';
 const ACTIVE = ['queued', 'running', 'waiting'];
+/** Workflow dei task diretti e passo del loro messaggio seguente (come in @jeko/shared). */
+const DIRECT_WORKFLOW = 'diretto';
+const DIRECT_FOLLOW_UP = 'seguito';
 const STATUS = {
   queued: 'In coda',
   running: 'Al lavoro',
@@ -13,9 +16,24 @@ const STATUS = {
   cancelled: 'Annullato',
 };
 const MODES = {
-  headless: 'Senza domande',
-  checkpoint: 'Con checkpoint',
-  interactive: 'Interattiva',
+  headless: 'Autonomo',
+  checkpoint: 'Checkpoint',
+  interactive: 'Interattivo',
+};
+/** Icone della web-app (Material Icons, Apache 2.0). */
+const ICONS = {
+  plan: 'M22 11V3h-7v3H9V3H2v8h7V8h2v10h4v3h7v-8h-7v3h-2V8h2v3z',
+  direct: 'M7 2v11h3v9l7-12h-4l4-8z',
+  send: 'M2.01 21L23 12 2.01 3 2 10l15 2-15 2z',
+};
+const icon = (name) =>
+  `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}" /></svg>`;
+const EFFORTS = {
+  low: 'Basso',
+  medium: 'Medio',
+  high: 'Alto',
+  xhigh: 'Molto alto',
+  max: 'Massimo',
 };
 
 const $ = (id) => document.getElementById(id);
@@ -30,6 +48,27 @@ const folderKey = (p) =>
     .replace(/[\\/]+/g, '/')
     .replace(/\/$/, '')
     .toLowerCase();
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+/** Come nella web-app: `opus` → Opus, `claude-opus-5-5` → Opus 5.5; gli altri come sono. */
+function modelLabel(m) {
+  if (/^[a-z]+$/.test(m)) return cap(m);
+  const [name, ...nums] = m
+    .replace(/^claude-/, '')
+    .replace(/\[.*\]$/, '')
+    .split('-')
+    .filter((p) => !/^\d{8}$/.test(p));
+  return name && /^[a-z]+$/.test(name) && nums.length && nums.every((n) => /^\d+$/.test(n))
+    ? `${cap(name)} ${nums.join('.')}`
+    : m;
+}
+/** Modello e impegno con cui lavora il task (vuoto se non si sa). */
+const agentText = (r) =>
+  [
+    r.model && modelLabel(r.model),
+    r.effort && `impegno ${(EFFORTS[r.effort] ?? r.effort).toLowerCase()}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 const when = (iso) =>
   iso
     ? new Date(iso).toLocaleString(undefined, {
@@ -108,6 +147,8 @@ const state = {
   at: null,
   view: { name: 'home' },
   detail: null,
+  /** Scelte della chat in fondo al progetto: controllo e con/senza workflow. */
+  composer: { mode: 'checkpoint', direct: false },
   error: '',
   ended: '',
 };
@@ -244,6 +285,8 @@ function onEvent(msg) {
       }
       break;
     case 'run.event':
+      if (open && msg.record.event.type === 'state' && msg.record.event.state?.sessionId)
+        state.detail.session = true;
       if (open && msg.record.event.type !== 'state') {
         state.detail.events = [...state.detail.events, msg.record].slice(-150);
       }
@@ -292,7 +335,8 @@ function show(view) {
       });
   }
   render();
-  scrollTo(0, 0);
+  // Nel progetto i task più recenti sono in fondo, vicino alla chat.
+  $('main').scrollTop = view.name === 'project' ? $('main').scrollHeight : 0;
 }
 
 addEventListener('popstate', (e) => show(e.state ?? { name: 'home' }));
@@ -303,7 +347,7 @@ const projectOf = (run) => state.projects.find((p) => folderKey(p.path) === fold
 const runsOf = (project) =>
   state.runs
     .filter((r) => folderKey(r.cwd) === folderKey(project.path))
-    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
 
 function pathDots(path) {
   return `<div class="path">${(path ?? []).map((m) => `<i class="${m}"></i>`).join('')}</div>`;
@@ -314,54 +358,100 @@ function runRow(r, withProject = false) {
   return `<button class="card row" data-go-task="${esc(r.id)}">
     <div class="grow">
       <div class="clip">${esc(r.request)}</div>
-      <div class="muted clip">${project ? `${esc(project.name)} · ` : ''}${when(r.updatedAt)}</div>
+      <div class="muted clip">${[project?.name, when(r.updatedAt), agentText(r)].filter(Boolean).map(esc).join(' · ')}</div>
       ${pathDots(r.path)}
     </div>
     <span class="badge ${r.status}">${STATUS[r.status] ?? r.status}</span>
   </button>`;
 }
 
+function projectRow(p) {
+  const runs = runsOf(p);
+  const w = runs.filter((r) => r.status === 'waiting').length;
+  const a = runs.filter((r) => r.status === 'running' || r.status === 'queued').length;
+  return `<button class="card row" data-go-project="${esc(p.id)}">
+    <div class="grow"><div class="clip">${esc(p.name)}</div>
+    <div class="muted clip">${esc(p.path)}</div></div>
+    ${w ? `<span class="badge waiting">${w} in attesa</span>` : ''}
+    ${a ? `<span class="badge running">${a} al lavoro</span>` : ''}
+  </button>`;
+}
+
+/** Home: da rispondere, poi i preferiti (nel loro ordine), poi gli altri progetti per nome. */
 function viewHome() {
   const waiting = state.runs.filter((r) => r.status === 'waiting');
-  const projects = [...state.projects].sort(
-    (a, b) => (a.favorite ?? Infinity) - (b.favorite ?? Infinity) || a.name.localeCompare(b.name),
+  const favorites = state.projects
+    .filter((p) => p.favorite !== undefined)
+    .sort((a, b) => a.favorite - b.favorite);
+  const others = state.projects
+    .filter((p) => p.favorite === undefined)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const section = (title, html) => (html ? `<h2>${title}</h2>${html}` : '');
+  return (
+    section('Da rispondere', waiting.map((r) => runRow(r, true)).join('')) +
+    section('Preferiti', favorites.map(projectRow).join('')) +
+    (section('Progetti', others.map(projectRow).join('')) ||
+      (favorites.length ? '' : '<p class="empty">Nessun progetto.</p>'))
   );
-  return `
-    ${waiting.length ? `<h2>Da rispondere</h2>${waiting.map((r) => runRow(r, true)).join('')}` : ''}
-    <h2>Progetti</h2>
-    ${
-      projects
-        .map((p) => {
-          const runs = runsOf(p);
-          const w = runs.filter((r) => r.status === 'waiting').length;
-          const a = runs.filter((r) => r.status === 'running' || r.status === 'queued').length;
-          return `<button class="card row" data-go-project="${esc(p.id)}">
-            <div class="grow"><div class="clip">${p.favorite !== undefined ? '★ ' : ''}${esc(p.name)}</div>
-            <div class="muted clip">${esc(p.path)}</div></div>
-            ${w ? `<span class="badge waiting">${w} in attesa</span>` : ''}
-            ${a ? `<span class="badge running">${a} al lavoro</span>` : ''}
-          </button>`;
-        })
-        .join('') || '<p class="empty">Nessun progetto.</p>'
-    }`;
 }
 
 function viewProject(project) {
   const runs = runsOf(project);
+  return runs.map((r) => runRow(r)).join('') || '<p class="empty">Nessun task.</p>';
+}
+
+/** Task diretto aperto in attesa del messaggio seguente: la sua richiesta, o null. */
+const followUpOf = (task) =>
+  task && ACTIVE.includes(task.status)
+    ? (task.prompts.find((p) => p.status === 'pending' && p.prompt.stepId === DIRECT_FOLLOW_UP) ??
+      null)
+    : null;
+
+/**
+ * Chat in fondo, come nella web-app: un nuovo task sul progetto. Sul task aperto in pagina: se è
+ * diretto e aspetta il seguito lo continua; se è chiuso ne avvia uno nuovo, che riparte dalla sua
+ * conversazione se era diretto.
+ */
+function composer(project, task = null) {
+  const follow = followUpOf(task);
+  const closed = !!task && !ACTIVE.includes(task.status);
+  const fork = closed && task.workflow === DIRECT_WORKFLOW && !!task.session;
+  const busy = runsOf(project).some((r) => ACTIVE.includes(r.status));
+  const direct = !!follow || fork || state.composer.direct;
+  const mode = follow ? task.mode : state.composer.mode;
+  const tone = direct ? 'direct' : 'plan';
+  const name = esc(project.name);
+  const placeholder = follow
+    ? `Continua il task su ${name}…`
+    : fork
+      ? `Questo task è chiuso: scrivi qui per avviarne uno nuovo su ${name} che riparte da questa conversazione.`
+      : closed
+        ? `Questo task è chiuso: scrivi qui per avviarne uno nuovo su ${name}.`
+        : `Cosa facciamo su ${name}?`;
+  const send = follow || (fork && !busy) ? 'Invia' : busy ? 'Metti in coda' : 'Avvia';
   return `
-    <div class="card">
-      <textarea id="req" data-keep placeholder="Cosa deve fare claude?"></textarea>
-      <select id="mode" data-keep aria-label="Modalità">
-        ${Object.entries(MODES)
-          .map(([k, v]) => `<option value="${k}">${v}</option>`)
-          .join('')}
-      </select>
-      <label class="check"><input type="checkbox" id="direct" data-keep /> Richiesta libera (senza workflow)</label>
-      <div class="actions"><button class="btn primary" data-act="start">Avvia task</button></div>
+    <div class="composer ${tone}">
+      <div class="composer-head">
+        <span class="mode-badge">${icon(tone)} ${direct ? 'Richiesta libera' : 'Segui workflow'}</span>
+      </div>
+      <textarea id="req" data-keep rows="2" aria-label="Richiesta" placeholder="${placeholder}"></textarea>
       ${state.error ? `<p class="error">${esc(state.error)}</p>` : ''}
-    </div>
-    <h2>Task</h2>
-    ${runs.map((r) => runRow(r)).join('') || '<p class="empty">Nessun task.</p>'}`;
+      <div class="composer-bar">
+        <div class="seg" role="radiogroup" aria-label="Controllo"${follow ? ' aria-disabled="true" title="Valgono quelli scelti all’avvio del task"' : ''}>
+          ${Object.entries(MODES)
+            .map(
+              ([k, v]) =>
+                `<button type="button" role="radio" aria-checked="${k === mode}" data-mode="${k}"${follow ? ' disabled' : ''}>${v}</button>`,
+            )
+            .join('')}
+        </div>
+        <button type="button" class="switch${follow || fork ? ' invisible' : ''}" data-act="switch" aria-label="Con o senza workflow" aria-pressed="${direct}"
+          title="${direct ? 'Task diretto: claude esegue la richiesta così com’è' : 'Task con workflow: piano, gate e controlli'}">
+          <span class="${direct ? '' : 'on'}">${icon('plan')}</span><span class="${direct ? 'on' : ''}">${icon('direct')}</span>
+        </button>
+        <button type="button" class="btn send" data-act="start">${icon('send')} ${send}</button>
+      </div>
+    </div>`;
 }
 
 function promptCard(p) {
@@ -415,9 +505,19 @@ function promptCard(p) {
   return `<div class="card">${body}</div>`;
 }
 
-function feed(events) {
+function feed(d) {
+  // I messaggi seguenti dell'utente (task diretto) fra gli eventi, in ordine di tempo.
+  const said = d.prompts
+    .filter((p) => p.prompt.stepId === DIRECT_FOLLOW_UP && p.answer?.value)
+    .map((p) => ({ at: p.createdAt, you: p.answer.value }));
+  const items = [...d.events, ...said].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   const lines = [];
-  for (const { event: e } of events) {
+  for (const item of items) {
+    if (item.you) {
+      lines.push(`<p class="you"><b>Tu</b> ${esc(item.you)}</p>`);
+      continue;
+    }
+    const e = item.event;
     if (e.type === 'step.started' && e.title) lines.push(`<p><b>${esc(e.title)}</b></p>`);
     else if (e.type === 'agent.activity' && e.kind === 'text') lines.push(`<p>${esc(e.text)}</p>`);
     else if (e.type === 'agent.activity')
@@ -437,12 +537,18 @@ function viewTask() {
     return state.error
       ? `<p class="error">${esc(state.error)}</p>`
       : '<p class="empty">Carico…</p>';
-  const prompts = d.prompts.filter((p) => p.status === 'pending');
+  const follow = followUpOf(d);
+  const origin = d.from ? state.runs.find((r) => r.id === d.from) : null;
+  const prompts = ACTIVE.includes(d.status)
+    ? d.prompts.filter((p) => p.status === 'pending' && p.prompt.stepId !== DIRECT_FOLLOW_UP)
+    : [];
   return `
     <div class="card">
       <div class="row"><div class="grow">${esc(d.request)}</div>
       <span class="badge ${d.status}">${STATUS[d.status] ?? d.status}</span></div>
       <div class="muted">${esc(d.workflow)} · ${esc(MODES[d.mode] ?? d.mode)} · ${when(d.createdAt)}</div>
+      ${agentText(d) ? `<div class="muted">${esc(agentText(d))}</div>` : ''}
+      ${origin ? `<button class="link muted clip" data-go-task="${esc(origin.id)}">Continua da: ${esc(origin.request)}</button>` : ''}
       ${pathDots(d.path)}
       ${d.error ? `<p class="error">${esc(d.error)}</p>` : ''}
       ${ACTIVE.includes(d.status) ? `<div class="actions"><button class="btn danger" data-act="cancel">Annulla task</button></div>` : ''}
@@ -450,7 +556,13 @@ function viewTask() {
     ${state.error ? `<p class="error">${esc(state.error)}</p>` : ''}
     ${prompts.length ? `<h2>Da rispondere</h2>${prompts.map(promptCard).join('')}` : ''}
     <h2>Attività</h2>
-    <div class="card feed">${feed(d.events) || '<p class="muted">Ancora niente.</p>'}</div>`;
+    <div class="card feed">${feed(d) || '<p class="muted">Ancora niente.</p>'}</div>
+    ${
+      follow
+        ? `<div class="follow"><span>Scrivi sotto per continuare il task</span>
+            <button class="btn ghost" data-ask="${esc(follow.id)}" data-null="1">Chiudi il task</button></div>`
+        : ''
+    }`;
 }
 
 function render() {
@@ -463,6 +575,7 @@ function render() {
   const status = $('status');
   let title = 'Jeko';
   let html;
+  let dock = '';
   if (state.ended) html = `<p class="empty">${esc(state.ended)}</p>`;
   else if (!state.pair)
     html = `<p class="empty">Questo browser non è collegato a Jeko.<br/>Sul PC apri Opzioni → Accesso remoto → Collega un dispositivo e inquadra il QR.</p>`;
@@ -473,9 +586,12 @@ function render() {
     const p = state.projects.find((x) => x.id === state.view.id);
     title = p?.name ?? 'Progetto';
     html = p ? viewProject(p) : '<p class="empty">Progetto non trovato.</p>';
+    if (p) dock = composer(p);
   } else if (state.view.name === 'task') {
     title = state.detail ? (projectOf(state.detail)?.name ?? 'Task') : 'Task';
     html = viewTask();
+    const p = state.detail && projectOf(state.detail);
+    if (p) dock = composer(p, state.detail);
   } else html = viewHome();
 
   $('title').textContent = title;
@@ -488,7 +604,13 @@ function render() {
       : state.relay
         ? `Jeko spento${state.at ? ` · dati delle ${when(state.at)}` : ''}`
         : 'Relay non raggiungibile';
-  $('main').innerHTML = html;
+  const main = $('main');
+  // Se si era in fondo (task più recenti), ci si resta anche quando la lista cresce.
+  const atBottom = main.scrollHeight - main.scrollTop - main.clientHeight < 24;
+  main.innerHTML = html;
+  if (state.view.name === 'project' && atBottom) main.scrollTop = main.scrollHeight;
+  $('dock').innerHTML = dock;
+  $('dock').hidden = !dock;
 
   for (const [id, v] of Object.entries(kept)) {
     const el = document.getElementById(id);
@@ -515,28 +637,50 @@ async function answer(promptId, value) {
   const runId = state.detail.id;
   await api('POST', `/api/runs/${runId}/prompts/${promptId}`, value);
   const p = state.detail?.prompts.find((x) => x.id === promptId);
-  if (p) p.status = 'answered';
+  if (p) Object.assign(p, { status: 'answered', answer: value });
 }
 
 $('back').addEventListener('click', () => history.back());
 
-$('main').addEventListener('click', (e) => {
+function onClick(e) {
   const t = e.target.closest('button');
   if (!t) return;
   const d = t.dataset;
+  if (d.mode) {
+    state.composer.mode = d.mode;
+    return render();
+  }
+  if (d.act === 'switch') {
+    state.composer.direct = !state.composer.direct;
+    return render();
+  }
   if (d.goProject) return go({ name: 'project', id: d.goProject });
   if (d.goTask) return go({ name: 'task', id: d.goTask });
   if (d.act === 'start')
     return act(async () => {
-      const p = state.projects.find((x) => x.id === state.view.id);
+      const task = state.view.name === 'task' ? state.detail : null;
+      const p = task ? projectOf(task) : state.projects.find((x) => x.id === state.view.id);
       const request = $('req').value.trim();
       if (!request) throw new Error('Scrivi la richiesta');
       t.disabled = true;
+      // Task diretto aperto che aspetta il seguito: il messaggio lo continua.
+      const follow = followUpOf(task);
+      if (follow) {
+        await answer(follow.id, { kind: 'ask', value: request });
+        $('req').value = '';
+        return;
+      }
+      // Task diretto chiuso: il nuovo riparte dalla sua conversazione.
+      const from =
+        task && !ACTIVE.includes(task.status) && task.workflow === DIRECT_WORKFLOW && task.session
+          ? task.id
+          : null;
       const run = await api('POST', '/api/runs', {
         request,
-        mode: $('mode').value,
+        mode: state.composer.mode,
         cwd: p.path,
-        ...($('direct').checked && { direct: true }),
+        ...((state.composer.direct || from) && { direct: true }),
+        ...(from && { from }),
       });
       $('req').value = '';
       state.runs = [run, ...state.runs];
@@ -575,7 +719,9 @@ $('main').addEventListener('click', (e) => {
       if (!d.ok && !feedback) throw new Error('Scrivi cosa cambiare');
       await answer(d.review, { kind: 'review', ok: !!d.ok, ...(!d.ok && { feedback }) });
     });
-});
+}
+$('main').addEventListener('click', onClick);
+$('dock').addEventListener('click', onClick);
 
 history.replaceState({ name: 'home' }, '');
 render();
