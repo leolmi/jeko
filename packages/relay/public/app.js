@@ -209,6 +209,8 @@ const state = {
    * (`agent`, vuoto = quelli del progetto; si riparte da vuoto cambiando progetto) e pannello aperto.
    */
   composer: { mode: 'checkpoint', direct: false, agent: {}, agentOf: null, picking: false },
+  /** Messaggi lunghi dell'attività aperti per intero (chiave: istante e posizione). */
+  expanded: new Set(),
   error: '',
   ended: '',
 };
@@ -616,22 +618,32 @@ function feed(d) {
     .map((p) => ({ at: p.createdAt, you: p.answer.value }));
   const items = [...d.events, ...said].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   const lines = [];
-  for (const item of items) {
+  // Testo lungo: si vedono le prime righe, il resto su richiesta.
+  const clip = (key, cls, text, max) => {
+    const long = text.length > max * 80 || text.split('\n').length > max;
+    if (!long) return `<p class="${cls}">${esc(text)}</p>`;
+    const open = state.expanded.has(key);
+    return `<div class="more${open ? ' open' : ''}"><p class="${cls}" style="--lines:${max}">${esc(text)}</p>
+      <button class="link" data-more="${esc(key)}">${open ? 'Mostra meno' : 'Mostra tutto'}</button></div>`;
+  };
+  items.forEach((item, i) => {
+    const key = `${item.at}|${i}`;
     if (item.you) {
       lines.push(`<p class="you"><b>Tu</b> ${esc(item.you)}</p>`);
-      continue;
+      return;
     }
     const e = item.event;
     if (e.type === 'step.started' && e.title) lines.push(`<p><b>${esc(e.title)}</b></p>`);
-    else if (e.type === 'agent.activity' && e.kind === 'text') lines.push(`<p>${esc(e.text)}</p>`);
+    else if (e.type === 'agent.activity' && e.kind === 'text')
+      lines.push(clip(key, 'text', e.text, 6));
     else if (e.type === 'agent.activity')
-      lines.push(`<p class="tool">${esc(e.tool ?? '')} ${esc(e.text)}</p>`);
+      lines.push(clip(key, 'tool', `${e.tool ?? ''} ${e.text}`, 2));
     else if (e.type === 'step.finished' && !e.ok) lines.push(`<p class="error">Passo fallito</p>`);
     else if (e.type === 'run.finished')
       lines.push(
         `<p class="muted">Fine: ${esc(STATUS[e.status] ?? e.status)}${e.error ? ` — ${esc(e.error)}` : ''}</p>`,
       );
-  }
+  });
   return lines.slice(-40).join('');
 }
 
@@ -767,6 +779,10 @@ function onClick(e) {
     if (v === undefined) continue;
     const { [field]: _, ...rest } = state.composer.agent;
     state.composer.agent = v ? { ...rest, [field]: v } : rest;
+    return render();
+  }
+  if (d.more) {
+    if (!state.expanded.delete(d.more)) state.expanded.add(d.more);
     return render();
   }
   if (d.goProject) return go({ name: 'project', id: d.goProject });

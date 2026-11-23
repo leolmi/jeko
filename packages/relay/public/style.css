@@ -162,6 +162,7 @@ h2 {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
+  overflow-wrap: anywhere;
 }
 .row {
   display: flex;
@@ -385,6 +386,34 @@ pre {
 .feed p {
   margin: 0 0 6px;
   font-size: 14px;
+  /* Percorsi e comandi lunghi vanno a capo invece di uscire dal riquadro. */
+  overflow-wrap: anywhere;
+}
+.feed .text {
+  white-space: pre-wrap;
+}
+.feed .more {
+  margin-bottom: 6px;
+}
+.feed .more p {
+  margin: 0;
+}
+.feed .more:not(.open) p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines);
+  overflow: hidden;
+}
+.feed .more button.link {
+  width: fit-content;
+  margin: 4px auto 0;
+  padding: 3px 12px;
+  font-size: 11px;
+  text-align: center;
+  text-decoration: none;
+  color: var(--faint);
+  background: var(--subtle);
+  border-radius: 6px;
 }
 .feed .tool {
   font-family: var(--font-mono);

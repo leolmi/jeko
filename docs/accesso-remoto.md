@@ -9,9 +9,15 @@ Segui e gestisci i task di Jeko dal telefono (o da un altro computer), anche fuo
 
 ## Cosa si può fare da remoto
 
-- vedere progetti (con i preferiti) e task, con il loro andamento, modello e impegno;
-- avviare un task nella cartella di un progetto, o continuarne uno concluso;
-- rispondere alle domande di Claude e approvare o rifiutare i gate;
+- vedere progetti e task: in home quelli da rispondere, poi i preferiti nel loro ordine e gli altri progetti;
+- seguire l'attività di un task: i messaggi lunghi si vedono in parte, con **Mostra tutto** per aprirli;
+- avviare un task dalla chat in fondo alla pagina, come nella web-app:
+  - **con o senza workflow** (task diretto: Claude esegue la richiesta così com'è);
+  - controllo **Autonomo**, **Checkpoint** o **Interattivo**;
+  - **modello e impegno** di Claude (predefiniti: quelli del progetto);
+  - se è già al lavoro un task sullo stesso progetto, il nuovo si **mette in coda**;
+- continuare un task diretto che aspetta il seguito, o ripartire dalla conversazione di uno concluso;
+- rispondere alle domande di Claude, approvare o rifiutare i gate e le revisioni;
 - annullare un task.
 
 Il resto (opzioni, workflow, progetti nuovi) resta sul PC.
@@ -24,7 +30,7 @@ telefono ──HTTPS──▶ relay ◀──WebSocket── Jeko sul PC
 
 - Il **relay** è un piccolo server ponte: serve la pagina remota e smista i messaggi tra Jeko e i dispositivi. Jeko si collega lui al relay, quindi sul PC non si apre nessuna porta verso l'esterno.
 - I messaggi sono **cifrati da un capo all'altro** (AES-GCM) con una chiave diversa per ogni dispositivo. Il relay non li può leggere: tiene solo l'ultimo stato cifrato di ogni dispositivo, così la pagina mostra qualcosa anche se Jeko è momentaneamente scollegato.
-- La chiave sta nel **QR**, nella parte del link dopo `#`, che il browser non manda mai al server.
+- La chiave sta nel **QR**, nella parte del link dopo `#`, che il browser non manda mai al server. Aperta la pagina, il link sparisce dalla barra degli indirizzi e la chiave viene salvata nel browser come chiave **non estraibile** (IndexedDB): si può usare per cifrare, ma nemmeno uno script nella pagina può leggerla.
 
 ## Configurazione con Tailscale Funnel (consigliata)
 
@@ -51,6 +57,7 @@ Il relay gira dentro Jeko, sul tuo PC; [Tailscale Funnel](https://tailscale.com/
 1. **Collega un dispositivo**: compare un QR, valido 15 minuti.
 2. Inquadralo col telefono (o copia il link) e apri la pagina.
 3. Il dispositivo compare nell'elenco come «da confermare»: premi **Conferma** sul PC. Solo da quel momento vede i dati e può fare richieste.
+4. Da lì in poi basta riaprire l'indirizzo del relay su quel browser: il collegamento resta salvato.
 
 Per toglierlo: il cestino accanto al dispositivo. La pagina sul telefono si chiude e, per riusarlo, va collegato di nuovo.
 
