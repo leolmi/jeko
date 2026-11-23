@@ -15,3 +15,6 @@ bin/
 release/
 neutralinojs.log
 .tmp/
+
+# Configurazione locale di Claude Code
+.claude/
