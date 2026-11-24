@@ -5,13 +5,12 @@ import { claudeAssistant } from './assist.js';
 import { claudeContextProbe } from './context-probe.js';
 import { RunnerClient } from './client.js';
 import { runDiagnostics } from './diagnostics.js';
-import { systemFolderPicker } from './folder-picker.js';
-import { systemTerminal } from './terminal.js';
 import { createNodeHost } from './engine/node-host.js';
 import { defaultDataDir } from './journal.js';
 import type { LinkSocket } from './link.js';
 import { createPermissionBridge } from './permissions/bridge.js';
 import { ApprovalEndpoint, pipePath } from './permissions/endpoint.js';
+import { platform } from './platform/index.js';
 import { ProcessRegistry } from './processes.js';
 
 export interface LocalRunner {
@@ -54,8 +53,8 @@ export async function startRunner(opts: {
     runnerId: process.env['JEKO_RUNNER_ID'] ?? hostname(),
     version: opts.version,
     dataDir,
-    pickFolder: systemFolderPicker(),
-    openTerminal: systemTerminal(),
+    pickFolder: platform.folderPicker,
+    openTerminal: platform.terminal,
     assist: claudeAssistant(claude),
     probeContext: claudeContextProbe(claude),
     diagnose: () => runDiagnostics({ claude, dataDir, scriptsDir, permissionsEndpoint: true }),

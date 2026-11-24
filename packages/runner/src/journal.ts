@@ -11,9 +11,9 @@ import {
   truncateSync,
   writeSync,
 } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { RunEvent } from '@jeko/shared';
+import { platform } from './platform/index.js';
 
 export interface JournalEntry {
   seq: number;
@@ -26,8 +26,7 @@ const ACK = 'ack.json';
 /** Cartella dei dati del runner: `JEKO_RUNNER_DATA`, altrimenti `%LOCALAPPDATA%\jeko\runner`. */
 export function defaultDataDir(env: NodeJS.ProcessEnv = process.env): string {
   if (env['JEKO_RUNNER_DATA']) return env['JEKO_RUNNER_DATA'];
-  const base = env['LOCALAPPDATA'] ?? join(homedir(), '.local', 'share');
-  return join(base, 'jeko', 'runner');
+  return join(platform.dataHome(env), 'jeko', 'runner');
 }
 
 /** Scrittura atomica: file temporaneo, fsync, rinomina. */

@@ -1,0 +1,2 @@
+# Gli script per Linux e macOS restano con LF anche con core.autocrlf su Windows.
+*.sh text eol=lf

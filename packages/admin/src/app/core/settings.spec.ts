@@ -5,7 +5,8 @@ describe('opzioni', () => {
     expect(projectDirHint('D:\\dev')).toBe('D:\\dev\\…');
     expect(projectDirHint('D:\\dev\\')).toBe('D:\\dev\\…');
     expect(projectDirHint('/home/me/dev/')).toBe('/home/me/dev/…');
-    expect(projectDirHint(undefined)).toBe('C:\\progetti\\…');
+    expect(projectDirHint(undefined, true)).toBe('C:\\progetti\\…');
+    expect(projectDirHint(undefined, false)).toBe('/home/utente/progetti/…');
   });
 
   it('Tab completa la cartella dei progetti solo se il campo ne è l’inizio', () => {

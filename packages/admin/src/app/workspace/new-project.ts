@@ -15,7 +15,7 @@ import { I18n } from '../core/i18n';
 import { Projects } from '../core/projects';
 import { Realtime } from '../core/realtime';
 import { Runs } from '../core/runs';
-import { completeProjectDir, projectDirHint, Settings } from '../core/settings';
+import { completeProjectDir, projectDirHint, projectDirPrefix, Settings } from '../core/settings';
 import { Templates } from '../core/templates';
 import { Icon } from '../ui/icon';
 import { Segmented, type SegmentOption } from '../ui/segmented';
@@ -102,7 +102,7 @@ const nameOf = (path: string) =>
             <input class="jk-input mt-1" name="newName" autocomplete="off" [(ngModel)]="newName" />
             @if (newName().trim() && settings.value()?.projectsDir; as dir) {
               <span class="mt-1 block truncate font-mono text-xs text-faint"
-                >{{ dir }}\\{{ slug(newName()) }}</span
+                >{{ dirPrefix(dir) }}{{ slug(newName()) }}</span
               >
             }
           </label>
@@ -162,6 +162,7 @@ export class NewProject {
   protected readonly addError = signal<'new.duplicate' | 'new.error' | 'new.pick.error' | null>(
     null,
   );
+  protected readonly dirPrefix = (dir: string) => projectDirPrefix(dir);
   protected readonly pathHint = computed(() => projectDirHint(this.settings.value()?.projectsDir));
   protected readonly rt = inject(Realtime);
   private readonly http = inject(HttpClient);
@@ -203,7 +204,7 @@ export class NewProject {
   }
 
   /**
-   * Dialogo "Seleziona cartella" di Windows, aperto dal runner sul PC: il browser da solo
+   * Dialogo "Seleziona cartella" del sistema, aperto dal runner sul PC: il browser da solo
    * non può dare il percorso completo. Parte dalla cartella scritta o da quella dei progetti.
    */
   protected async pick(): Promise<void> {

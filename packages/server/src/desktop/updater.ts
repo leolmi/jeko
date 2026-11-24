@@ -1,7 +1,7 @@
-import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   accessSync,
+  chmodSync,
   constants,
   cpSync,
   existsSync,
@@ -13,19 +13,29 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 import type { UpdateInfo } from '@jeko/shared';
-
-const run = promisify(execFile);
+import { platform as current, type Platform } from '../../../runner/src/platform/index.js';
 
 /** `release/manifest.json`, pubblicato con ogni release GitHub (`npm run release`). */
 export interface Manifest {
   version: string;
-  package: { name: string; size: number; sha256: string };
+  /** Il pacchetto Windows: le versioni fino alla 0.2.2 leggono solo questo. */
+  package?: ManifestPackage;
+  /** Un pacchetto per sistema: `win-x64`, `linux-x64`, `linux-arm64`, `mac-universal`. */
+  packages?: Record<string, ManifestPackage>;
 }
 
-/** Cosa si sostituisce nella cartella dell'app: l'exe, le risorse della finestra, il servizio. */
-export const APP_ENTRIES = ['jeko.exe', 'resources.neu', 'server'] as const;
+export interface ManifestPackage {
+  name: string;
+  size: number;
+  sha256: string;
+}
+
+/** Il pacchetto del manifest per questo sistema, se c'è. */
+export function packageFor(manifest: Manifest, key: string | null): ManifestPackage | undefined {
+  if (!key) return undefined;
+  return manifest.packages?.[key] ?? (key === 'win-x64' ? manifest.package : undefined);
+}
 
 export function compareVersions(a: string, b: string): number {
   const [pa, pb] = [a, b].map((v) => v.replace(/^v/, '').split('.').map(Number));
@@ -38,27 +48,32 @@ export function compareVersions(a: string, b: string): number {
 
 export interface UpdaterOptions {
   version: string;
-  /** Cartella dell'app (con `jeko.exe`); null se il servizio gira dai sorgenti. */
+  /** Cartella dell'app (con `jeko.exe` o `jeko`); null se il servizio gira dai sorgenti. */
   appDir: string | null;
   /** Repository GitHub delle release, `proprietario/nome`. */
   repo: string;
   log: { info(msg: string): void; warn(msg: string): void };
   fetch?: typeof fetch;
+  /** Il sistema (nei test); altrimenti quello su cui gira. */
+  platform?: Platform;
 }
 
 /**
- * Aggiornamento automatico dalle release GitHub: un solo pacchetto (zip) con exe, risorse
- * della finestra e bundle del servizio. I file in uso non si possono sovrascrivere ma si
- * possono rinominare: i vecchi diventano `*.old` e si cancellano all'avvio successivo.
+ * Aggiornamento automatico dalle release GitHub: un pacchetto per sistema (zip su Windows,
+ * tar.gz altrove) con l'eseguibile, le risorse della finestra e il bundle del servizio. I file
+ * in uso non si possono sovrascrivere ma si possono rinominare: i vecchi diventano `*.old` e si
+ * cancellano all'avvio successivo.
  */
 export class Updater {
   private last: UpdateInfo | null = null;
-  private latestManifest: { manifest: Manifest; url: string } | null = null;
+  private latestManifest: { manifest: Manifest; pkg: ManifestPackage; url: string } | null = null;
   private busy = false;
   private readonly fetch: typeof fetch;
+  private readonly platform: Platform;
 
   constructor(private readonly opts: UpdaterOptions) {
     this.fetch = opts.fetch ?? fetch;
+    this.platform = opts.platform ?? current;
   }
 
   get info(): UpdateInfo | null {
@@ -103,9 +118,15 @@ export class Updater {
       const manifest = (await (
         await this.fetch(m.browser_download_url, { headers })
       ).json()) as Manifest;
-      const zip = asset(manifest.package.name);
-      if (!zip) throw new Error(`La release non ha ${manifest.package.name}`);
-      this.latestManifest = { manifest, url: zip.browser_download_url };
+      const key = this.platform.packageKey;
+      const pkg = packageFor(manifest, key);
+      if (!pkg)
+        throw new Error(
+          `La release non ha un pacchetto per questo sistema (${key ?? process.arch})`,
+        );
+      const file = asset(pkg.name);
+      if (!file) throw new Error(`La release non ha ${pkg.name}`);
+      this.latestManifest = { manifest, pkg, url: file.browser_download_url };
       this.last = {
         ...base,
         latest: manifest.version,
@@ -135,50 +156,31 @@ export class Updater {
       rmSync(work, { recursive: true, force: true });
       mkdirSync(join(work, 'files'), { recursive: true });
 
-      this.opts.log.info(`scarico ${latest.manifest.package.name}`);
+      this.opts.log.info(`scarico ${latest.pkg.name}`);
       const res = await this.fetch(latest.url, { headers: { 'user-agent': 'jeko-updater' } });
       if (!res.ok) throw new Error(`Download non riuscito (${res.status})`);
       const data = Buffer.from(await res.arrayBuffer());
       const hash = createHash('sha256').update(data).digest('hex');
-      if (hash !== latest.manifest.package.sha256) throw new Error('Pacchetto rovinato (SHA-256)');
-      const zip = join(work, latest.manifest.package.name);
-      writeFileSync(zip, data);
-      // tar.exe di Windows (10 e successivi) apre anche gli zip; quello di Git, se nel PATH, no.
-      const tar = join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'tar.exe');
-      await run(tar, ['-xf', zip, '-C', join(work, 'files')], { windowsHide: true });
+      if (hash !== latest.pkg.sha256) throw new Error('Pacchetto rovinato (SHA-256)');
+      const archive = join(work, latest.pkg.name);
+      writeFileSync(archive, data);
       const files = join(work, 'files');
-      for (const e of ['jeko.exe', join('server', 'jeko.js')])
+      await this.platform.extract(archive, files);
+      const bin = this.platform.appBinary;
+      for (const e of [bin, join('server', 'jeko.js')])
         if (!existsSync(join(files, e))) throw new Error(`Pacchetto incompleto: manca ${e}`);
 
-      replaceEntries(appDir, files, APP_ENTRIES);
+      replaceEntries(appDir, files, this.platform.appEntries);
+      if (this.platform.os !== 'win') chmodSync(join(appDir, bin), 0o755);
       this.opts.log.info(`installata la versione ${latest.manifest.version}`);
     } finally {
       this.busy = false;
     }
   }
 
-  /**
-   * Riapre l'app appena questo processo è uscito. Lo fa uno script PowerShell avviato con
-   * `cmd /c start`: lanciato direttamente da Node, con `detached` PowerShell esce subito senza
-   * far niente, e senza muore insieme al servizio.
-   */
+  /** Riapre l'app appena questo processo è uscito. */
   relaunch(): void {
-    const appDir = this.opts.appDir;
-    if (!appDir) return;
-    const dir = join(tmpdir(), 'jeko-update');
-    mkdirSync(dir, { recursive: true });
-    const script = join(dir, 'relaunch.ps1');
-    // Con il BOM PowerShell 5.1 legge l'UTF-8 (percorsi con lettere accentate).
-    writeFileSync(script, `\uFEFF${relaunchScript(process.pid, appDir)}`, 'utf8');
-    spawn(
-      'cmd.exe',
-      [
-        '/d',
-        '/c',
-        `start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${script}"`,
-      ],
-      { detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true },
-    ).unref();
+    if (this.opts.appDir) this.platform.relaunch(process.pid, this.opts.appDir);
   }
 
   /** Toglie i `*.old` lasciati dall'ultimo aggiornamento (quelli ancora in uso restano). */
@@ -194,16 +196,6 @@ export class Updater {
       }
     }
   }
-}
-
-/** Script che aspetta la fine del processo `pid` e poi riapre `jeko.exe` da `appDir`. */
-export function relaunchScript(pid: number, appDir: string): string {
-  const q = (v: string) => `'${v.replaceAll("'", "''")}'`;
-  return [
-    `Wait-Process -Id ${pid} -Timeout 120 -ErrorAction SilentlyContinue`,
-    `Start-Process -FilePath ${q(join(appDir, 'jeko.exe'))} -WorkingDirectory ${q(appDir)}`,
-    '',
-  ].join('\r\n');
 }
 
 /**

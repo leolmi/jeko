@@ -93,7 +93,7 @@
         <p class="error">Il servizio di Jeko non risponde.</p>
         <p>
           Serve <strong>Node.js 22</strong> o successivo, installato e nel PATH. Il registro del
-          servizio è in <code>%LOCALAPPDATA%\jeko\logs\jeko.log</code>.
+          servizio è in <code id="log">%LOCALAPPDATA%\jeko\logs\jeko.log</code>.
         </p>
         <p><button id="retry" type="button">Riprova</button></p>
       </div>
@@ -101,6 +101,12 @@
     <script>
       const SERVICE = 'http://127.0.0.1:4310';
       const TIMEOUT_MS = 30000;
+      const ua = navigator.userAgent;
+      if (/Macintosh/.test(ua))
+        document.getElementById('log').textContent =
+          '~/Library/Application Support/jeko/logs/jeko.log';
+      else if (!/Windows/.test(ua))
+        document.getElementById('log').textContent = '~/.local/share/jeko/logs/jeko.log';
 
       async function ready() {
         try {

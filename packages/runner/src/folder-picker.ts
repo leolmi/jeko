@@ -115,8 +115,3 @@ export const windowsFolderPicker: FolderPicker = async ({ start, title }) => {
   if (res.code !== 0) throw new Error(res.stderr.trim() || `PowerShell è uscito con ${res.code}`);
   return res.stdout.trim() || null;
 };
-
-/** Il dialogo per questo sistema; per ora c'è solo quello di Windows. */
-export function systemFolderPicker(): FolderPicker | undefined {
-  return process.platform === 'win32' ? windowsFolderPicker : undefined;
-}

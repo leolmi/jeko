@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18n } from '../core/i18n';
-import { Settings } from '../core/settings';
+import { isWindows, Settings } from '../core/settings';
 import { Icon } from './icon';
 
 /** Form delle opzioni dell'utente: nel primo avvio e nella pagina Opzioni. */
@@ -20,7 +20,7 @@ import { Icon } from './icon';
           name="projectsDir"
           autocomplete="off"
           spellcheck="false"
-          [placeholder]="i18n.t('settings.projectsDir.placeholder')"
+          [placeholder]="i18n.t(placeholder)"
           [(ngModel)]="projectsDir"
         />
         <button class="jk-btn-primary shrink-0" type="submit" [disabled]="!dirty() || saving()">
@@ -39,6 +39,9 @@ export class UserSettings {
   protected readonly i18n = inject(I18n);
   private readonly settings = inject(Settings);
 
+  protected readonly placeholder = isWindows()
+    ? 'settings.projectsDir.placeholder'
+    : 'settings.projectsDir.placeholder.posix';
   protected readonly projectsDir = signal('');
   protected readonly saving = signal(false);
   protected readonly saved = signal(false);

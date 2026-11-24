@@ -21,7 +21,9 @@
   "extensions": [
     {
       "id": "it.leolmi.jeko.service",
-      "commandWindows": "node \"${NL_PATH}/server/jeko.js\" --desktop"
+      "commandWindows": "node \"${NL_PATH}/server/jeko.js\" --desktop",
+      "commandLinux": "sh \"${NL_PATH}/server/service.sh\" --desktop",
+      "commandDarwin": "sh \"${NL_PATH}/server/service.sh\" --desktop"
     }
   ],
   "modes": {

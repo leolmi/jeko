@@ -11,6 +11,7 @@ import {
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { linkPair } from '../../runner/src/link.js';
+import { platform } from '../../runner/src/platform/index.js';
 import { startRunner } from '../../runner/src/runner.js';
 import { buildApp, type JekoApp } from './app.js';
 import { defaultDataDir } from './data/files.js';
@@ -68,10 +69,10 @@ function relayPublicDir(): string {
   return bundled ? join(here, 'relay') : join(here, '..', '..', 'relay', 'public');
 }
 
-/** Cartella dell'app (con `jeko.exe`), solo se il servizio gira dal bundle installato. */
+/** Cartella dell'app (con `jeko.exe` o `jeko`), solo se il servizio gira dal bundle installato. */
 function appDir(): string | null {
   const dir = dirname(here);
-  return bundled && existsSync(join(dir, 'jeko.exe')) ? dir : null;
+  return bundled && existsSync(join(dir, platform.appBinary)) ? dir : null;
 }
 
 /** Registro del servizio desktop (che non ha console): `%LOCALAPPDATA%\jeko\logs\jeko.log`. */

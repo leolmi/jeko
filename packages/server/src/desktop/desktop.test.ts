@@ -4,7 +4,10 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Lifecycle } from './lifecycle.js';
 import { parseNeutralinoInfo } from './neutralino.js';
-import { compareVersions, relaunchScript, replaceEntries, Updater } from './updater.js';
+import { platformFor } from '../../../runner/src/platform/index.js';
+import { relaunchShell, shQuote } from '../../../runner/src/platform/posix.js';
+import { relaunchScript } from '../../../runner/src/platform/windows.js';
+import { compareVersions, packageFor, replaceEntries, Updater } from './updater.js';
 
 describe('vita del servizio desktop', () => {
   afterEach(() => vi.useRealTimers());
@@ -109,6 +112,7 @@ describe('aggiornamento', () => {
       repo: 'x/y',
       log: console,
       fetch: fake,
+      platform: platformFor('win32'),
     });
     expect(await u.check()).toMatchObject({
       current: '0.1.0',
@@ -118,6 +122,17 @@ describe('aggiornamento', () => {
       notes: 'note',
     });
     await expect(u.install()).rejects.toThrow();
+  });
+
+  it('sceglie il pacchetto del sistema, con quello Windows delle versioni vecchie', () => {
+    const p = (name: string) => ({ name, size: 1, sha256: 'x' });
+    const old = { version: '0.2.2', package: p('win.zip') };
+    const all = { version: '0.3.0', package: p('win.zip'), packages: { 'linux-x64': p('l.tgz') } };
+    expect(packageFor(old, platformFor('win32').packageKey)?.name).toBe('win.zip');
+    expect(packageFor(old, platformFor('linux', 'x64').packageKey)).toBeUndefined();
+    expect(packageFor(all, platformFor('linux', 'x64').packageKey)?.name).toBe('l.tgz');
+    expect(packageFor(all, platformFor('linux', 'ia32').packageKey)).toBeUndefined();
+    expect(platformFor('darwin', 'arm64').packageKey).toBe('mac-universal');
   });
 
   it("legge i dati dell'estensione Neutralino", () => {
@@ -141,5 +156,12 @@ describe('riavvio dopo l’aggiornamento', () => {
       `Start-Process -FilePath ${q(join(dir, 'jeko.exe'))} -WorkingDirectory ${q(dir)}`,
     );
     expect(script).toContain("d''Leo");
+  });
+
+  it('su Linux e macOS aspetta il servizio con kill -0 e riapre jeko', () => {
+    const script = relaunchShell(42, "/home/leo/d'app/jeko");
+    expect(script).toContain('kill -0 42');
+    expect(script).toContain(`exec ${shQuote("/home/leo/d'app/jeko")}`);
+    expect(shQuote("d'app")).toBe(String.raw`'d'\''app'`);
   });
 });

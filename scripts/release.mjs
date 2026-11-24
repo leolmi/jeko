@@ -1,8 +1,9 @@
-// Pubblica il pacchetto di `npm run package` come release GitHub v<versione> del repository
-// (GitHub CLI, `gh auth login`): le app installate la trovano come ultima release.
+// Pubblica i pacchetti di `npm run package` come release GitHub v<versione> del repository
+// (GitHub CLI, `gh auth login`): le app installate la trovano come ultima release. Con loro
+// va anche install.sh, l'installazione per Linux e macOS.
 // Note: `npm run release -- "testo"`, altrimenti l'oggetto dell'ultimo commit.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,8 +19,14 @@ if (manifest.version !== version)
   throw new Error(
     `release/ ha la versione ${manifest.version}, package.json ${version}: rifai "npm run package"`,
   );
-const zipPath = join(releaseDir, manifest.package.name);
-if (!existsSync(zipPath)) throw new Error(`manca ${zipPath}: rifai "npm run package"`);
+const assets = Object.values(manifest.packages ?? { win: manifest.package }).map((p) =>
+  join(releaseDir, p.name),
+);
+for (const a of assets) if (!existsSync(a)) throw new Error(`manca ${a}: rifai "npm run package"`);
+const installSh = join(root, 'install.sh');
+const lf = join(releaseDir, 'install.sh');
+// Con CRLF (core.autocrlf) sh non lo legge.
+writeFileSync(lf, readFileSync(installSh, 'utf8').replace(/\r\n/g, '\n'));
 
 const run = (cmd, args) =>
   execFileSync(cmd, args, {
@@ -41,8 +48,9 @@ console.log(
     'release',
     'create',
     tag,
-    zipPath,
+    ...assets,
     manifestPath,
+    lf,
     '--title',
     `Jeko ${version}`,
     '--notes',

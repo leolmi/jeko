@@ -8,14 +8,13 @@ import {
   renameSync,
   writeSync,
 } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { platform } from '../../../runner/src/platform/index.js';
 
 /** Cartella dei dati: `JEKO_DATA_DIR` o `%LOCALAPPDATA%\jeko\data`. */
 export function defaultDataDir(env: NodeJS.ProcessEnv = process.env): string {
   if (env['JEKO_DATA_DIR']) return env['JEKO_DATA_DIR'];
-  const base = env['LOCALAPPDATA'] ?? join(homedir(), '.local', 'share');
-  return join(base, 'jeko', 'data');
+  return join(platform.dataHome(env), 'jeko', 'data');
 }
 
 /** Scrittura atomica: file temporaneo, fsync, rinomina. Un PC spento a metà lascia il vecchio. */

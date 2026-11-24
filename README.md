@@ -2,7 +2,7 @@
 
 **English** · [Italiano](./README.it.md)
 
-A local, personal SDLC tool: a Windows desktop app ([Neutralino](https://neutralino.js.org)) with a Node service that runs your Agent.
+A local, personal SDLC tool: a desktop app for Windows, Linux and macOS (preview) ([Neutralino](https://neutralino.js.org)) with a Node service that runs your Agent.
 
 - **Your agent, your PC.** A complete development cycle that runs entirely on your machine with your own Agent: no cloud, no account, your projects stay where they are.
 - **Always up to date, on its own.** New versions come from GitHub releases: one click and Jeko updates and restarts.
@@ -48,6 +48,14 @@ server/relay/     remote page, for the relay on this PC
 - Once the window is closed, the service exits when it has no active tasks; if there are some, it stays on until they finish or stop at a question or a gate, then exits. Paused tasks resume at the next start. Reopening Jeko while the service is still running, the window uses it.
 - Log: `%LOCALAPPDATA%\jeko\logs\jeko.log`.
 - **Updates** (Options → Version and updates; also checked at startup and every 6 hours): the latest GitHub release of `leolmi/jeko` has `manifest.json` and a zip with the exe, `resources.neu` and `server/`. The service downloads the zip, checks its SHA-256, renames the current files to `*.old`, copies the new ones and restarts the app. Only with no tasks at work, and not when running from source. The first version is installed by hand.
+
+### Linux and macOS (preview)
+
+```sh
+curl -fsSL https://github.com/leolmi/jeko/releases/latest/download/install.sh | sh
+```
+
+The script checks Node, Git and claude, downloads the package for the system (`linux-x64`, `linux-arm64`, `mac-universal`), checks its SHA-256 and installs it in `~/.local/share/jeko/app` (Linux, with a menu entry) or `~/Library/Application Support/jeko/app` (macOS, with `~/Applications/Jeko.app`). After that it updates itself like on Windows. Data and log sit beside it (`…/jeko/data`, `…/jeko/logs`). The service starts with `server/service.sh`, which takes the PATH from the login shell when node, git or claude are missing (apps opened from the desktop don't have it). On Linux the window needs WebKitGTK, and the folder dialog needs `zenity` or `kdialog`. macOS has never been tried on a real Mac.
 
 ## Remote access
 

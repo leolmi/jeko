@@ -21,17 +21,23 @@ export class Settings {
   }
 }
 
+/** Il servizio gira sul PC della finestra: il sistema è quello del browser. */
+export const isWindows = () => /Windows/.test(navigator.userAgent);
+
 /** Cartella dei progetti col separatore finale (es. `D:\dev\`); null se non è impostata. */
-export function projectDirPrefix(projectsDir: string | undefined): string | null {
+export function projectDirPrefix(
+  projectsDir: string | undefined,
+  windows = isWindows(),
+): string | null {
   const dir = projectsDir?.trim().replace(/[\\/]+$/, '');
   if (!dir) return null;
-  const sep = dir.includes('/') && !dir.includes('\\') ? '/' : '\\';
+  const sep = dir.includes('\\') || (!dir.includes('/') && windows) ? '\\' : '/';
   return `${dir}${sep}`;
 }
 
 /** Esempio di cartella di un progetto: dentro la cartella dei progetti. */
-export function projectDirHint(projectsDir: string | undefined): string {
-  return `${projectDirPrefix(projectsDir) ?? 'C:\\progetti\\'}…`;
+export function projectDirHint(projectsDir: string | undefined, windows = isWindows()): string {
+  return `${projectDirPrefix(projectsDir, windows) ?? (windows ? 'C:\\progetti\\' : '/home/utente/progetti/')}…`;
 }
 
 /**
