@@ -37,6 +37,47 @@ describe('server', () => {
     expect((await app.inject('/api/projects')).json()).toEqual([]);
   });
 
+  it('gestisce le note, con o senza progetto', async () => {
+    const project = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/projects',
+        payload: { name: 'Jeko', path: 'C:\\dev\\jeko' },
+      })
+    ).json() as { id: string };
+    const add = (payload: object) => app.inject({ method: 'POST', url: '/api/notes', payload });
+
+    // Senza tipo è un'idea; senza progetto resta senza.
+    const loose = await add({ body: '  Un progetto nuovo  ' });
+    expect(loose.statusCode).toBe(201);
+    expect(loose.json()).toMatchObject({ body: 'Un progetto nuovo', kind: 'idea' });
+    expect(loose.json()).not.toHaveProperty('projectId');
+    const note = (await add({ body: 'Bug', kind: 'issue', projectId: project.id })).json() as {
+      id: string;
+    };
+    expect(note).toMatchObject({ projectId: project.id, kind: 'issue' });
+    expect((await add({ body: '   ' })).statusCode).toBe(400);
+    expect((await add({ body: 'x', kind: 'altro' })).statusCode).toBe(400);
+    const ghost = '00000000-0000-4000-8000-000000000000';
+    expect((await add({ body: 'x', projectId: ghost })).statusCode).toBe(422);
+
+    const patch = (payload: object) =>
+      app.inject({ method: 'PATCH', url: `/api/notes/${note.id}`, payload });
+    const runId = '11111111-1111-4111-8111-111111111111';
+    expect((await patch({ kind: 'idea', runId })).json()).toMatchObject({ kind: 'idea', runId });
+    const reopened = (await patch({ runId: null, projectId: null })).json() as object;
+    expect(reopened).not.toHaveProperty('runId');
+    expect(reopened).not.toHaveProperty('projectId');
+    expect((await patch({ projectId: ghost })).statusCode).toBe(422);
+    await patch({ projectId: project.id });
+    expect((await app.inject('/api/notes')).json()).toHaveLength(2);
+
+    // Togliendo il progetto le sue note se ne vanno, le altre restano.
+    await app.inject({ method: 'DELETE', url: `/api/projects/${project.id}` });
+    expect((await patch({ body: 'y' })).statusCode).toBe(404);
+    expect((await app.inject('/api/notes')).json()).toHaveLength(1);
+  });
+
   it('salva i preferiti nel loro ordine', async () => {
     const add = async (name: string) =>
       (

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
-import { I18n } from './core/i18n';
+import { I18n, type I18nKey } from './core/i18n';
 import { Realtime } from './core/realtime';
 import { Settings } from './core/settings';
 import { Setup } from './core/setup';
@@ -10,7 +10,7 @@ import { Theme } from './core/theme';
 import { UpdatePrompt } from './settings/update-prompt';
 import { Splash } from './setup/splash';
 import { Wizard } from './setup/wizard';
-import { Icon } from './ui/icon';
+import { Icon, type IconName } from './ui/icon';
 import { Prefs } from './ui/prefs';
 
 /** Splash minimo, per non far lampeggiare la schermata di caricamento. */
@@ -41,27 +41,6 @@ const SPLASH_MS = 600;
               }
               <span class="hidden text-xs text-faint sm:inline">{{ i18n.t('app.tagline') }}</span>
             </a>
-            <nav class="flex gap-1 text-sm">
-              <a
-                routerLink="/"
-                class="rounded-md px-2.5 py-1 text-muted transition-colors hover:text-fg"
-                [class.bg-subtle]="section() === 'projects'"
-                [class.!text-fg]="section() === 'projects'"
-                >{{ i18n.t('nav.projects') }}</a
-              >
-              <a
-                routerLink="/workflow"
-                class="rounded-md px-2.5 py-1 text-muted transition-colors hover:text-fg"
-                routerLinkActive="bg-subtle !text-fg"
-                >{{ i18n.t('nav.workflows') }}</a
-              >
-              <a
-                routerLink="/statistiche"
-                class="rounded-md px-2.5 py-1 text-muted transition-colors hover:text-fg"
-                routerLinkActive="bg-subtle !text-fg"
-                >{{ i18n.t('nav.stats') }}</a
-              >
-            </nav>
             <span class="ml-auto flex items-center gap-2 text-xs text-muted" aria-live="polite">
               <span
                 class="size-2 rounded-full"
@@ -86,9 +65,30 @@ const SPLASH_MS = 600;
               <jk-icon name="settings" [size]="18" />
             </a>
           </header>
-          <main class="min-h-0 flex-1">
-            <router-outlet />
-          </main>
+          <div class="flex min-h-0 flex-1">
+            <!-- Pagine principali: una barra di sole icone, il nome nel suggerimento. -->
+            <nav
+              class="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-line bg-surface py-3"
+              [attr.aria-label]="i18n.t('nav.label')"
+            >
+              @for (l of links; track l.path) {
+                <a
+                  class="flex size-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-subtle hover:text-fg"
+                  [routerLink]="l.path"
+                  [class.bg-subtle]="section() === l.section"
+                  [class.!text-fg]="section() === l.section"
+                  [attr.aria-current]="section() === l.section ? 'page' : null"
+                  [title]="i18n.t(l.label)"
+                  [attr.aria-label]="i18n.t(l.label)"
+                >
+                  <jk-icon [name]="l.icon" [size]="22" />
+                </a>
+              }
+            </nav>
+            <main class="min-h-0 min-w-0 flex-1">
+              <router-outlet />
+            </main>
+          </div>
         </div>
         <jk-update-prompt />
       }
@@ -112,9 +112,15 @@ export class App {
     ),
     { initialValue: inject(Router).url },
   );
-  /** Sezione attiva: la pagina dei progetti (task, chat, nuovo progetto) o quella dei workflow. */
-  protected readonly section = computed(() =>
-    /^\/(workflow|statistiche|opzioni)(\/|$|\?)/.test(this.url()) ? 'other' : 'projects',
+  protected readonly links: { path: string; section: string; icon: IconName; label: I18nKey }[] = [
+    { path: '/', section: 'projects', icon: 'folder', label: 'nav.projects' },
+    { path: '/workflow', section: 'workflow', icon: 'account_tree', label: 'nav.workflows' },
+    { path: '/statistiche', section: 'statistiche', icon: 'bar_chart', label: 'nav.stats' },
+    { path: '/note', section: 'note', icon: 'lightbulb', label: 'nav.notes' },
+  ];
+  /** Sezione attiva: una delle pagine principali; i task, le chat e i nuovi progetti sono "projects". */
+  protected readonly section = computed(
+    () => /^\/(workflow|statistiche|note|opzioni)(?=\/|$|\?)/.exec(this.url())?.[1] ?? 'projects',
   );
   protected readonly connection = computed(() =>
     this.i18n.t(

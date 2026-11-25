@@ -133,6 +133,55 @@ export const SaveProjectPromptSchema = Type.Object(
   { additionalProperties: false },
 );
 
+/**
+ * Nota: un'idea o un problema visto, da trasformare in task quando si vuole. Il testo è in
+ * pratica un prompt. Senza progetto può essere, per esempio, l'idea di un progetto nuovo.
+ */
+export const NoteKindSchema = Type.Union([Type.Literal('idea'), Type.Literal('issue')]);
+export type NoteKind = Static<typeof NoteKindSchema>;
+
+const NoteBody = Type.String({ minLength: 1, maxLength: 20_000, pattern: '\\S' });
+
+export const NoteSchema = Type.Object(
+  {
+    id: Id,
+    /** Progetto della nota; assente = nessuno (es. un progetto nuovo). */
+    projectId: Type.Optional(Id),
+    kind: NoteKindSchema,
+    body: Type.String(),
+    createdAt: Timestamp,
+    updatedAt: Timestamp,
+    /** Task in cui è stata trasformata; assente = ancora da fare. */
+    runId: Type.Optional(Id),
+  },
+  { additionalProperties: false },
+);
+export type Note = Static<typeof NoteSchema>;
+
+export const CreateNoteSchema = Type.Object(
+  {
+    body: NoteBody,
+    /** Assente = idea. */
+    kind: Type.Optional(NoteKindSchema),
+    projectId: Type.Optional(Type.Union([Id, Type.Null()])),
+  },
+  { additionalProperties: false },
+);
+export type CreateNote = Static<typeof CreateNoteSchema>;
+
+export const UpdateNoteSchema = Type.Object(
+  {
+    body: Type.Optional(NoteBody),
+    kind: Type.Optional(NoteKindSchema),
+    /** null = nessun progetto. */
+    projectId: Type.Optional(Type.Union([Id, Type.Null()])),
+    /** null = di nuovo da fare. */
+    runId: Type.Optional(Type.Union([Id, Type.Null()])),
+  },
+  { additionalProperties: false },
+);
+export type UpdateNote = Static<typeof UpdateNoteSchema>;
+
 export const HealthSchema = Type.Object({
   status: Type.Literal('ok'),
   /** Per riconoscere il servizio di Jeko sulla porta (pagina d'avvio, seconda istanza). */

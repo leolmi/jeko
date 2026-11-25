@@ -5,9 +5,11 @@ import websocket from '@fastify/websocket';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { folderKey, HealthSchema } from '@jeko/shared';
 import { SettingsFile } from './data/files.js';
+import { NoteStore } from './notes/store.js';
 import { ProjectStore } from './projects/store.js';
 import { TemplateStore, type TemplateFile } from './projects/templates.js';
 import { appRoutes, type AppControl } from './routes/app.js';
+import { noteRoutes } from './routes/notes.js';
 import { projectRoutes } from './routes/projects.js';
 import { remoteRoutes } from './routes/remote.js';
 import { runRoutes } from './routes/runs.js';
@@ -28,7 +30,7 @@ import { VERSION } from './version.js';
 import { WorkflowStore } from './workflows/store.js';
 
 export interface AppOptions {
-  /** Cartella dei dati (`settings.json`, `projects.json`, `runs/`…). */
+  /** Cartella dei dati (`settings.json`, `projects.json`, `notes.json`, `runs/`…). */
   dataDir: string;
   logger?: boolean | { level?: string; stream?: NodeJS.WritableStream };
   /** Build della web-app da servire su `/` (assente in sviluppo: c'è `ng serve`). */
@@ -74,6 +76,7 @@ export async function buildApp({
   const runs = new RunStore(dataDir);
   const settings = new UserSettingsStore(settingsFile);
   const projects = new ProjectStore(dataDir);
+  const notes = new NoteStore(dataDir);
   const templates = new TemplateStore(dataDir, settingsFile);
   if (seed) {
     await workflows.seed(seed.workflows);
@@ -88,7 +91,8 @@ export async function buildApp({
     return { status: 'ok' as const, app: 'jeko' as const, version: VERSION, runner: hub.connected };
   });
 
-  await app.register(projectRoutes, { projects, workflows, hub });
+  await app.register(projectRoutes, { projects, workflows, hub, notes });
+  await app.register(noteRoutes, { notes, projects });
   await app.register(templateRoutes, { templates, runs, hub });
   await app.register(workflowRoutes, { workflows, projects, hub });
   await app.register(runRoutes, { runs, workflows, projects, hub });

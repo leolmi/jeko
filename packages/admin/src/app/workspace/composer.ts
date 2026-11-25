@@ -10,6 +10,7 @@ import {
 import { Router } from '@angular/router';
 import type { AgentChoice, RunMode } from '@jeko/shared';
 import { I18n } from '../core/i18n';
+import { Notes } from '../core/notes';
 import { Projects } from '../core/projects';
 import { Realtime } from '../core/realtime';
 import { Runs } from '../core/runs';
@@ -142,6 +143,7 @@ export class TaskComposer {
   protected readonly rt = inject(Realtime);
   private readonly projects = inject(Projects);
   private readonly runs = inject(Runs);
+  private readonly notes = inject(Notes);
   private readonly router = inject(Router);
 
   protected readonly project = this.projects.active;
@@ -207,7 +209,10 @@ export class TaskComposer {
 
   protected setDraft(text: string): void {
     const p = this.project();
-    if (p) this.projects.setDraft(p.id, text);
+    if (!p) return;
+    this.projects.setDraft(p.id, text);
+    // Svuotata la chat, le note messe lì tornano da fare.
+    if (!text.trim()) this.notes.dropPending(p.id);
   }
 
   protected submit(): void {
@@ -242,6 +247,7 @@ export class TaskComposer {
       })
       .subscribe({
         next: (run) => {
+          this.notes.linkRun(p.id, run.id);
           done();
           void this.router.navigate(['/runs', run.id]);
         },

@@ -12,6 +12,7 @@ import { Router } from '@angular/router';
 import { kebab, type RunMode } from '@jeko/shared';
 import { firstValueFrom } from 'rxjs';
 import { I18n } from '../core/i18n';
+import { NEW_PROJECT, Notes } from '../core/notes';
 import { Projects } from '../core/projects';
 import { Realtime } from '../core/realtime';
 import { Runs } from '../core/runs';
@@ -151,6 +152,7 @@ export class NewProject {
   protected readonly i18n = inject(I18n);
   private readonly projects = inject(Projects);
   private readonly runs = inject(Runs);
+  private readonly notes = inject(Notes);
   private readonly router = inject(Router);
   protected readonly settings = inject(Settings);
 
@@ -188,6 +190,8 @@ export class NewProject {
 
   constructor() {
     if (!this.settings.value()) void this.settings.load().catch(() => undefined);
+    // Arrivando da una nota senza progetto, la richiesta è il suo testo.
+    this.request.set(this.notes.newProjectRequest());
   }
 
   private finalName(): string {
@@ -257,6 +261,7 @@ export class NewProject {
     this.runs.createProject(body).subscribe({
       next: (run) => {
         this.busy.set(false);
+        this.notes.linkRun(NEW_PROJECT, run.id);
         void this.router.navigate(['/runs', run.id]);
       },
       error: () => {

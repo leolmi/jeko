@@ -26,6 +26,10 @@ export const routes: Routes = [
     loadComponent: () => import('./stats/stats-page').then((m) => m.StatsPage),
   },
   {
+    path: 'note',
+    loadComponent: () => import('./notes/notes-page').then((m) => m.NotesPage),
+  },
+  {
     path: 'opzioni',
     loadComponent: () => import('./settings/settings-page').then((m) => m.SettingsPage),
   },

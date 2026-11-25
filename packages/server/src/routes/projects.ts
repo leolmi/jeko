@@ -15,6 +15,7 @@ import {
 } from '@jeko/shared';
 import type { FastifyReply } from 'fastify';
 import { Type } from '@sinclair/typebox';
+import type { NoteStore } from '../notes/store.js';
 import type { ProjectStore } from '../projects/store.js';
 import type { RunnerHub } from '../runs/hub.js';
 import type { WorkflowStore } from '../workflows/store.js';
@@ -24,7 +25,8 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
   projects: ProjectStore;
   workflows: WorkflowStore;
   hub: RunnerHub;
-}> = async (app, { projects, workflows, hub }) => {
+  notes: NoteStore;
+}> = async (app, { projects, workflows, hub, notes }) => {
   app.get('/api/projects', { schema: { response: { 200: Type.Array(ProjectSchema) } } }, () =>
     projects.list(),
   );
@@ -213,11 +215,14 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{
     },
   );
 
-  // Toglie il progetto dall'elenco di Jeko: la cartella e le run restano.
+  // Toglie il progetto dall'elenco di Jeko: la cartella e le run restano, le note no.
   app.delete(
     '/api/projects/:id',
     { schema: { params: Type.Object({ id: Id }) } },
-    async (req, reply) =>
-      (await projects.remove(req.params.id)) ? reply.code(204).send() : reply.callNotFound(),
+    async (req, reply) => {
+      if (!(await projects.remove(req.params.id))) return reply.callNotFound();
+      notes.removeProject(req.params.id);
+      return reply.code(204).send();
+    },
   );
 };
