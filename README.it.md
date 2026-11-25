@@ -113,6 +113,6 @@ Il runner la passa a claude nel primo turno di ogni run. La creazione di un prog
 
 - I workflow sono solo di sviluppo (`kind: develop`). Ogni progetto ne fissa uno nelle sue opzioni (⚙ accanto al nome), altrimenti vale il predefinito, cioè il primo per nome. Si usa sempre l'ultima versione.
 - Nei passi `agent`, `effort` (`low`…`max`) e `model` (es. `opus`) diventano `claude --effort/--model`. Esempio: `sviluppo-completo.yaml`.
-- Le pagine principali (Progetti, Workflow, Note, Statistiche) e le Opzioni sono nella barra di icone a sinistra; sui Progetti un pallino segnala i task aperti (pulsa se uno lavora, ha un cerchio se uno aspetta te).
+- Le pagine principali (Progetti, Note, Workflow, Statistiche) e le Opzioni sono nella barra di icone a sinistra; sui Progetti un pallino segnala i task aperti (pulsa se uno lavora, ha un cerchio se uno aspetta te).
 - **Note**: idee e problemi annotati al volo, con un progetto o senza, in pratica dei prompt. La pagina mostra quelle da lavorare raggruppate per progetto. "Crea task" apre il progetto con il testo già nella chat; per le note senza progetto "Crea progetto" lo mette nella richiesta del progetto nuovo. Quando il task parte la nota gli si lega ed esce dall'elenco.
 - I progetti nuovi li crea l'AI, partendo da un template, cioè un prompt già pronto con un nome, che si gestisce in "Nuovo progetto". Nel prompt valgono `{{ name }}`, `{{ dir }}` e `{{ request }}`. Al termine il progetto entra da solo nell'elenco.

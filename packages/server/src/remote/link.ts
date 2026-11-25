@@ -35,9 +35,16 @@ export interface RemoteLinkOptions {
   WebSocketImpl?: typeof WebSocket;
 }
 
-/** Cosa può fare un dispositivo remoto: leggere progetti e task, avviarli, rispondere, annullare. */
+/**
+ * Cosa può fare un dispositivo remoto: leggere progetti e task, avviarli, rispondere, annullare;
+ * leggere, scrivere ed eliminare le note.
+ */
 const ALLOWED: [string, RegExp][] = [
   ['GET', /^\/api\/projects$/],
+  ['GET', /^\/api\/notes$/],
+  ['POST', /^\/api\/notes$/],
+  ['PATCH', /^\/api\/notes\/[\w-]+$/],
+  ['DELETE', /^\/api\/notes\/[\w-]+$/],
   ['GET', /^\/api\/runs$/],
   ['GET', /^\/api\/runs\/[\w-]+$/],
   ['POST', /^\/api\/runs$/],

@@ -73,8 +73,8 @@ describe('App', () => {
     const nav = [...el.querySelectorAll<HTMLAnchorElement>('nav a')];
     expect(nav.map((a) => a.getAttribute('href'))).toEqual([
       '/',
-      '/workflow',
       '/note',
+      '/workflow',
       '/statistiche',
       '/opzioni',
     ]);

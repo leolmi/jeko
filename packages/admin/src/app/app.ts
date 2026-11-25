@@ -135,8 +135,8 @@ export class App {
   );
   protected readonly links: { path: string; section: string; icon: IconName; label: I18nKey }[] = [
     { path: '/', section: 'projects', icon: 'folder', label: 'nav.projects' },
-    { path: '/workflow', section: 'workflow', icon: 'account_tree', label: 'nav.workflows' },
     { path: '/note', section: 'note', icon: 'lightbulb', label: 'nav.notes' },
+    { path: '/workflow', section: 'workflow', icon: 'account_tree', label: 'nav.workflows' },
     { path: '/statistiche', section: 'statistiche', icon: 'bar_chart', label: 'nav.stats' },
   ];
   /**

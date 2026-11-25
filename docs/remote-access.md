@@ -23,7 +23,8 @@ The remote page uses the language chosen in Jeko (Italian or English).
   - if a task is already at work on the same project, the new one is **queued**;
 - continue a direct task that is waiting for a follow-up, or start again from the conversation of a finished one;
 - answer the Agent's questions, approve or reject gates and reviews;
-- cancel a task.
+- cancel a task;
+- manage notes ("Notes" tab on the home page): add, edit and delete them and, if they have a project, turn them into a task with "Create task", which opens the project with the text already in the chat.
 
 Everything else (options, workflows, new projects) stays on the PC.
 

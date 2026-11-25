@@ -24,7 +24,8 @@ La pagina remota usa la lingua scelta in Jeko (italiano o inglese).
   - se è già al lavoro un task sullo stesso progetto, il nuovo si **mette in coda**;
 - continuare un task diretto che aspetta il seguito, o ripartire dalla conversazione di uno concluso;
 - rispondere alle domande dell'Agent, approvare o rifiutare i gate e le revisioni;
-- annullare un task.
+- annullare un task;
+- gestire le note (scheda «Note» in home): aggiungerle, modificarle, eliminarle e, se hanno un progetto, trasformarle in task con «Crea task», che apre il progetto con il testo già nella chat.
 
 Il resto (opzioni, workflow, progetti nuovi) resta sul PC.
 

@@ -113,6 +113,6 @@ The runner passes it to claude in the first turn of every run. Creating a projec
 
 - Workflows are development-only (`kind: develop`). Each project pins one in its options (⚙ next to the name), otherwise the default applies, i.e. the first by name. The latest version is always used.
 - In `agent` steps, `effort` (`low`…`max`) and `model` (e.g. `opus`) become `claude --effort/--model`. Example: `sviluppo-completo.yaml`.
-- The main pages (Projects, Workflows, Notes, Statistics) and the Options are in the icon bar on the left; on Projects a dot shows open tasks (it pulses while one works, has a ring when one waits for you).
+- The main pages (Projects, Notes, Workflows, Statistics) and the Options are in the icon bar on the left; on Projects a dot shows open tasks (it pulses while one works, has a ring when one waits for you).
 - **Notes**: ideas and problems jotted down on the fly, with or without a project, prompts in practice. The page shows the ones still to work on, grouped by project. "Create task" opens the project with the text already in the chat; for notes without a project "Create project" puts it in the new project's request. When the task starts the note is linked to it and leaves the list.
 - New projects are created by the AI, starting from a template, i.e. a ready-made prompt with a name, managed in "New project". The prompt can use `{{ name }}`, `{{ dir }}` and `{{ request }}`. When done, the project joins the list by itself.

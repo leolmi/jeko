@@ -16,7 +16,16 @@ const ICONS = {
   plan: 'M22 11V3h-7v3H9V3H2v8h7V8h2v10h4v3h7v-8h-7v3h-2V8h2v3z',
   direct: 'M7 2v11h3v9l7-12h-4l4-8z',
   send: 'M2.01 21L23 12 2.01 3 2 10l15 2-15 2z',
+  idea: 'M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z',
+  issue:
+    'M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z',
+  arrow: 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z',
+  edit: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
+  delete: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+  close:
+    'M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
 };
+const NOTE_KINDS = ['idea', 'issue'];
 const icon = (name) =>
   `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}" /></svg>`;
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
@@ -193,7 +202,22 @@ const state = {
    * Scelte della chat in fondo al progetto: controllo, con/senza workflow, modello e impegno
    * (`agent`, vuoto = quelli del progetto; si riparte da vuoto cambiando progetto) e pannello aperto.
    */
-  composer: { mode: 'checkpoint', direct: false, agent: {}, agentOf: null, picking: false },
+  composer: {
+    mode: 'checkpoint',
+    direct: false,
+    agent: {},
+    agentOf: null,
+    picking: false,
+    /** Nota da cui viene il testo: quando il task parte le si lega. */
+    note: null,
+  },
+  /** Scheda della home: i task e i progetti, o le note. */
+  tab: 'tasks',
+  /** Note (null finché non arrivano); quella aperta (con i comandi) e quella in modifica. */
+  notes: null,
+  noteOpen: null,
+  noteEdit: null,
+  noteKind: 'idea',
   /** Messaggi lunghi dell'attività aperti per intero (chiave: istante e posizione). */
   expanded: new Set(),
   error: '',
@@ -302,6 +326,7 @@ async function onFrame(data) {
       state.projects = body.projects;
       state.runs = body.runs;
       state.at = body.at;
+      if (state.notes === null && state.host) void loadNotes();
     }
     return render();
   }
@@ -354,6 +379,15 @@ function onEvent(msg) {
       return;
   }
   render();
+}
+
+async function loadNotes() {
+  try {
+    state.notes = await api('GET', '/api/notes');
+    render();
+  } catch {
+    /* si riprova aprendo le note */
+  }
 }
 
 async function refreshRuns() {
@@ -430,8 +464,18 @@ function projectRow(p) {
   </button>`;
 }
 
+/** Schede della home: task e progetti, o note (col numero di quelle da lavorare). */
+function homeTabs() {
+  const todo = (state.notes ?? []).filter((n) => !n.runId).length;
+  const tab = (k, label) =>
+    `<button type="button" role="tab" aria-selected="${state.tab === k}" data-tab="${k}">${label}</button>`;
+  const notes = todo ? `${t('tabs.notes')} · ${todo}` : t('tabs.notes');
+  return `<div class="tabs" role="tablist">${tab('tasks', t('tabs.tasks'))}${tab('notes', notes)}</div>`;
+}
+
 /** Home: da rispondere, poi i preferiti (nel loro ordine), poi gli altri progetti per nome. */
 function viewHome() {
+  if (state.tab === 'notes') return homeTabs() + viewNotes();
   const waiting = state.runs.filter((r) => r.status === 'waiting');
   const favorites = state.projects
     .filter((p) => p.favorite !== undefined)
@@ -441,11 +485,76 @@ function viewHome() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const section = (title, html) => (html ? `<h2>${title}</h2>${html}` : '');
   return (
+    homeTabs() +
     section(t('home.waiting'), waiting.map((r) => runRow(r, true)).join('')) +
     section(t('home.favorites'), favorites.map(projectRow).join('')) +
     (section(t('home.projects'), others.map(projectRow).join('')) ||
       (favorites.length ? '' : `<p class="empty">${t('home.empty')}</p>`))
   );
+}
+
+function noteCard(n) {
+  const open = state.noteOpen === n.id;
+  const hasProject = state.projects.some((p) => p.id === n.projectId);
+  const kind = esc(t(`notes.${n.kind}`));
+  return `<div class="card note">
+    <button type="button" class="note-main" data-note-open="${esc(n.id)}" aria-expanded="${open}">
+      <span class="note-kind ${n.kind}" role="img" aria-label="${kind}" title="${kind}">${icon(n.kind)}</span>
+      <span class="grow"><span class="note-body">${esc(n.body)}</span>
+      <span class="muted">${when(n.createdAt)}</span></span>
+    </button>
+    ${
+      open
+        ? `<div class="actions">
+            ${hasProject ? `<button type="button" class="btn primary" data-note-task="${esc(n.id)}">${icon('arrow')} ${t('notes.toTask')}</button>` : ''}
+            <button type="button" class="btn" data-note-edit="${esc(n.id)}" aria-label="${t('notes.edit')}" title="${t('notes.edit')}">${icon('edit')}</button>
+            <button type="button" class="btn danger" data-note-delete="${esc(n.id)}" aria-label="${t('notes.delete')}" title="${t('notes.delete')}">${icon('delete')}</button>
+          </div>`
+        : ''
+    }
+  </div>`;
+}
+
+/** Note da lavorare per progetto, in ordine di nome; quelle senza progetto in fondo. */
+function viewNotes() {
+  if (state.notes === null) return `<p class="empty">${t('notes.loading')}</p>`;
+  const todo = state.notes.filter((n) => !n.runId);
+  const known = new Set(state.projects.map((p) => p.id));
+  const groups = [...state.projects]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((p) => [p.name, todo.filter((n) => n.projectId === p.id)]);
+  groups.push([t('notes.noProject'), todo.filter((n) => !known.has(n.projectId))]);
+  const html = groups
+    .filter(([, notes]) => notes.length)
+    .map(([name, notes]) => `<h2>${esc(name)}</h2>${notes.map(noteCard).join('')}`)
+    .join('');
+  return html || `<p class="empty">${t('notes.empty')}</p>`;
+}
+
+/** In fondo alle note: una nuova, o quella in modifica. */
+function noteForm() {
+  const editing = !!state.noteEdit;
+  const projects = [...state.projects].sort((a, b) => a.name.localeCompare(b.name));
+  return `
+    <div class="note-form">
+      ${editing ? `<div class="muted">${t('notes.editing')}</div>` : ''}
+      <textarea id="note-body" data-keep rows="2" aria-label="${t('notes.new')}" placeholder="${esc(t('notes.placeholder'))}"></textarea>
+      ${state.error ? `<p class="error">${esc(state.error)}</p>` : ''}
+      <div class="note-bar">
+        <div class="seg" role="radiogroup" aria-label="${t('notes.kind')}">
+          ${NOTE_KINDS.map(
+            (k) =>
+              `<button type="button" role="radio" aria-checked="${k === state.noteKind}" data-note-kind="${k}">${icon(k)} ${t(`notes.${k}`)}</button>`,
+          ).join('')}
+        </div>
+        <select id="note-project" data-keep aria-label="${t('notes.project')}">
+          <option value="">${t('notes.noProject')}</option>
+          ${projects.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}
+        </select>
+        ${editing ? `<button type="button" class="btn ghost" data-act="note-cancel">${t('notes.cancel')}</button>` : ''}
+        <button type="button" class="btn primary" data-act="note-save">${t(editing ? 'notes.save' : 'notes.add')}</button>
+      </div>
+    </div>`;
 }
 
 function viewProject(project) {
@@ -520,13 +629,15 @@ function composer(project, task = null) {
           </div>
         </div>`
       : '';
+  const note = !task && state.composer.note?.projectId === project.id ? state.composer.note : null;
   return `
     <div class="composer ${tone}">
       <div class="composer-head">
+        ${note ? `<button type="button" class="from-note" data-act="unnote" title="${esc(t('notes.unlink'))}">${icon('idea')} ${t('notes.fromNote')} ${icon('close')}</button>` : ''}
         <span class="mode-badge">${icon(tone)} ${t(direct ? 'composer.direct' : 'composer.plan')}</span>
       </div>
       ${picker}
-      <textarea id="req" data-keep rows="2" aria-label="${t('composer.request')}" placeholder="${esc(placeholder)}"></textarea>
+      <textarea id="req" data-keep rows="2" aria-label="${t('composer.request')}" placeholder="${esc(placeholder)}">${note ? esc(note.body) : ''}</textarea>
       ${state.error ? `<p class="error">${esc(state.error)}</p>` : ''}
       <div class="composer-bar">
         <div class="seg" role="radiogroup" aria-label="${t('composer.control')}"${follow ? ` aria-disabled="true" title="${fromTask}"` : ''}>
@@ -697,7 +808,10 @@ function render() {
     html = viewTask();
     const p = state.detail && projectOf(state.detail);
     if (p) dock = composer(p, state.detail);
-  } else html = viewHome();
+  } else {
+    html = viewHome();
+    if (state.tab === 'notes' && state.notes !== null) dock = noteForm();
+  }
 
   $('title').textContent = title;
   document.title = t('app.title');
@@ -750,9 +864,9 @@ async function answer(promptId, value) {
 $('back').addEventListener('click', () => history.back());
 
 function onClick(e) {
-  const t = e.target.closest('button');
-  if (!t) return;
-  const d = t.dataset;
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const d = btn.dataset;
   if (d.mode) {
     state.composer.mode = d.mode;
     return render();
@@ -776,6 +890,75 @@ function onClick(e) {
     if (!state.expanded.delete(d.more)) state.expanded.add(d.more);
     return render();
   }
+  if (d.tab) {
+    state.tab = d.tab;
+    state.error = '';
+    if (d.tab === 'notes') void loadNotes();
+    return render();
+  }
+  if (d.noteOpen) {
+    state.noteOpen = state.noteOpen === d.noteOpen ? null : d.noteOpen;
+    return render();
+  }
+  if (d.noteKind) {
+    state.noteKind = d.noteKind;
+    return render();
+  }
+  if (d.noteEdit) {
+    const n = state.notes?.find((x) => x.id === d.noteEdit);
+    if (!n) return;
+    state.noteEdit = n.id;
+    state.noteKind = n.kind;
+    // I campi tengono quello che c'è scritto: si riempiono prima di ridisegnare.
+    $('note-body').value = n.body;
+    $('note-project').value = n.projectId ?? '';
+    render();
+    return $('note-body').focus();
+  }
+  if (d.act === 'note-cancel') {
+    state.noteEdit = null;
+    $('note-body').value = '';
+    return render();
+  }
+  if (d.act === 'note-save')
+    return act(async () => {
+      const body = $('note-body').value.trim();
+      if (!body) throw new Error(t('err.note'));
+      btn.disabled = true;
+      const fields = { body, kind: state.noteKind, projectId: $('note-project').value || null };
+      const saved = state.noteEdit
+        ? await api('PATCH', `/api/notes/${state.noteEdit}`, fields)
+        : await api('POST', '/api/notes', fields);
+      const others = (state.notes ?? []).filter((n) => n.id !== saved.id);
+      state.notes = state.noteEdit
+        ? (state.notes ?? []).map((n) => (n.id === saved.id ? saved : n))
+        : [saved, ...others];
+      state.noteEdit = null;
+      $('note-body').value = '';
+    });
+  if (d.noteDelete)
+    return act(async () => {
+      const n = state.notes?.find((x) => x.id === d.noteDelete);
+      if (!n || !confirm(t('notes.delete.confirm', { text: n.body.slice(0, 80) }))) return;
+      await api('DELETE', `/api/notes/${n.id}`);
+      state.notes = state.notes.filter((x) => x.id !== n.id);
+      if (state.noteEdit === n.id) {
+        state.noteEdit = null;
+        $('note-body').value = '';
+      }
+    });
+  if (d.noteTask) {
+    const n = state.notes?.find((x) => x.id === d.noteTask);
+    if (!n?.projectId) return;
+    state.composer.note = n;
+    state.noteOpen = null;
+    return go({ name: 'project', id: n.projectId });
+  }
+  if (d.act === 'unnote') {
+    state.composer.note = null;
+    if ($('req')) $('req').value = '';
+    return render();
+  }
   if (d.goProject) return go({ name: 'project', id: d.goProject });
   if (d.goTask) return go({ name: 'task', id: d.goTask });
   if (d.act === 'start')
@@ -784,7 +967,7 @@ function onClick(e) {
       const p = task ? projectOf(task) : state.projects.find((x) => x.id === state.view.id);
       const request = $('req').value.trim();
       if (!request) throw new Error(t('err.request'));
-      t.disabled = true;
+      btn.disabled = true;
       // Task diretto aperto che aspetta il seguito: il messaggio lo continua.
       const follow = followUpOf(task);
       if (follow) {
@@ -808,6 +991,16 @@ function onClick(e) {
       $('req').value = '';
       state.composer.picking = false;
       state.runs = [run, ...state.runs];
+      const note = state.composer.note;
+      if (!task && note?.projectId === p.id) {
+        state.composer.note = null;
+        // Il task è partito: la nota gli si lega ed esce da quelle da lavorare.
+        await api('PATCH', `/api/notes/${note.id}`, { runId: run.id })
+          .then((saved) => {
+            state.notes = (state.notes ?? []).map((n) => (n.id === saved.id ? saved : n));
+          })
+          .catch(() => {});
+      }
       go({ name: 'task', id: run.id });
     });
   if (d.act === 'cancel')

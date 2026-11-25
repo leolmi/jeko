@@ -173,6 +173,16 @@ describe('accesso remoto: Jeko ↔ relay ↔ dispositivo', () => {
     const detail = await dev.req('GET', `/api/runs/${(started.body as { id: string }).id}`);
     expect(detail.body).toMatchObject({ model: 'claude-opus-5-5', effort: 'high', session: false });
 
+    // Le note si leggono, scrivono ed eliminano anche da remoto.
+    const note = await dev.req('POST', '/api/notes', { body: 'Idea dal telefono' });
+    expect(note.status).toBe(201);
+    const noteId = (note.body as { id: string }).id;
+    expect((await dev.req('PATCH', `/api/notes/${noteId}`, { kind: 'issue' })).body).toMatchObject({
+      kind: 'issue',
+    });
+    expect((await dev.req('GET', '/api/notes')).body).toHaveLength(1);
+    expect((await dev.req('DELETE', `/api/notes/${noteId}`)).status).toBe(204);
+
     // Lo stesso messaggio rimandato non si esegue due volte.
     const m = await page.seal(
       await page.importKey(new URLSearchParams(new URL(pair.body.link).hash.slice(1)).get('k')!),
