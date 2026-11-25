@@ -85,6 +85,15 @@ const PROJECTS = [
   },
 ];
 
+// Note da trasformare in task: [progetto o null, tipo, testo].
+const NOTES = [
+  ['ricettario', 'idea', 'Suggerire ricette con quello che resta in frigo'],
+  ['ricettario', 'issue', 'Le foto verticali escono tagliate nella scheda'],
+  ['bilancio-casa', 'issue', 'Il riepilogo annuale conta due volte le spese di dicembre'],
+  ['meteo-cli', 'idea', 'Avviso di pioggia per la prossima ora'],
+  [null, 'idea', 'App per prenotare il campo da tennis del circolo'],
+];
+
 // Task già fatti negli ultimi 30 giorni: [progetto, richiesta, giorni fa, approvato, diretto].
 const HISTORY = (() => {
   let seed = 7;
@@ -251,6 +260,8 @@ async function prepare() {
     await call('PATCH', `/projects/${created.id}`, { workflow: 'sviluppo' });
     byName[p.name] = created;
   }
+  for (const [name, kind, body] of NOTES)
+    await call('POST', '/notes', { kind, body, ...(name && { projectId: byName[name].id }) });
   // Un task alla volta per progetto, i progetti in parallelo.
   const ages = [];
   await Promise.all(

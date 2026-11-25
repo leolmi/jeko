@@ -1,6 +1,6 @@
 /* global addEventListener, document */
 // Video dimostrativo di Jeko (docs/jeko-demo.webm): rifà i dati finti (demo.mjs), poi Edge,
-// pilotato da Playwright, avvia un task, approva i gate e passa da Workflow e Statistiche.
+// pilotato da Playwright, avvia un task, approva i gate e passa da Note, Workflow e Statistiche.
 // Uso: node scripts/video/record.mjs
 import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -90,11 +90,14 @@ try {
   }
   await pause(4000);
 
-  await click(page.getByRole('link', { name: 'Workflow' }));
+  // Le pagine dalla barra a sinistra.
+  await click(page.getByRole('link', { name: 'Note', exact: true }));
+  await pause(3000);
+  await click(page.getByRole('link', { name: 'Workflow', exact: true }));
   await pause(3500);
-  await click(page.getByRole('link', { name: 'Statistiche' }));
+  await click(page.getByRole('link', { name: 'Statistiche', exact: true }));
   await pause(4500);
-  await click(page.getByRole('link', { name: 'Progetti' }));
+  await click(page.getByRole('link', { name: /^Progetti/ }));
   await pause(2000);
 } finally {
   const video = page.video();

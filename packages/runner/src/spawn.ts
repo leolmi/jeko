@@ -76,7 +76,9 @@ export function run(
   return new Promise((resolve) => {
     let child: ChildProcess;
     try {
+      // Senza finestra: dal servizio staccato ogni programma da console ne aprirebbe una.
       child = spawnArgv(argv, {
+        windowsHide: true,
         ...rest,
         stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
       });
