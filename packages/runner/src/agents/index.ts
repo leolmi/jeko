@@ -12,7 +12,7 @@ interface AgentDef {
   /** Comando senza impostazioni (variabile d'ambiente o nome dell'eseguibile). */
   defaultCommand(env: NodeJS.ProcessEnv): string[];
   create(command: string[]): AgentDriver;
-  /** Driver non ancora provato con la CLI vera: visibile solo con `JEKO_AGENTS_PREVIEW=1`. */
+  /** Driver non ancora provato con la CLI vera: si sceglie, ma il menu lo segna "(beta)". */
   preview?: boolean;
 }
 
@@ -42,13 +42,9 @@ const AGENTS: readonly AgentDef[] = [
   },
 ];
 
-/** Agenti utilizzabili: quelli in anteprima solo se richiesti. */
-const available = (env: NodeJS.ProcessEnv) =>
-  AGENTS.filter((a) => !a.preview || env['JEKO_AGENTS_PREVIEW'] === '1');
-
 /** Agenti disponibili, per le impostazioni dell'app. */
 export const agentInfos = (env: NodeJS.ProcessEnv = process.env): AgentInfo[] =>
-  available(env).map((a) => ({
+  AGENTS.map((a) => ({
     id: a.id,
     label: a.label,
     command: a.defaultCommand(env).join(' '),
@@ -64,7 +60,7 @@ export function runAgent(
   settings: AgentsSettings | undefined,
   env: NodeJS.ProcessEnv = process.env,
 ): AgentDriver {
-  const def = available(env).find((a) => a.id === id);
+  const def = AGENTS.find((a) => a.id === id);
   if (!def) throw new Error(`L'agente della run (${id}) non è disponibile su questo PC`);
   const custom = settings?.commands?.[id]?.trim();
   return def.create(custom ? [custom] : def.defaultCommand(env));
@@ -78,8 +74,7 @@ export function resolveAgent(
   settings: AgentsSettings | undefined,
   env: NodeJS.ProcessEnv = process.env,
 ): AgentDriver {
-  const list = available(env);
-  const def = list.find((a) => a.id === settings?.default) ?? list[0]!;
+  const def = AGENTS.find((a) => a.id === settings?.default) ?? AGENTS[0]!;
   const custom = settings?.commands?.[def.id]?.trim();
   return def.create(custom ? [custom] : def.defaultCommand(env));
 }

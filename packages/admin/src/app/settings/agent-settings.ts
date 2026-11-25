@@ -82,7 +82,7 @@ export class AgentSettings {
   protected readonly options = computed((): SegmentOption<string>[] =>
     this.agents().map((a) => ({
       value: a.id,
-      label: a.preview ? `${a.label} · ${this.i18n.t('agents.preview')}` : a.label,
+      label: a.preview ? `${a.label} (${this.i18n.t('agents.preview')})` : a.label,
     })),
   );
   /** Verifiche dell'agente scelto: `<id>` e `<id>.…`. */

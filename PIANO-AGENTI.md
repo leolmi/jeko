@@ -16,19 +16,19 @@ funziona oggi. Workflow, knowledge `.jeko/`, prompt, gate, chat e accesso remoto
 
 ## Cosa è legato a claude
 
-| Punto | File |
-|---|---|
-| Argomenti, stream-json, attività, consumi | `runner/src/claude.ts` |
-| Sessione con id scelto da Jeko (`--session-id`), `--resume`, `--fork-session` | `turn.ts`, `claude.ts` |
-| Permessi: `--permission-prompt-tool` (MCP `approve`) + hook PreToolUse via `--settings` | `permissions/bridge.ts`, `hook.ts`, `mcp.ts` |
-| Domande: formato di AskUserQuestion | `permissions/bridge.ts` |
-| Nomi degli strumenti (`Bash`, `PowerShell`, `WebFetch`, `mcp__…`) | `engine/policy.ts` (`classifyTool`), `claude.ts` |
-| `tools` dei passi agent con sintassi claude (`Bash(npm test:*)`) | `shared/workflow/schema.ts` |
-| Esclusioni dal contesto (plugin, skill, server MCP) e analisi dell'`init` | `claude.ts`, `context-probe.ts` |
-| Modelli (`opus`, `sonnet`…), impegno, modello predefinito per cartella | `shared/workflow/schema.ts`, `server/settings/claude-models.ts`, `admin/ui/agent-choice.ts` |
-| Risposte solo testo (`assist`), diagnostica (versione, login) | `assist.ts`, `diagnostics.ts` |
-| Nota di sistema del turno (`TURN_NOTE`, nome `mcp__jeko__start_process`) | `claude.ts` |
-| Testi e messaggi ("claude", `JEKO_CLAUDE_BIN`) | `admin/core/i18n.ts`, vari |
+| Punto                                                                                   | File                                                                                        |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Argomenti, stream-json, attività, consumi                                               | `runner/src/claude.ts`                                                                      |
+| Sessione con id scelto da Jeko (`--session-id`), `--resume`, `--fork-session`           | `turn.ts`, `claude.ts`                                                                      |
+| Permessi: `--permission-prompt-tool` (MCP `approve`) + hook PreToolUse via `--settings` | `permissions/bridge.ts`, `hook.ts`, `mcp.ts`                                                |
+| Domande: formato di AskUserQuestion                                                     | `permissions/bridge.ts`                                                                     |
+| Nomi degli strumenti (`Bash`, `PowerShell`, `WebFetch`, `mcp__…`)                       | `engine/policy.ts` (`classifyTool`), `claude.ts`                                            |
+| `tools` dei passi agent con sintassi claude (`Bash(npm test:*)`)                        | `shared/workflow/schema.ts`                                                                 |
+| Esclusioni dal contesto (plugin, skill, server MCP) e analisi dell'`init`               | `claude.ts`, `context-probe.ts`                                                             |
+| Modelli (`opus`, `sonnet`…), impegno, modello predefinito per cartella                  | `shared/workflow/schema.ts`, `server/settings/claude-models.ts`, `admin/ui/agent-choice.ts` |
+| Risposte solo testo (`assist`), diagnostica (versione, login)                           | `assist.ts`, `diagnostics.ts`                                                               |
+| Nota di sistema del turno (`TURN_NOTE`, nome `mcp__jeko__start_process`)                | `claude.ts`                                                                                 |
+| Testi e messaggi ("claude", `JEKO_CLAUDE_BIN`)                                          | `admin/core/i18n.ts`, vari                                                                  |
 
 ## Fasi
 
@@ -46,8 +46,8 @@ Resta da fare: `permissions/` (bridge e hook sono di claude) resta dov'è.
 - `turn.ts` gestisce la sessione scelta dall'agente (`sessionOf`) e la nota del turno in testa
   alla richiesta (`preparePrompt`) per chi non ha un prompt di sistema.
 - Driver in ANTEPRIMA, non provati con le CLI vere (scritti dalla documentazione):
-  `agents/codex.ts`, `agents/cursor.ts`, `agents/gemini.ts`. Visibili solo con
-  `JEKO_AGENTS_PREVIEW=1`. Senza blocco per azione (`gate: 'none'`), senza MCP di Jeko
+  `agents/codex.ts`, `agents/cursor.ts`, `agents/gemini.ts`. Sempre nel menu, segnati
+  "(beta)". Senza blocco per azione (`gate: 'none'`), senza MCP di Jeko
   (niente `start_process`), senza copia della sessione. Da verificare per ciascuno: argomenti,
   eventi dell'uscita, ripresa, permessi in modalità non interattiva (fase 3).
 - Agente fissato nella run: il server lo salva al primo avvio (`agentId` in `run.json`) e lo
@@ -61,23 +61,26 @@ Nuova cartella `packages/runner/src/agents/`:
 
 ```ts
 interface AgentDriver {
-  id: string;                       // 'claude', 'codex', …
+  id: string; // 'claude', 'codex', …
   label: string;
   caps: {
-    resume: boolean;  fork: boolean;
-    ownSessionId: boolean;          // l'id lo sceglie Jeko (claude) o l'agente (lo legge dall'uscita)
-    effort: readonly string[];      // [] se non c'è
-    models: readonly string[];      // alias proposti nel menu
-    gate: 'per-tool' | 'none';      // può fermare la singola azione?
-    questions: boolean;             // domande all'utente nella chat
-    mcp: boolean;                   // start_process e permessi via MCP
-    contextProbe: boolean;  usage: boolean;  cost: boolean;
+    resume: boolean;
+    fork: boolean;
+    ownSessionId: boolean; // l'id lo sceglie Jeko (claude) o l'agente (lo legge dall'uscita)
+    effort: readonly string[]; // [] se non c'è
+    models: readonly string[]; // alias proposti nel menu
+    gate: 'per-tool' | 'none'; // può fermare la singola azione?
+    questions: boolean; // domande all'utente nella chat
+    mcp: boolean; // start_process e permessi via MCP
+    contextProbe: boolean;
+    usage: boolean;
+    cost: boolean;
   };
-  command(): string[];              // es. JEKO_CLAUDE_BIN o 'claude'
+  command(): string[]; // es. JEKO_CLAUDE_BIN o 'claude'
   turn(input: TurnInput): { args: string[]; env?: Record<string, string> };
-  parseStream(text: string): TurnOutput | null;   // anche sessionId e modello
+  parseStream(text: string): TurnOutput | null; // anche sessionId e modello
   parseActivity(line: string): Activity[];
-  permissions?: PermissionBridge;   // solo se gate === 'per-tool'
+  permissions?: PermissionBridge; // solo se gate === 'per-tool'
   canonicalTool(name: string): 'shell' | 'web' | 'ask' | 'process' | 'other';
   assist(prompt: string): Promise<string>;
   probe?(cwd: string): Promise<ContextInventory>;
@@ -108,6 +111,7 @@ interface AgentDriver {
 
 Se `gate === 'none'` e una policy della run vuole fermare un'azione nella modalità scelta
 (deciso da Leo):
+
 - nelle modalità con conferma Jeko rifiuta di avviare la run spiegando perché;
 - in modalità autonoma avvisa e prosegue.
 

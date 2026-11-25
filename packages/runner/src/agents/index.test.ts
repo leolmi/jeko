@@ -3,7 +3,7 @@ import { agentInfos, resolveAgent, runAgent } from './index.js';
 
 describe('agenti', () => {
   it('elenca gli agenti col comando predefinito', () => {
-    expect(agentInfos({})).toEqual([{ id: 'claude', label: 'Claude Code', command: 'claude' }]);
+    expect(agentInfos({})[0]).toEqual({ id: 'claude', label: 'Claude Code', command: 'claude' });
     expect(agentInfos({ JEKO_CLAUDE_BIN: 'C:\\bin\\claude.exe' })[0]?.command).toBe(
       'C:\\bin\\claude.exe',
     );
@@ -26,7 +26,7 @@ describe('agenti', () => {
   it("l'agente di una run non ricade su un altro", () => {
     const custom = runAgent('claude', { commands: { claude: 'D:/c.exe' } }, {});
     expect(custom.command).toEqual(['D:/c.exe']);
-    expect(() => runAgent('codex', undefined, {})).toThrow(/non è disponibile/);
-    expect(runAgent('codex', undefined, { JEKO_AGENTS_PREVIEW: '1' }).id).toBe('codex');
+    expect(() => runAgent('altro', undefined, {})).toThrow(/non è disponibile/);
+    expect(runAgent('codex', undefined, {}).id).toBe('codex');
   });
 });

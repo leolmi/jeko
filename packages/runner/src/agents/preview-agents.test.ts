@@ -148,16 +148,13 @@ describe('Gemini CLI', () => {
 });
 
 describe('agenti in anteprima', () => {
-  it('compaiono e si scelgono solo con JEKO_AGENTS_PREVIEW=1', () => {
-    expect(agentInfos({}).map((a) => a.id)).toEqual(['claude']);
-    const env = { JEKO_AGENTS_PREVIEW: '1' };
-    expect(agentInfos(env).map((a) => [a.id, a.preview ?? false])).toEqual([
+  it('compaiono sempre, segnati come anteprima, e si scelgono', () => {
+    expect(agentInfos({}).map((a) => [a.id, a.preview ?? false])).toEqual([
       ['claude', false],
       ['codex', true],
       ['cursor', true],
       ['gemini', true],
     ]);
-    expect(resolveAgent({ default: 'gemini' }, {}).id).toBe('claude');
-    expect(resolveAgent({ default: 'gemini' }, env).id).toBe('gemini');
+    expect(resolveAgent({ default: 'gemini' }, {}).id).toBe('gemini');
   });
 });
