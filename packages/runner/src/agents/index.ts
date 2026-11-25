@@ -56,6 +56,21 @@ export const agentInfos = (env: NodeJS.ProcessEnv = process.env): AgentInfo[] =>
   }));
 
 /**
+ * Driver dell'agente fissato in una run, col comando delle impostazioni se impostato. Errore se
+ * non è (più) disponibile: la sessione è sua, un altro agente non saprebbe riprenderla.
+ */
+export function runAgent(
+  id: string,
+  settings: AgentsSettings | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): AgentDriver {
+  const def = available(env).find((a) => a.id === id);
+  if (!def) throw new Error(`L'agente della run (${id}) non è disponibile su questo PC`);
+  const custom = settings?.commands?.[id]?.trim();
+  return def.create(custom ? [custom] : def.defaultCommand(env));
+}
+
+/**
  * Driver dell'agente scelto nelle impostazioni, col suo comando se impostato; un agente
  * sconosciuto o non disponibile ricade sul predefinito.
  */

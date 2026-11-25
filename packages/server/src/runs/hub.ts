@@ -429,6 +429,9 @@ export class RunnerHub {
     }
     const settings = await this.settings.get();
     const exclude = (await this.projects.byPath(run.cwd))?.exclude;
+    // L'agente si fissa al primo avvio: le riprese non cambiano agente con le Opzioni.
+    const agentId = run.agentId ?? settings.agents?.default ?? this.runner?.agents?.[0]?.id;
+    if (agentId && !run.agentId) await this.runs.fixAgent(run.id, agentId);
     const sent = this.sendRunner({
       type: 'run.start',
       runId: run.id,
@@ -441,6 +444,7 @@ export class RunnerHub {
       settings,
       ...(exclude && !noExclusions(exclude) && { exclude }),
       ...(run.agent && { agent: run.agent }),
+      ...(agentId && { agentId }),
       ...(run.forkSession && { forkSession: run.forkSession }),
     });
     if (!sent) return 'offline';

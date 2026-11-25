@@ -61,7 +61,7 @@ export const runRoutes: FastifyPluginAsyncTypebox<{
           workflow: definition.name,
           version: definition.version,
           definition,
-          ...(source && { from, forkSession: source.sessionId }),
+          ...(source && { from, forkSession: source.sessionId, agentId: source.agentId }),
         });
         await hub.start();
         return reply.code(201).send((await runs.get(run.id))!);

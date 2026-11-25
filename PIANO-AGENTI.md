@@ -50,8 +50,10 @@ Resta da fare: `permissions/` (bridge e hook sono di claude) resta dov'è.
   `JEKO_AGENTS_PREVIEW=1`. Senza blocco per azione (`gate: 'none'`), senza MCP di Jeko
   (niente `start_process`), senza copia della sessione. Da verificare per ciascuno: argomenti,
   eventi dell'uscita, ripresa, permessi in modalità non interattiva (fase 3).
-- Da fare: una run ripresa dopo un cambio di agente usa il nuovo agente (andrebbe fissato
-  l'agente nella run).
+- Agente fissato nella run: il server lo salva al primo avvio (`agentId` in `run.json`) e lo
+  manda in `run.start`; una ripresa usa quello anche se le Opzioni sono cambiate, e un task che
+  ne continua un altro prende l'agente dell'origine. Se l'agente non è più disponibile la run
+  fallisce (`runAgent`), invece di riprendere la sessione con un altro.
 
 Bozza iniziale:
 
@@ -104,10 +106,10 @@ interface AgentDriver {
 
 ### 3. Permessi quando l'agente non ferma la singola azione
 
-Se `gate === 'none'` e una policy della run vuole fermare un'azione nella modalità scelta:
-- l'agente lavora in sola lettura / sandbox se lo permette, oppure
-- Jeko rifiuta di avviare la run spiegando perché, oppure
-- avvisa e prosegue (solo in modalità autonoma).
+Se `gate === 'none'` e una policy della run vuole fermare un'azione nella modalità scelta
+(deciso da Leo):
+- nelle modalità con conferma Jeko rifiuta di avviare la run spiegando perché;
+- in modalità autonoma avvisa e prosegue.
 
 Le domande all'utente senza `questions`: l'agente decide da solo (come oggi in autonomia).
 
@@ -124,4 +126,4 @@ le richieste di approvazione si possono passare a uno strumento MCP: in quel cas
 ## Decisioni per Leo
 
 1. Quale secondo agente (Codex CLI?).
-2. Comportamento della fase 3 quando le policy chiedono uno stop che l'agente non sa fare.
+2. ~~Comportamento della fase 3~~: deciso (rifiuta, in autonomia avvisa).

@@ -34,6 +34,8 @@ export interface NewRun {
   /** Task da cui continua e sessione di claude da copiare al primo turno. */
   from?: string | undefined;
   forkSession?: string | undefined;
+  /** Agente già fissato (task che ne continua un altro: la sessione è di quell'agente). */
+  agentId?: string | undefined;
 }
 
 /** Dati per (ri)avviare una run sul runner. */
@@ -50,6 +52,7 @@ export interface RunLaunch {
   definition: Workflow | null;
   agent: AgentChoice | null;
   forkSession: string | null;
+  agentId: string | null;
 }
 
 /** Contenuto di `runs/<id>/run.json`: la run con le sue richieste all'utente. */
@@ -61,6 +64,8 @@ export interface RunFile extends Omit<RunSummary, 'usage' | 'path' | 'agent'> {
   agent?: AgentChoice | null;
   /** Sessione di claude da copiare al primo turno (task che ne continua un altro). */
   forkSession?: string;
+  /** Agente della run, fissato al primo avvio (assente prima di allora). */
+  agentId?: string;
   prompts: (PromptRecord & { answeredAt?: string })[];
 }
 
@@ -77,6 +82,7 @@ const summary = ({
   inputs: _i,
   agent,
   forkSession: _f,
+  agentId: _a,
   state,
   definition,
   prompts,
@@ -132,6 +138,7 @@ export class RunStore {
       agent: run.agent && Object.keys(run.agent).length ? run.agent : null,
       ...(run.from && { from: run.from }),
       ...(run.forkSession && { forkSession: run.forkSession }),
+      ...(run.agentId && { agentId: run.agentId }),
       prompts: [],
       createdAt: at,
       updatedAt: at,
@@ -168,14 +175,17 @@ export class RunStore {
   }
 
   /**
-   * Task diretto chiuso da cui se ne può continuare un altro: cartella e sessione di claude.
+   * Task diretto chiuso da cui se ne può continuare un altro: cartella, sessione e agente.
    * Null se non esiste, non è diretto, è ancora aperto o non ha mai avuto un turno.
    */
-  async forkSource(id: string): Promise<{ cwd: string | null; sessionId: string } | null> {
+  async forkSource(
+    id: string,
+  ): Promise<{ cwd: string | null; sessionId: string; agentId?: string } | null> {
     const run = this.runs.get(id);
     const sessionId = run?.state?.sessionId;
     if (!run || !sessionId || run.workflow !== DIRECT_WORKFLOW) return null;
-    return FINAL_STATUSES.includes(run.status) ? { cwd: run.cwd, sessionId } : null;
+    if (!FINAL_STATUSES.includes(run.status)) return null;
+    return { cwd: run.cwd, sessionId, ...(run.agentId && { agentId: run.agentId }) };
   }
 
   async get(id: string): Promise<RunSummary | null> {
@@ -210,7 +220,13 @@ export class RunStore {
         definition: r.definition,
         agent: r.agent ?? null,
         forkSession: r.forkSession ?? null,
+        agentId: r.agentId ?? null,
       }));
+  }
+
+  /** Fissa l'agente della run (al primo avvio). */
+  async fixAgent(id: string, agentId: string): Promise<void> {
+    this.change(id, (r) => ({ ...r, agentId }));
   }
 
   /** Definizione propria della run, se ne ha una (run di creazione). */

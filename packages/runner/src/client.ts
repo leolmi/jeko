@@ -423,6 +423,20 @@ export class RunnerClient {
       },
     };
 
+    let host: Host;
+    try {
+      host = this.opts.makeHost(io, start, { runDir: this.journals.runDir(start.runId) });
+    } catch (e) {
+      // Es. l'agente della run non c'è più: la run fallisce invece di restare in corso.
+      const reason = e instanceof Error ? e.message : String(e);
+      this.log.warn(`run ${start.runId}: ${reason}`);
+      return this.emit({
+        type: 'run.finished',
+        runId: start.runId,
+        status: 'failed',
+        error: reason,
+      });
+    }
     this.sessions.set(start.runId, session);
     session.done = runWorkflow(
       {
@@ -437,7 +451,7 @@ export class RunnerClient {
         ...(start.agent && { agent: start.agent }),
         ...(start.forkSession && { forkSession: start.forkSession }),
       },
-      this.opts.makeHost(io, start, { runDir: this.journals.runDir(start.runId) }),
+      host,
     )
       .catch((e: unknown) => this.log.error('errore inatteso nella run', e))
       .finally(() => {

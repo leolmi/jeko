@@ -209,6 +209,11 @@ export const RunStartSchema = Type.Object({
   exclude: Type.Optional(ContextExclusionsSchema),
   /** Ragionamento e modello scelti dall'utente, per i passi agent che non li fissano. */
   agent: Type.Optional(AgentChoiceSchema),
+  /**
+   * Agente della run, fissato al primo avvio: una ripresa usa lo stesso anche se nelle Opzioni
+   * è cambiato (la sessione è di quell'agente). Senza, quello delle `settings`.
+   */
+  agentId: Type.Optional(AgentId),
   /** Sessione di claude da cui ripartire (copiata) al primo turno: task che continua un altro. */
   forkSession: Type.Optional(Type.String({ minLength: 1 })),
 });

@@ -43,6 +43,8 @@ describe('run server ↔ runner', () => {
   let others: RunnerClient[];
   let dataDir: string;
   let agentCalls: AgentRequest[];
+  /** Agente con cui il server ha (ri)avviato ogni run. */
+  let startedWith: (string | undefined)[];
   /** Cartelle in cui il finto runner ha aperto un terminale. */
   let terminals: string[];
   /** Funzioni dei workflow (exists, fileContains…) del finto host. */
@@ -86,23 +88,27 @@ describe('run server ↔ runner', () => {
         const yaml = /Workflow attuale:\n```yaml\n([\s\S]*?)```/.exec(prompt)![1]!;
         return `SUMMARY: descrizione aggiunta\n\`\`\`yaml\n${yaml}description: Rivisto\n\`\`\``;
       },
-      makeHost: (io): Host => ({
-        ...io,
-        get functions() {
-          return functions;
-        },
-        exec: async () => ({ code: 0, stdout: '', stderr: '' }),
-        agent: async (req) => {
-          agentCalls.push(req);
-          return { ok: true, output: `fatto: ${req.instructions}`, sessionId: 's' };
-        },
-      }),
+      makeHost: (io, start): Host => {
+        startedWith.push(start.agentId);
+        return {
+          ...io,
+          get functions() {
+            return functions;
+          },
+          exec: async () => ({ code: 0, stdout: '', stderr: '' }),
+          agent: async (req) => {
+            agentCalls.push(req);
+            return { ok: true, output: `fatto: ${req.instructions}`, sessionId: 's' };
+          },
+        };
+      },
     });
     client.start();
   };
 
   beforeEach(async () => {
     agentCalls = [];
+    startedWith = [];
     terminals = [];
     functions = {};
     others = [];
@@ -496,5 +502,26 @@ describe('run server ↔ runner', () => {
     await answer(body.id, gate, { kind: 'approve', approved: true });
     await until(async () => (await detail(body.id)).status === 'done');
     expect(agentCalls.map((c) => c.instructions)).toEqual(['Ciao Eva']);
+  });
+
+  it("una run ripresa resta con l'agente con cui è partita", async () => {
+    const opts = (agent: string) => api('PUT', '/api/settings', { agents: { default: agent } });
+    expect((await opts('codex')).status).toBe(200);
+    startRunner();
+    const { body } = await api<RunSummary>('POST', '/api/runs', {
+      workflow: 'demo',
+      request: 'x',
+      mode: 'checkpoint',
+    });
+    await pendingPrompt(body.id);
+
+    // Cambia l'agente nelle Opzioni, poi il runner riparte e riprende la run.
+    await opts('claude');
+    const old = client!;
+    old.detach();
+    others.push(old);
+    startRunner();
+    await until(async () => startedWith.length === 2);
+    expect(startedWith).toEqual(['codex', 'codex']);
   });
 });

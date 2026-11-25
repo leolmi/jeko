@@ -2,7 +2,7 @@ import { hostname, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentsSettings } from '@jeko/shared';
-import { agentInfos, resolveAgent } from './agents/index.js';
+import { agentInfos, resolveAgent, runAgent } from './agents/index.js';
 import { RunnerClient } from './client.js';
 import { runDiagnostics } from './diagnostics.js';
 import { createNodeHost } from './engine/node-host.js';
@@ -70,11 +70,13 @@ export async function startRunner(opts: {
       return true;
     },
     makeHost: (io, start, { runDir }) => {
-      const runAgent = resolveAgent(start.settings?.agents);
-      const permissions = runAgent.permissions?.({ endpoint, scriptsDir });
+      const driver = start.agentId
+        ? runAgent(start.agentId, start.settings?.agents)
+        : resolveAgent(start.settings?.agents);
+      const permissions = driver.permissions?.({ endpoint, scriptsDir });
       return createNodeHost({
         ...io,
-        agent: runAgent,
+        agent: driver,
         ...(permissions && { permissions }),
         startProcess: (p) => processes.start(start.runId, p),
         turnsDir: join(runDir, 'turns'),
