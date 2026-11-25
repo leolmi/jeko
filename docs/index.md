@@ -15,6 +15,7 @@ Jeko is a Windows desktop app that manages your projects and works on them with 
 - **Projects**: the list of projects you follow, each with its own workflow and the Agent's model and effort.
 - **Workflows**: development steps in YAML (agents, checks, approval gates), versioned.
 - **Runs**: the Agent works one turn at a time; when needed it asks you a question or stops at a gate and waits.
+- **Notes**: ideas and problems jotted down on the fly, per project or without one; when you want, they become a task (or a new project) in one click.
 - **New projects**: the AI creates them from a template, then they join the list by themselves.
 - **Project knowledge**: in each project's `.jeko/` (description, commands, notes), kept up to date by the workflows.
 - **Remote access**: follow and manage tasks from your phone, with encrypted messages ([how to set it up](./remote-access.html)).
