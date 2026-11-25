@@ -67,15 +67,16 @@ describe('App', () => {
     expect(el.querySelector('header')?.textContent).toContain('jeko');
   });
 
-  it('passa tra progetti, workflow, statistiche e note dalla barra a sinistra', async () => {
+  it('passa tra le pagine e le opzioni dalla barra a sinistra', async () => {
     const el = await render(status(true));
     await stable();
     const nav = [...el.querySelectorAll<HTMLAnchorElement>('nav a')];
     expect(nav.map((a) => a.getAttribute('href'))).toEqual([
       '/',
       '/workflow',
-      '/statistiche',
       '/note',
+      '/statistiche',
+      '/opzioni',
     ]);
     // Solo icone: il nome è nell'etichetta accessibile.
     expect(nav.every((a) => a.getAttribute('aria-label'))).toBe(true);
