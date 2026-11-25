@@ -194,12 +194,29 @@ export type TimeFormat = NonNullable<Formats['time']>;
 export const LangSchema = Type.Union([Type.Literal('it'), Type.Literal('en')]);
 export type Lang = Static<typeof LangSchema>;
 
+/** Agente dei turni (id del driver nel runner, es. `claude`). */
+export const AgentId = Type.String({ minLength: 1, maxLength: 40, pattern: '^[a-z][a-z0-9-]*$' });
+
+/** Agente scelto e comandi personalizzati per agente (senza, quello predefinito del runner). */
+export const AgentsSettingsSchema = Type.Object(
+  {
+    default: Type.Optional(AgentId),
+    /** Comando (percorso dell'eseguibile) per id dell'agente. */
+    commands: Type.Optional(
+      Type.Record(Type.String(), Type.String({ minLength: 1, maxLength: 500 })),
+    ),
+  },
+  { additionalProperties: false },
+);
+export type AgentsSettings = Static<typeof AgentsSettingsSchema>;
+
 export const UserSettingsSchema = Type.Object(
   {
     /** Cartella in cui nascono i progetti nuovi (`jeko.projectsDir` nei workflow). */
     projectsDir: Type.Optional(Type.String({ minLength: 1, maxLength: 260 })),
     formats: Type.Optional(FormatsSchema),
     lang: Type.Optional(LangSchema),
+    agents: Type.Optional(AgentsSettingsSchema),
   },
   { additionalProperties: false },
 );

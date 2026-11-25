@@ -2,32 +2,17 @@ import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  claudeArgs,
-  parseActivity,
-  parseStream,
-  settingsWithPlugins,
-  type Activity,
-  type TurnInput,
-  type TurnOutput,
-} from './claude.js';
 import type { ContextExclusions } from '@jeko/shared';
+import type { Activity, AgentDriver, TurnOutput, TurnPermissions } from './agents/driver.js';
 import { writeAtomic } from './journal.js';
 import { killTree, processAlive, sameProcess } from './process.js';
 import { spawnArgv } from './spawn.js';
 
-/** Permessi di un turno: configurazione per claude e token da ritrovare dopo un riavvio. */
-export interface TurnPermissions {
-  input: Pick<TurnInput, 'mcpConfig' | 'permissionPromptTool' | 'settings' | 'env'>;
-  token: string;
-  dispose: () => void;
-}
-
 export interface DurableTurnOptions {
   /** Cartella del turno: richiesta, uscite e stato (`turn.json`). */
   dir: string;
-  /** Comando di claude (di solito `[claude]`; nei test uno script finto). */
-  command: string[];
+  /** Agente del turno (nei test con uno script finto come comando). */
+  agent: AgentDriver;
   prompt: string;
   cwd?: string | undefined;
   /** Sessione dei turni precedenti della run, da riprendere. */
@@ -41,16 +26,16 @@ export interface DurableTurnOptions {
   /** Ragionamento e modello del passo (`--effort`, `--model`). */
   effort?: string | undefined;
   model?: string | undefined;
-  /** Esclusioni dal contesto di claude, dal progetto. */
+  /** Esclusioni dal contesto dell'agente, dal progetto. */
   exclude?: ContextExclusions | undefined;
   /** Collega il turno ai permessi di Jeko; `token` c'è quando si riaggancia un turno. */
   permissions?: ((dir: string, token?: string) => TurnPermissions) | undefined;
   signal?: AbortSignal | undefined;
-  /** Avanzamento del turno (testo e strumenti), letto dall'uscita mentre claude lavora. */
+  /** Avanzamento del turno (testo e strumenti), letto dall'uscita mentre l'agente lavora. */
   onActivity?: ((a: Activity) => void) | undefined;
   pollMs?: number;
   /**
-   * Attesa dopo il risultato prima di chiudere claude: con task in background (server,
+   * Attesa dopo il risultato prima di chiudere l'agente: con task in background (server,
    * monitor) resterebbe vivo e il turno non finirebbe mai.
    */
   resultGraceMs?: number;
@@ -65,7 +50,8 @@ interface Attempt {
 }
 
 interface TurnMeta {
-  sessionId: string;
+  /** Assente finché l'agente che sceglie da sé la sessione non la dice nell'uscita. */
+  sessionId?: string;
   /** La sessione esisteva già prima di questo turno. */
   resumed: boolean;
   token?: string;
@@ -102,7 +88,7 @@ function tail(file: string): string {
 }
 
 /**
- * Un turno di claude che sopravvive al runner. Il processo parte staccato, con richiesta e
+ * Un turno dell'agente che sopravvive al runner. Il processo parte staccato, con richiesta e
  * uscita su file; lo stato in `turn.json` permette a un runner riavviato di:
  * - restituire il risultato di un turno già finito, senza rieseguirlo;
  * - riagganciare il processo ancora vivo e attenderne la fine;
@@ -114,8 +100,9 @@ export async function durableTurn(o: DurableTurnOptions): Promise<TurnOutput> {
   if (meta?.result) return meta.result;
 
   const perms = o.permissions?.(o.dir, meta?.token);
+  const sessionId = o.sessionId ?? (o.agent.caps.ownSessionId ? randomUUID() : undefined);
   meta ??= {
-    sessionId: o.sessionId ?? randomUUID(),
+    ...(sessionId !== undefined && { sessionId }),
     resumed: o.sessionId !== undefined,
     attempts: [],
   };
@@ -125,7 +112,7 @@ export async function durableTurn(o: DurableTurnOptions): Promise<TurnOutput> {
   let checkedIdentity = false;
   const pump = (n: number) => {
     pumpActivity(o, meta, n);
-    return parseStream(read(files(o.dir, n).out)) !== null;
+    return o.agent.parseStream(read(files(o.dir, n).out)) !== null;
   };
 
   try {
@@ -134,9 +121,10 @@ export async function durableTurn(o: DurableTurnOptions): Promise<TurnOutput> {
       const last = meta.attempts.at(-1);
       if (last) {
         pump(last.n);
-        const out = parseStream(read(files(o.dir, last.n).out));
+        const out = o.agent.parseStream(read(files(o.dir, last.n).out));
         if (out) {
-          meta.result = { ...out, sessionId: out.sessionId ?? meta.sessionId };
+          const session = out.sessionId ?? meta.sessionId;
+          meta.result = { ...out, ...(session !== undefined && { sessionId: session }) };
           save(o.dir, meta);
           return meta.result;
         }
@@ -151,14 +139,26 @@ export async function durableTurn(o: DurableTurnOptions): Promise<TurnOutput> {
         }
         if (meta.attempts.length >= maxAttempts) {
           const err = tail(files(o.dir, last.n).err);
-          return { ok: false, output: `Turno di claude interrotto${err ? `:\n${err}` : ''}` };
+          return {
+            ok: false,
+            output: `Turno di ${o.agent.label} interrotto${err ? `:\n${err}` : ''}`,
+          };
         }
       }
 
       const n = meta.attempts.length + 1;
       const f = files(o.dir, n);
-      writeFileSync(f.prompt, (n > 1 ? RESUME_NOTE : '') + o.prompt);
-      const child = spawnTurn(o, meta, n > 1 || meta.resumed, perms, f);
+      // Sessione scelta dall'agente: si cerca negli avvii precedenti, per riprenderla.
+      for (const a of meta.attempts) {
+        if (meta.sessionId !== undefined) break;
+        const found = o.agent.sessionOf?.(read(files(o.dir, a.n).out));
+        if (found) meta.sessionId = found;
+      }
+      const raw = (n > 1 ? RESUME_NOTE : '') + o.prompt;
+      const prompt = o.agent.preparePrompt?.(raw) ?? raw;
+      writeFileSync(f.prompt, prompt);
+      const resume = meta.sessionId !== undefined && (n > 1 || meta.resumed);
+      const child = spawnTurn(o, meta, prompt, resume, perms, f);
       meta.attempts.push({
         n,
         ...(child.pid !== undefined && { pid: child.pid }),
@@ -176,6 +176,7 @@ export async function durableTurn(o: DurableTurnOptions): Promise<TurnOutput> {
 function spawnTurn(
   o: DurableTurnOptions,
   meta: TurnMeta,
+  prompt: string,
   resume: boolean,
   perms: TurnPermissions | undefined,
   f: ReturnType<typeof files>,
@@ -184,20 +185,21 @@ function spawnTurn(
   const stdout = openSync(f.out, 'a');
   const stderr = openSync(f.err, 'a');
   try {
-    const args = claudeArgs({
+    const { args, env } = o.agent.turn({
+      dir: o.dir,
+      prompt,
       sessionId: meta.sessionId,
       resume,
       fork: o.fork,
       allowedTools: o.allowedTools,
       effort: o.effort,
       model: o.model,
-      ...perms?.input,
-      settings: excludePlugins(perms?.input.settings, o),
       exclude: o.exclude,
+      permissions: perms?.input,
     });
-    const child = spawnArgv([...o.command, ...args], {
+    const child = spawnArgv([...o.agent.command, ...args], {
       ...(o.cwd !== undefined && { cwd: o.cwd }),
-      env: { ...process.env, ...perms?.input.env },
+      env: { ...process.env, ...env },
       stdio: [stdin, stdout, stderr],
       detached: true,
       windowsHide: true,
@@ -271,20 +273,8 @@ function pumpActivity(o: DurableTurnOptions, meta: TurnMeta, n: number): void {
   const end = buf.lastIndexOf(0x0a);
   if (end < 0) return;
   for (const line of buf.subarray(0, end).toString('utf8').split('\n')) {
-    for (const a of parseActivity(line)) o.onActivity(a);
+    for (const a of o.agent.parseActivity(line)) o.onActivity(a);
   }
   meta.seen = { n, bytes: start + end + 1 };
   save(o.dir, meta);
-}
-
-/** File di impostazioni del turno con i plugin esclusi; senza esclusioni quello dei permessi. */
-function excludePlugins(settings: string | undefined, o: DurableTurnOptions): string | undefined {
-  const plugins = o.exclude?.plugins ?? [];
-  if (!plugins.length) return settings;
-  const base = settings
-    ? (JSON.parse(readFileSync(settings, 'utf8')) as Record<string, unknown>)
-    : {};
-  const file = join(o.dir, 'settings.exclude.json');
-  writeFileSync(file, JSON.stringify(settingsWithPlugins(base, plugins)));
-  return file;
 }

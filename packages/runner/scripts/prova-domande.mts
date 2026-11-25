@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import type { AgentQuestion, AgentRequest } from '../src/engine/engine.ts';
 import { createPermissionBridge } from '../src/permissions/bridge.ts';
 import { ApprovalEndpoint } from '../src/permissions/endpoint.ts';
+import { claudeDriver } from '../src/agents/claude/index.ts';
 import { durableTurn } from '../src/turn.ts';
 
 const PROMPT =
@@ -35,7 +36,7 @@ const req: AgentRequest = {
 };
 const res = await durableTurn({
   dir: join(root, 'turn'),
-  command: ['claude'],
+  agent: claudeDriver(),
   prompt: PROMPT,
   cwd: root,
   permissions: (d, token) => bridge(req, d, token),

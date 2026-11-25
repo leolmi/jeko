@@ -1,4 +1,6 @@
 import { join, resolve } from 'node:path';
+import { claudeDriver } from '../agents/claude/index.js';
+import type { AgentDriver } from '../agents/driver.js';
 import { knowledgePrompt, type ContextExclusions, type RunEvent } from '@jeko/shared';
 import { loadKnowledge } from '../knowledge.js';
 import { readPrompt } from '../prompts.js';
@@ -13,27 +15,27 @@ import { localPackage } from './policy.js';
 export interface NodeHostOptions {
   /** Cartella di lavoro predefinita (per WF2 la cartella del progetto). */
   cwd?: string;
-  /** Dove stanno i turni di claude della run (nel suo giornale). */
+  /** Dove stanno i turni dell'agente della run (nel suo giornale). */
   turnsDir: string;
-  /** Comando di claude; di default `JEKO_CLAUDE_BIN` o `claude`. */
-  claude?: string[];
+  /** Agente dei turni; di default Claude Code. */
+  agent?: AgentDriver;
   /** Interazione con l'utente: fornita da chi usa il runner (server via WebSocket). */
   ask: Host['ask'];
   approve: Host['approve'];
   review: Host['review'];
   emit: (e: RunEvent) => void;
-  /** Collega ogni turno di claude ai permessi di Jeko (server MCP + hook). */
+  /** Collega ogni turno dell'agente ai permessi di Jeko (server MCP + hook). */
   permissions?: PermissionBridge;
-  /** Esclusioni dal contesto di claude, dal progetto della run. */
+  /** Esclusioni dal contesto dell'agente, dal progetto della run. */
   exclude?: ContextExclusions;
   /** Processi che restano attivi dopo il turno (strumento `start_process`), per questa run. */
   startProcess?: (req: { command: string; cwd: string }) => Promise<ProcessResponse>;
 }
 
-/** Host reale: comandi locali, file system e claude CLI. */
+/** Host reale: comandi locali, file system e agente (CLI). */
 export function createNodeHost(opts: NodeHostOptions): Host {
-  const claude = opts.claude ?? [process.env['JEKO_CLAUDE_BIN'] ?? 'claude'];
-  // Cartelle la cui conoscenza (.jeko/) claude ha già ricevuto in questa run.
+  const agent = opts.agent ?? claudeDriver();
+  // Cartelle la cui conoscenza (.jeko/) l'agente ha già ricevuto in questa run.
   const informed = new Set<string>();
   const withKnowledge = (instructions: string, dir: string | undefined) => {
     if (dir === undefined || informed.has(dir)) return instructions;
@@ -67,7 +69,7 @@ export function createNodeHost(opts: NodeHostOptions): Host {
           start({ command: p.command, cwd: resolve(cwd ?? process.cwd(), p.cwd ?? '.') }));
       return durableTurn({
         dir: join(opts.turnsDir, req.turnKey),
-        command: claude,
+        agent,
         prompt: withKnowledge(req.instructions, cwd),
         cwd,
         sessionId: req.sessionId,

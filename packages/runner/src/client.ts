@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import {
   ajv,
   ServerToRunnerSchema,
+  type AgentInfo,
+  type AgentsSettings,
   type Check,
   type ContextInventory,
   validator,
@@ -15,8 +17,7 @@ import {
   type TaskProcess,
 } from '@jeko/shared';
 import { runWorkflow, type Host } from './engine/engine.js';
-import type { Assistant } from './assist.js';
-import type { ContextProbe } from './context-probe.js';
+import type { Assistant, ContextProbe } from './agents/driver.js';
 import type { FolderPicker } from './folder-picker.js';
 import { deletePrompt, listPrompts, savePrompt } from './prompts.js';
 import type { TerminalOpener } from './terminal.js';
@@ -38,6 +39,10 @@ export interface ClientOptions {
   reconnectMs?: number;
   /** Verifiche dell'ambiente, inviate dopo ogni collegamento e su richiesta del server. */
   diagnose?: () => Promise<Check[]>;
+  /** Agenti disponibili, annunciati nel `hello`. */
+  agents?: AgentInfo[] | undefined;
+  /** Agente scelto nelle impostazioni; true se è cambiato (si rifanno le verifiche). */
+  configureAgents?: ((agents: AgentsSettings) => boolean) | undefined;
   /** Risposte di claude alle richieste di assistenza; senza, ricevono un errore. */
   assist?: Assistant | undefined;
   /** Dialogo di scelta cartella del PC; senza, le richieste ricevono un errore. */
@@ -132,6 +137,7 @@ export class RunnerClient {
         runnerId: this.opts.runnerId,
         version: this.opts.version,
         activeRuns: this.activeRuns,
+        ...(this.opts.agents && { agents: this.opts.agents }),
       });
       // Prima ciò che il server non ha confermato, poi `ready`: solo allora riavvia le run.
       for (const runId of this.journals.runIds()) {
@@ -234,6 +240,9 @@ export class RunnerClient {
       }
       case 'checks.request':
         return this.sendChecks();
+      case 'agents.config':
+        if (this.opts.configureAgents?.(msg.agents)) this.sendChecks();
+        return;
       case 'folder.pick':
         return void this.pickFolder(msg);
       case 'terminal.open':

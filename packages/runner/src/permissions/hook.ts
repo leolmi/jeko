@@ -1,4 +1,5 @@
 import type { Policy, RunMode } from '@jeko/shared';
+import { claudeToolCall } from '../agents/claude/cli.js';
 import { classifyTool, localPackage, policyStops } from '../engine/policy.js';
 import { ASK_TOOL, ENV, START_PROCESS_TOOL } from './protocol.js';
 
@@ -42,7 +43,7 @@ export function hookDecision(input: HookInput, policy: HookPolicy): HookDecision
     return { decision: 'deny', reason: NO_BACKGROUND };
   if (tool === ASK_TOOL) return { decision: 'ask', reason: "domanda per l'utente" };
   const local = localPackage(input.cwd ?? process.cwd());
-  const { actions, command } = classifyTool(tool, input.tool_input ?? {}, local);
+  const { actions, command } = classifyTool(claudeToolCall(tool, input.tool_input ?? {}), local);
   if (!policyStops(actions, policy.policies, policy.mode)) return null;
   return { decision: 'ask', reason: `${actions.join(', ')}: ${command}` };
 }

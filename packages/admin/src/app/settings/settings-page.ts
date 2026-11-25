@@ -4,13 +4,14 @@ import { I18n } from '../core/i18n';
 import { Setup } from '../core/setup';
 import { Icon } from '../ui/icon';
 import { UserSettings } from '../ui/user-settings';
+import { AgentSettings } from './agent-settings';
 import { FormatSettings } from './format-settings';
 import { RemoteSettings } from './remote-settings';
 
 /** Pagina Opzioni: le opzioni dell'utente, modificabili in ogni momento. */
 @Component({
   selector: 'jk-settings-page',
-  imports: [UserSettings, FormatSettings, RemoteSettings, Icon],
+  imports: [UserSettings, AgentSettings, FormatSettings, RemoteSettings, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
   template: `
@@ -19,7 +20,9 @@ import { RemoteSettings } from './remote-settings';
       <p class="mt-2 text-sm text-muted">{{ i18n.t('settings.body') }}</p>
       <div class="mt-8"><jk-user-settings /></div>
 
-      <jk-format-settings class="mt-8" />
+      <jk-agent-settings class="mt-8" />
+
+      <jk-format-settings class="mt-4" />
 
       <jk-remote-settings class="mt-4" />
 

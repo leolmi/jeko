@@ -1,10 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { run } from './spawn.js';
-
-/** Risposta testuale di claude a un prompt. */
-export type Assistant = (prompt: string) => Promise<string>;
+import { run } from '../../spawn.js';
+import type { Assistant } from '../driver.js';
 
 /** Testo del risultato di `claude -p --output-format json`. */
 export function parseResult(stdout: string): string {

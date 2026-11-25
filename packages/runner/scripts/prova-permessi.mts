@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import type { AgentRequest } from '../src/engine/engine.ts';
 import { createPermissionBridge } from '../src/permissions/bridge.ts';
 import { ApprovalEndpoint, pipePath } from '../src/permissions/endpoint.ts';
+import { claudeDriver } from '../src/agents/claude/index.ts';
 import { durableTurn } from '../src/turn.ts';
 
 const PROMPT =
@@ -32,15 +33,15 @@ async function runner(pipe: string, dir: string, work: string, asked: string[]) 
     instructions: PROMPT,
     turnKey: 'prova-0',
     gates: { policies: [{ match: 'git.push', gate: 'always' }], mode: 'headless' },
-    authorize: async (tool, input) => {
-      const cmd = String((input as { command?: unknown }).command ?? '');
-      asked.push(`${tool}: ${cmd}`);
+    authorize: async (call) => {
+      const cmd = call.target;
+      asked.push(`${call.name}: ${cmd}`);
       return !/git\s+push/.test(cmd);
     },
   };
   const res = await durableTurn({
     dir,
-    command: ['claude'],
+    agent: claudeDriver(),
     prompt: PROMPT,
     cwd: work,
     allowedTools: ALLOWED,

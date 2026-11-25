@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { claudeDriver } from './agents/claude/index.js';
 import { runDiagnostics } from './diagnostics.js';
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url));
@@ -11,7 +12,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'jeko-diag-'));
 describe('runDiagnostics', () => {
   it('riconosce claude e gli script dei permessi', async () => {
     const checks = await runDiagnostics({
-      claude: [process.execPath, '-e', 'console.log("2.1.0 (Claude Code)")', '--'],
+      agent: claudeDriver([process.execPath, '-e', 'console.log("2.1.0 (Claude Code)")', '--']),
       dataDir,
       scriptsDir,
       permissionsEndpoint: true,
@@ -27,7 +28,7 @@ describe('runDiagnostics', () => {
 
   it('segnala claude mancante', async () => {
     const checks = await runDiagnostics({
-      claude: ['jeko-claude-che-non-esiste'],
+      agent: claudeDriver(['jeko-claude-che-non-esiste']),
       dataDir,
       scriptsDir: dataDir,
       permissionsEndpoint: false,

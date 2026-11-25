@@ -1,11 +1,9 @@
 import type { ContextInventory } from '@jeko/shared';
-import { parseInit } from './claude.js';
-import { MCP_SERVER_NAME } from './permissions/protocol.js';
-import { killTree } from './process.js';
-import { spawnArgv } from './spawn.js';
-
-/** Cosa claude carica all'avvio in una cartella. */
-export type ContextProbe = (cwd: string) => Promise<ContextInventory>;
+import { parseInit } from './cli.js';
+import { MCP_SERVER_NAME } from '../../permissions/protocol.js';
+import { killTree } from '../../process.js';
+import { spawnArgv } from '../../spawn.js';
+import type { ContextProbe } from '../driver.js';
 
 const PROBE_TIMEOUT_MS = 60_000;
 /**

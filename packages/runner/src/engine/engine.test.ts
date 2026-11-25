@@ -512,8 +512,8 @@ steps:
           mode: 'headless',
         });
         allowed = [
-          await req.authorize('Bash', { command: 'npm i zod' }),
-          await req.authorize('Bash', { command: 'npm test' }),
+          await req.authorize({ kind: 'shell', name: 'Bash', target: 'npm i zod' }),
+          await req.authorize({ kind: 'shell', name: 'Bash', target: 'npm test' }),
         ];
         return { ok: true, output: '' };
       },

@@ -1,5 +1,7 @@
 import { Type, type Static } from '@sinclair/typebox';
 import {
+  AgentId,
+  AgentsSettingsSchema,
   ContextExclusionsSchema,
   ContextInventorySchema,
   Id,
@@ -94,6 +96,17 @@ export const CheckSchema = Type.Object({
 });
 export type Check = Static<typeof CheckSchema>;
 
+/** Agente che il runner sa usare: le verifiche con id `<id>` o `<id>.…` sono sue. */
+export const AgentInfoSchema = Type.Object({
+  id: AgentId,
+  label: Type.String({ minLength: 1 }),
+  /** Comando usato senza un comando nelle impostazioni. */
+  command: Type.String(),
+  /** Driver in anteprima, non ancora provato con la CLI vera. */
+  preview: Type.Optional(Type.Boolean()),
+});
+export type AgentInfo = Static<typeof AgentInfoSchema>;
+
 // ---------- processi lasciati attivi da un task ----------
 
 /** Processo avviato da claude con `start_process`: resta attivo fino alla chiusura del task. */
@@ -118,6 +131,8 @@ export const RunnerToServerSchema = Type.Union([
     activeRuns: Type.Array(Type.String()),
     /** Verifiche dell'ambiente del runner (claude, git, permessi…). */
     checks: Type.Optional(Type.Array(CheckSchema)),
+    /** Agenti disponibili, il predefinito per primo. */
+    agents: Type.Optional(Type.Array(AgentInfoSchema)),
   }),
   /** Verifiche rifatte su richiesta del server. */
   Type.Object({ type: Type.Literal('checks'), checks: Type.Array(CheckSchema) }),
@@ -210,6 +225,11 @@ export const ServerToRunnerSchema = Type.Union([
   Type.Object({ type: Type.Literal('run.cancel'), runId: Type.String() }),
   /** Rifai le verifiche dell'ambiente e rimandale. */
   Type.Object({ type: Type.Literal('checks.request') }),
+  /**
+   * Agente scelto nelle impostazioni, per assistenza, analisi del contesto e verifiche (le run
+   * lo ricevono nelle `settings` di `run.start`). Il runner rifà le verifiche se cambia.
+   */
+  Type.Object({ type: Type.Literal('agents.config'), agents: AgentsSettingsSchema }),
   /** Chiedi a claude, senza strumenti né progetto, una risposta testuale al prompt. */
   Type.Object({
     type: Type.Literal('assist.request'),
@@ -422,6 +442,8 @@ export interface SetupStatus {
     version?: string;
     checks: Check[] | null;
     checkedAt?: string;
+    /** Agenti disponibili nel runner. */
+    agents?: AgentInfo[];
   };
 }
 

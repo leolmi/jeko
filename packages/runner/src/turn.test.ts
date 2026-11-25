@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { claudeDriver } from './agents/claude/index.js';
+import type { AgentDriver } from './agents/driver.js';
 import { durableTurn, type DurableTurnOptions } from './turn.js';
 
 const fake = fileURLToPath(new URL('./fixtures/fake-claude.mjs', import.meta.url));
@@ -23,7 +25,7 @@ const invocations = (): { args: string[]; stdin: string }[] => {
 const turn = (extra: Partial<DurableTurnOptions> = {}) =>
   durableTurn({
     dir: join(root, 'turn'),
-    command: [process.execPath, fake],
+    agent: claudeDriver([process.execPath, fake]),
     prompt: 'lavora',
     pollMs: 50,
     ...extra,
@@ -71,6 +73,26 @@ describe('turno di claude staccato', () => {
     expect(first!.args).toContain('--session-id');
     expect(second!.args).toContain('--resume');
     expect(second!.stdin).toContain('si è interrotto');
+  });
+
+  it("con la sessione scelta dall'agente la legge dall'uscita e la riprende", async () => {
+    process.env['FAKE_DIE'] = '1';
+    const base = claudeDriver([process.execPath, fake]);
+    const agent: AgentDriver = {
+      ...base,
+      caps: { ...base.caps, ownSessionId: false },
+      // Senza id da Jeko il finto "sceglie" la sessione; poi la si riprende.
+      turn: (t) => ({
+        args: t.sessionId ? ['--resume', t.sessionId] : ['--session-id', 'scelta-dall-agente'],
+      }),
+      sessionOf: (text) => /"session_id":"([^"]+)"/.exec(text)?.[1] ?? null,
+    };
+    const res = await turn({ agent });
+    expect(res.ok).toBe(true);
+    expect(res.sessionId).toBe('scelta-dall-agente');
+    const [first, second] = invocations();
+    expect(first!.args).toEqual(['--session-id', 'scelta-dall-agente']);
+    expect(second!.args).toEqual(['--resume', 'scelta-dall-agente']);
   });
 
   it('copiando una sessione, anche la ripresa copia di nuovo l’originale', async () => {

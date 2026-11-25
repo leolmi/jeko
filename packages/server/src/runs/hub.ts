@@ -8,6 +8,7 @@ import {
   RunnerToServerSchema,
   validator,
   type AdminMessage,
+  type AgentInfo,
   type Answer,
   type Check,
   type ContextInventory,
@@ -57,6 +58,7 @@ export class RunnerHub {
     runnerId: string;
     version: string;
     activeRuns: string[];
+    agents?: AgentInfo[];
   } | null = null;
   /** Ultime verifiche dell'ambiente ricevute dal runner collegato. */
   private checks: { list: Check[]; at: string } | null = null;
@@ -94,7 +96,14 @@ export class RunnerHub {
       ...(this.runner && { runnerId: this.runner.runnerId, version: this.runner.version }),
       checks: this.checks?.list ?? null,
       ...(this.checks && { checkedAt: this.checks.at }),
+      ...(this.runner?.agents && { agents: this.runner.agents }),
     };
+  }
+
+  /** Manda al runner l'agente scelto nelle impostazioni (dopo il collegamento e a ogni modifica). */
+  async sendAgentsConfig(): Promise<void> {
+    const agents = (await this.settings.get()).agents ?? {};
+    this.sendRunner({ type: 'agents.config', agents });
   }
 
   /** Chiede al runner di rifare le verifiche; false se non è collegato. */
@@ -302,10 +311,12 @@ export class RunnerHub {
       runnerId: msg.runnerId,
       version: msg.version,
       activeRuns: msg.activeRuns,
+      ...(msg.agents && { agents: msg.agents }),
     };
     this.checks = msg.checks ? { list: msg.checks, at: new Date().toISOString() } : null;
     this.log.info({ runnerId: msg.runnerId, version: msg.version }, 'runner collegato');
     this.broadcast({ type: 'runner', connected: true, runnerId: msg.runnerId });
+    await this.sendAgentsConfig();
   }
 
   /** Il runner ha reinviato il suo giornale: ora lo stato salvato è aggiornato. */

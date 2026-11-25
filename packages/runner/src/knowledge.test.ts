@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { claudeDriver } from './agents/claude/index.js';
 import { createNodeHost } from './engine/node-host.js';
 import { loadKnowledge } from './knowledge.js';
 
@@ -73,7 +74,7 @@ describe('.jeko/', () => {
     const host = createNodeHost({
       cwd: dir,
       turnsDir: tmp(),
-      claude: [process.execPath, fake],
+      agent: claudeDriver([process.execPath, fake]),
       ask: async () => null,
       approve: async () => ({ approved: true }),
       review: async () => ({ ok: true }),

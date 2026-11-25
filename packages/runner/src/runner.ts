@@ -1,21 +1,20 @@
 import { hostname, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { claudeAssistant } from './assist.js';
-import { claudeContextProbe } from './context-probe.js';
+import type { AgentsSettings } from '@jeko/shared';
+import { agentInfos, resolveAgent } from './agents/index.js';
 import { RunnerClient } from './client.js';
 import { runDiagnostics } from './diagnostics.js';
 import { createNodeHost } from './engine/node-host.js';
 import { defaultDataDir } from './journal.js';
 import type { LinkSocket } from './link.js';
-import { createPermissionBridge } from './permissions/bridge.js';
 import { ApprovalEndpoint, pipePath } from './permissions/endpoint.js';
 import { platform } from './platform/index.js';
 import { ProcessRegistry } from './processes.js';
 
 export interface LocalRunner {
   client: RunnerClient;
-  /** Esce senza annullare nulla: i turni di claude restano vivi e il prossimo avvio li riaggancia. */
+  /** Esce senza annullare nulla: i turni dell'agente restano vivi e il prossimo avvio li riaggancia. */
   detach(): Promise<void>;
 }
 
@@ -44,8 +43,9 @@ export async function startRunner(opts: {
     throw e;
   }
   const scriptsDir = opts.scriptsDir ?? dirname(fileURLToPath(import.meta.url));
-  const permissions = createPermissionBridge({ endpoint, scriptsDir });
-  const claude = [process.env['JEKO_CLAUDE_BIN'] ?? 'claude'];
+  // Agente delle impostazioni per assistenza, contesto e verifiche; le run usano il proprio.
+  let agentsConfig = '{}';
+  let agent = resolveAgent(undefined);
   const processes = new ProcessRegistry(join(dataDir, 'processes'));
 
   const client = new RunnerClient({
@@ -55,18 +55,33 @@ export async function startRunner(opts: {
     dataDir,
     pickFolder: platform.folderPicker,
     openTerminal: platform.terminal,
-    assist: claudeAssistant(claude),
-    probeContext: claudeContextProbe(claude),
-    diagnose: () => runDiagnostics({ claude, dataDir, scriptsDir, permissionsEndpoint: true }),
-    makeHost: (io, start, { runDir }) =>
-      createNodeHost({
+    assist: (prompt) => agent.assist(prompt),
+    probeContext: (cwd) =>
+      agent.probe
+        ? agent.probe(cwd)
+        : Promise.reject(new Error(`${agent.label} non elenca cosa carica`)),
+    diagnose: () => runDiagnostics({ agent, dataDir, scriptsDir, permissionsEndpoint: true }),
+    agents: agentInfos(),
+    configureAgents: (agents: AgentsSettings) => {
+      const next = JSON.stringify(agents);
+      if (next === agentsConfig) return false;
+      agentsConfig = next;
+      agent = resolveAgent(agents);
+      return true;
+    },
+    makeHost: (io, start, { runDir }) => {
+      const runAgent = resolveAgent(start.settings?.agents);
+      const permissions = runAgent.permissions?.({ endpoint, scriptsDir });
+      return createNodeHost({
         ...io,
-        permissions,
+        agent: runAgent,
+        ...(permissions && { permissions }),
         startProcess: (p) => processes.start(start.runId, p),
         turnsDir: join(runDir, 'turns'),
         ...(start.cwd !== undefined && { cwd: start.cwd }),
         ...(start.exclude && { exclude: start.exclude }),
-      }),
+      });
+    },
     onRunFinished: (runId) => processes.stopRun(runId),
     processes: (runId, stop) => (stop ? processes.stop(runId) : processes.status(runId)),
     ...(opts.log && { log: opts.log }),

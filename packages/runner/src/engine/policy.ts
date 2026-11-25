@@ -7,7 +7,6 @@ import {
   type PolicyAction,
   type RunMode,
 } from '@jeko/shared';
-import { START_PROCESS_TOOL } from '../permissions/protocol.js';
 
 interface Rule {
   action: PolicyAction;
@@ -110,24 +109,29 @@ export function classifyCommand(line: string, local?: LocalCheck): PolicyAction[
   return [...found];
 }
 
-/** Azioni sensibili di una chiamata a uno strumento di claude. */
+/**
+ * Chiamata a uno strumento dell'agente, come la vedono le policy: il driver dell'agente
+ * traduce i propri strumenti (es. Bash di claude → `shell`).
+ */
+export interface ToolCall {
+  /** `shell`: riga di comando; `web`: indirizzo o ricerca; `other`: nessuna azione sensibile. */
+  kind: 'shell' | 'web' | 'other';
+  /** Nome dello strumento per l'agente. */
+  name: string;
+  /** Riga di comando (`shell`) o indirizzo/ricerca (`web`). */
+  target: string;
+}
+
+/** Azioni sensibili di una chiamata a uno strumento dell'agente. */
 export function classifyTool(
-  tool: string,
-  input: unknown,
+  call: ToolCall,
   local?: LocalCheck,
 ): { actions: PolicyAction[]; command: string } {
-  const field = (k: string) =>
-    input && typeof input === 'object' && typeof (input as Record<string, unknown>)[k] === 'string'
-      ? ((input as Record<string, unknown>)[k] as string)
-      : '';
-  if (tool === 'Bash' || tool === 'PowerShell' || tool === START_PROCESS_TOOL) {
-    const command = field('command');
-    return { actions: classifyCommand(command, local), command };
-  }
-  if (tool === 'WebFetch' || tool === 'WebSearch') {
-    return { actions: ['network'], command: `${tool} ${field('url') || field('query')}`.trim() };
-  }
-  return { actions: [], command: tool };
+  if (call.kind === 'shell')
+    return { actions: classifyCommand(call.target, local), command: call.target };
+  if (call.kind === 'web')
+    return { actions: ['network'], command: `${call.name} ${call.target}`.trim() };
+  return { actions: [], command: call.name };
 }
 
 /** Le policy fermano queste azioni in questa modalità? */

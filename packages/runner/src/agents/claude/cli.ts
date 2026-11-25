@@ -1,4 +1,7 @@
 import type { AgentUsage, ContextExclusions, ContextInventory } from '@jeko/shared';
+import type { ToolCall } from '../../engine/policy.js';
+import { START_PROCESS_TOOL } from '../../permissions/protocol.js';
+import type { Activity, TurnOutput } from '../driver.js';
 
 export interface TurnInput {
   prompt: string;
@@ -23,15 +26,6 @@ export interface TurnInput {
   env?: Record<string, string> | undefined;
   /** Cosa togliere dal contesto (i plugin passano invece dalle impostazioni). */
   exclude?: ContextExclusions | undefined;
-}
-
-export interface TurnOutput {
-  ok: boolean;
-  output: string;
-  sessionId?: string;
-  usage?: AgentUsage;
-  /** Modello del turno, dal messaggio `init`. */
-  model?: string;
 }
 
 /**
@@ -77,6 +71,19 @@ export function claudeArgs(input: Omit<TurnInput, 'prompt' | 'cwd' | 'env'>): st
   if (deny.length) args.push('--disallowedTools', deny.join(','));
   if (input.exclude?.skills) args.push('--disable-slash-commands');
   return args;
+}
+
+/** Chiamata a uno strumento di claude, come la vedono le policy. */
+export function claudeToolCall(tool: string, input: unknown): ToolCall {
+  const field = (k: string) =>
+    input && typeof input === 'object' && typeof (input as Record<string, unknown>)[k] === 'string'
+      ? ((input as Record<string, unknown>)[k] as string)
+      : '';
+  if (tool === 'Bash' || tool === 'PowerShell' || tool === START_PROCESS_TOOL)
+    return { kind: 'shell', name: tool, target: field('command') };
+  if (tool === 'WebFetch' || tool === 'WebSearch')
+    return { kind: 'web', name: tool, target: field('url') || field('query') };
+  return { kind: 'other', name: tool, target: '' };
 }
 
 /**
@@ -178,10 +185,6 @@ export function parseUsage(msg: Record<string, unknown>): AgentUsage | null {
     turns: 1,
   };
 }
-
-/** Cosa sta facendo claude in un turno: testo scritto o strumento usato. */
-export type Activity =
-  { kind: 'text'; text: string } | { kind: 'tool'; tool: string; text: string };
 
 const MAX_TEXT = 2000;
 const MAX_DETAIL = 200;

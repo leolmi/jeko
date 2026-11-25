@@ -94,7 +94,7 @@ export async function buildApp({
   await app.register(runRoutes, { runs, workflows, projects, hub });
   await app.register(statsRoutes, { runs, projects });
   await app.register(setupRoutes, { settings: settingsFile, workflows, hub, version: VERSION });
-  await app.register(settingsRoutes, { settings });
+  await app.register(settingsRoutes, { settings, hub });
   await app.register(appRoutes, { control, runs, version: VERSION });
 
   // Accesso remoto: le richieste dei dispositivi passano di qui (`inject`), solo quelle ammesse.

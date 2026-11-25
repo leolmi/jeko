@@ -1,13 +1,13 @@
 import { accessSync, constants, existsSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Check } from '@jeko/shared';
+import type { AgentDriver } from './agents/driver.js';
 import { BUNDLE } from './permissions/bridge.js';
 import { run } from './spawn.js';
 
 export interface DiagnosticsOptions {
-  /** Comando di claude (come per i turni). */
-  claude: string[];
+  /** Agente dei turni: le sue verifiche (installato, accesso…). */
+  agent: AgentDriver;
   dataDir: string;
   /** Cartella con gli script `mcp` e `hook` dei permessi. */
   scriptsDir: string;
@@ -44,28 +44,12 @@ export async function runDiagnostics(opts: DiagnosticsOptions): Promise<Check[]>
     detail: `v${process.versions.node}`,
   });
 
-  const [git, claude] = await Promise.all([
+  const [git, agent] = await Promise.all([
     version(['git', '--version'], env),
-    version([...opts.claude, '--version'], env),
+    opts.agent.checks(env),
   ]);
   checks.push({ id: 'git', ok: git !== null, severity: 'error', ...(git && { detail: git }) });
-  checks.push({
-    id: 'claude',
-    ok: claude !== null,
-    severity: 'error',
-    detail: claude ?? opts.claude.join(' '),
-  });
-
-  // Accesso di claude: chiave o token nell'ambiente, oppure le credenziali salvate dal login.
-  const configDir = env['CLAUDE_CONFIG_DIR'] ?? join(homedir(), '.claude');
-  const byEnv = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'].find((k) => env[k]);
-  const byFile = existsSync(join(configDir, '.credentials.json'));
-  checks.push({
-    id: 'claude.auth',
-    ok: Boolean(byEnv) || byFile,
-    severity: 'warn',
-    ...(byEnv ? { detail: byEnv } : byFile ? { detail: configDir } : {}),
-  });
+  checks.push(...agent);
 
   let writable = true;
   try {

@@ -2,7 +2,8 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentQuestion, AgentRequest } from '../engine/engine.js';
 import type { ProcessStarter } from '../processes.js';
-import type { TurnPermissions } from '../turn.js';
+import { claudeToolCall } from '../agents/claude/cli.js';
+import type { TurnPermissions } from '../agents/driver.js';
 import type { ApprovalEndpoint, Authorizer } from './endpoint.js';
 import type { HookPolicy } from './hook.js';
 import { ASK_TOOL, ENV, MCP_SERVER_NAME, PERMISSION_PROMPT_TOOL } from './protocol.js';
@@ -106,7 +107,8 @@ export function createPermissionBridge(opts: BridgeOptions): PermissionBridge {
   return (req, dir, existing, startProcess) => {
     const { token, dispose } = opts.endpoint.register(
       async (tool, input) => {
-        if (tool !== ASK_TOOL) return { approved: await req.authorize(tool, input) };
+        if (tool !== ASK_TOOL)
+          return { approved: await req.authorize(claudeToolCall(tool, input)) };
         if (!req.askUser) return { approved: false, note: NO_QUESTIONS };
         return answerQuestions(input, req.askUser);
       },

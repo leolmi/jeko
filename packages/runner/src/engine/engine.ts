@@ -29,6 +29,7 @@ import {
   gateStops,
   policyStops,
   type LocalCheck,
+  type ToolCall,
 } from './policy.js';
 
 // ---------- host: tutto ciò che il motore non fa da sé ----------
@@ -73,8 +74,8 @@ export interface AgentRequest {
   signal?: AbortSignal;
   /** Policy e modalità: servono all'hook di claude per sapere quando chiedere. */
   gates: { policies: Policy[]; mode: RunMode };
-  /** Da chiamare quando claude chiede il permesso per uno strumento. */
-  authorize: (tool: string, input: unknown) => Promise<boolean>;
+  /** Da chiamare quando l'agente chiede il permesso per uno strumento (tradotto dal driver). */
+  authorize: (call: ToolCall) => Promise<boolean>;
   /** Domanda di claude all'utente; null se l'utente non risponde. Assente in headless. */
   askUser?: (q: AgentQuestion) => Promise<string | null>;
   /** Avanzamento del turno: testo di claude o strumento usato. */
@@ -345,8 +346,8 @@ export async function runWorkflow(opts: RunOptions, host: Host): Promise<RunOutc
           ? { sessionId: state.sessionId }
           : opts.forkSession !== undefined && { sessionId: opts.forkSession, fork: true }),
         gates: { policies: wf.policies ?? [], mode },
-        authorize: async (tool, input) => {
-          const { actions, command } = classifyTool(tool, input, local(cwd));
+        authorize: async (call) => {
+          const { actions, command } = classifyTool(call, local(cwd));
           return authorize(step.id, actions, command);
         },
         // In headless la run si ferma solo ai gate `always`: claude decide da sé.

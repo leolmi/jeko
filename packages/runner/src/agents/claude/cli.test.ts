@@ -8,7 +8,7 @@ import {
   parseStream,
   settingsWithPlugins,
   toolDetail,
-} from './claude.js';
+} from './cli.js';
 
 describe('claude', () => {
   it('costruisce gli argomenti del turno', () => {

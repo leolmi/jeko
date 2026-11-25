@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { claudeToolCall } from '../agents/claude/cli.js';
 import { classifyCommand, classifyTool, gateStops, localPackage, policyStops } from './policy.js';
 
 describe('policy', () => {
@@ -31,12 +32,13 @@ describe('policy', () => {
   });
 
   it('classifica gli strumenti di claude', () => {
-    expect(classifyTool('Bash', { command: 'npm ci' })).toEqual({
+    const classify = (tool: string, input: unknown) => classifyTool(claudeToolCall(tool, input));
+    expect(classify('Bash', { command: 'npm ci' })).toEqual({
       actions: ['install'],
       command: 'npm ci',
     });
-    expect(classifyTool('WebFetch', { url: 'https://x' }).actions).toEqual(['network']);
-    expect(classifyTool('Edit', { file_path: 'a' }).actions).toEqual([]);
+    expect(classify('WebFetch', { url: 'https://x' }).actions).toEqual(['network']);
+    expect(classify('Edit', { file_path: 'a' }).actions).toEqual([]);
   });
 
   it.each([
