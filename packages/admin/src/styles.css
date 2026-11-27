@@ -83,6 +83,78 @@
 @utility jk-btn-outline {
   @apply jk-btn border border-line text-fg hover:bg-subtle;
 }
+/* Markdown reso (componente jk-md). */
+@layer components {
+  .jk-md {
+    @apply text-sm leading-relaxed;
+  }
+  .jk-md > * + *,
+  .jk-md li > * + *,
+  .jk-md blockquote > * + * {
+    @apply mt-2.5;
+  }
+  .jk-md :is(h1, h2, h3, h4, h5, h6) {
+    @apply mt-4 font-bold tracking-tight first:mt-0;
+  }
+  .jk-md h1 {
+    @apply text-lg;
+  }
+  .jk-md h2 {
+    @apply text-base;
+  }
+  .jk-md :is(h3, h4, h5, h6) {
+    @apply text-sm;
+  }
+  .jk-md ul {
+    @apply list-disc pl-5;
+  }
+  .jk-md ol {
+    @apply list-decimal pl-5;
+  }
+  .jk-md li {
+    @apply mt-1 marker:text-faint;
+  }
+  .jk-md code {
+    @apply rounded bg-subtle px-1 py-0.5 font-mono text-[0.85em];
+  }
+  .jk-md pre {
+    @apply overflow-x-auto rounded-lg bg-subtle p-3 font-mono text-xs leading-relaxed;
+  }
+  .jk-md pre code {
+    @apply bg-transparent p-0 text-[1em];
+  }
+  .jk-md blockquote {
+    @apply border-l-2 border-line pl-3 text-muted;
+  }
+  .jk-md a {
+    @apply underline decoration-faint underline-offset-2 hover:decoration-fg;
+  }
+  .jk-md hr {
+    @apply my-4 border-line;
+  }
+  .jk-md strong {
+    @apply font-bold;
+  }
+  .jk-md .jk-md-table {
+    @apply overflow-x-auto;
+  }
+  .jk-md table {
+    @apply w-full border-collapse text-xs;
+  }
+  .jk-md :is(th, td) {
+    @apply border border-line px-2 py-1 text-left align-top;
+  }
+  .jk-md th {
+    @apply bg-subtle font-bold;
+  }
+  .jk-md :is(th, td).text-center {
+    @apply text-center;
+  }
+  .jk-md :is(th, td).text-right {
+    @apply text-right;
+  }
+}
+
 @utility jk-label {
   @apply text-xs font-medium tracking-wide text-muted uppercase;
 }

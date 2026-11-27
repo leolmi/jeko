@@ -27,6 +27,7 @@ import { I18n, type I18nKey } from '../core/i18n';
 import { Realtime } from '../core/realtime';
 import { Runs } from '../core/runs';
 import { Icon } from '../ui/icon';
+import { Md } from '../ui/md';
 import { ModeBadge, runTone } from '../ui/mode-tone';
 import { Status } from '../ui/status';
 import { PromptCard } from './prompt-card';
@@ -37,7 +38,7 @@ import { UsageBar } from './usage-bar';
 /** Filo di una run: la richiesta, l'avanzamento e le domande a cui rispondere. */
 @Component({
   selector: 'jk-thread',
-  imports: [NgTemplateOutlet, RouterLink, Icon, Status, PromptCard, ModeBadge, UsageBar],
+  imports: [NgTemplateOutlet, RouterLink, Icon, Md, Status, PromptCard, ModeBadge, UsageBar],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex h-full flex-col' },
   template: `
@@ -191,9 +192,10 @@ import { UsageBar } from './usage-bar';
                     }
                     @if (direct() && item.state !== 'running' && item.output) {
                       <!-- Task diretto: l'uscita è la risposta di claude, da leggere subito. -->
-                      <pre
-                        class="mt-2 ml-7 rounded-2xl rounded-bl-md border border-line bg-surface px-4 py-3 font-sans text-sm leading-relaxed whitespace-pre-wrap text-fg"
-                        >{{ item.output }}</pre>
+                      <jk-md
+                        class="mt-2 ml-7 rounded-2xl rounded-bl-md border border-line bg-surface px-4 py-3 text-fg"
+                        [text]="item.output"
+                      />
                     } @else if (item.output && item.state !== 'skipped') {
                       <details class="mt-1 ml-7">
                         <summary

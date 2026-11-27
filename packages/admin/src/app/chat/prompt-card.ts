@@ -11,11 +11,12 @@ import { FormsModule } from '@angular/forms';
 import type { Answer, PromptRecord } from '@jeko/shared';
 import { I18n, type I18nKey } from '../core/i18n';
 import { Icon, type IconName } from '../ui/icon';
+import { Md } from '../ui/md';
 
 /** Una richiesta all'utente nel filo della chat: aperta (con i comandi) o già chiusa. */
 @Component({
   selector: 'jk-prompt-card',
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, Md],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let p = record().prompt;
@@ -37,7 +38,7 @@ import { Icon, type IconName } from '../ui/icon';
       <div class="px-4 pt-1.5 pb-4">
         @switch (p.kind) {
           @case ('ask') {
-            <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ p.question }}</p>
+            <jk-md [text]="p.question" />
             @if (pending) {
               @if (p.options) {
                 <div class="mt-3 flex flex-col gap-1.5">
@@ -148,11 +149,12 @@ import { Icon, type IconName } from '../ui/icon';
 
           @case ('approve') {
             @if (p.output) {
-              <pre
-                class="mb-3 max-h-96 overflow-auto rounded-lg bg-subtle p-3 font-sans text-sm leading-relaxed whitespace-pre-wrap text-fg"
-                >{{ p.output }}</pre>
+              <jk-md
+                class="mb-3 max-h-96 overflow-auto rounded-lg border border-line p-3 text-fg"
+                [text]="p.output"
+              />
             }
-            <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ p.message }}</p>
+            <jk-md [text]="p.message" />
             @if (p.actions?.length) {
               <div class="mt-2 flex flex-wrap gap-1.5">
                 @for (a of p.actions; track a) {
@@ -195,9 +197,10 @@ import { Icon, type IconName } from '../ui/icon';
           }
 
           @case ('review') {
-            <pre
-              class="max-h-72 overflow-auto rounded-lg bg-subtle p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-fg"
-              >{{ p.output }}</pre>
+            <jk-md
+              class="max-h-72 overflow-auto rounded-lg border border-line p-3 text-fg"
+              [text]="p.output"
+            />
             @if (pending) {
               <textarea
                 class="jk-input mt-3 resize-none"

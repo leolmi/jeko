@@ -5,6 +5,7 @@ import { I18n } from '../core/i18n';
 import { Notes } from '../core/notes';
 import { Projects } from '../core/projects';
 import { Icon } from '../ui/icon';
+import { Md } from '../ui/md';
 import { Segmented, type SegmentOption } from '../ui/segmented';
 
 interface Group {
@@ -20,7 +21,7 @@ interface Group {
  */
 @Component({
   selector: 'jk-notes-page',
-  imports: [Icon, Segmented],
+  imports: [Icon, Md, Segmented],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
   template: `
@@ -30,7 +31,7 @@ interface Group {
       <!-- Nuova nota: si scrive al volo, Ctrl+Invio per aggiungerla. -->
       <div class="mt-4 rounded-xl border border-line bg-surface p-3">
         <textarea
-          class="block w-full resize-y bg-transparent text-sm leading-relaxed outline-none"
+          class="block w-full resize-y bg-transparent font-mono text-sm leading-relaxed outline-none"
           rows="3"
           [attr.aria-label]="i18n.t('notes.new')"
           [placeholder]="i18n.t('notes.placeholder')"
@@ -88,7 +89,7 @@ interface Group {
                 @if (editing() === n.id) {
                   <div class="flex min-w-48 flex-1 flex-col gap-2">
                     <textarea
-                      class="jk-input min-h-24 w-full text-sm"
+                      class="jk-input min-h-24 w-full font-mono text-sm"
                       [attr.aria-label]="i18n.t('notes.edit')"
                       [value]="editBody()"
                       (input)="editBody.set($any($event.target).value)"
@@ -131,10 +132,7 @@ interface Group {
                   </div>
                 } @else {
                   <div class="min-w-48 flex-1">
-                    <p
-                      class="text-sm leading-relaxed break-words whitespace-pre-wrap"
-                      [textContent]="n.body"
-                    ></p>
+                    <jk-md [text]="n.body" />
                     <p class="mt-1 flex items-center gap-2 text-xs text-faint">
                       <span [title]="i18n.dateTime(n.createdAt)">{{ i18n.ago(n.createdAt) }}</span>
                       @if (notes.isPending(n)) {
