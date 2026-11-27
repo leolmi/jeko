@@ -53,11 +53,11 @@ export const runTone = (r: { workflow: string }): Tone =>
   host: { class: 'inline-flex shrink-0' },
   template: `
     <span
-      class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide whitespace-nowrap uppercase"
-      [class]="tone().badge"
+      class="inline-flex items-center rounded-full font-semibold tracking-wide whitespace-nowrap uppercase"
+      [class]="tone().badge + (small() ? ' gap-1 px-2 text-[10px]' : ' gap-1.5 px-2.5 py-0.5 text-xs')"
       [title]="i18n.t(tone().hint)"
     >
-      <jk-icon [name]="tone().icon" [size]="14" />
+      <jk-icon [name]="tone().icon" [size]="small() ? 11 : 14" />
       {{ i18n.t(tone().label) }}
     </span>
   `,
@@ -65,4 +65,6 @@ export const runTone = (r: { workflow: string }): Tone =>
 export class ModeBadge {
   protected readonly i18n = inject(I18n);
   readonly tone = input.required<Tone>();
+  /** Versione ridotta, per stare in un angolo senza occupare una riga. */
+  readonly small = input(false);
 }

@@ -280,15 +280,15 @@ const CHECK_DELAY_MS = 300;
         }
       </section>
 
-      <!-- Chat: modifica chiesta all'AI sul workflow aperto. -->
+      <!-- Chat: modifica chiesta all'AI sul workflow aperto. Bassa finché il testo è corto. -->
       <section
-        class="flex h-[30%] min-h-40 shrink-0 flex-col border-t border-line bg-surface px-5 py-3"
+        class="flex max-h-[max(30%,10rem)] min-h-0 shrink-0 flex-col border-t border-line bg-surface px-5 py-3"
       >
         <div
-          class="flex min-h-0 flex-1 flex-col rounded-2xl border border-line bg-bg focus-within:border-faint"
+          class="flex min-h-0 flex-col rounded-2xl border border-line bg-bg focus-within:border-faint"
         >
           <textarea
-            class="block min-h-0 w-full flex-1 resize-none bg-transparent px-4 pt-3 text-sm leading-relaxed outline-none"
+            class="block min-h-[calc(1lh+0.75rem)] w-full resize-none bg-transparent px-4 pt-2.5 text-sm leading-relaxed outline-none [field-sizing:content]"
             [attr.aria-label]="i18n.t('wf.ask')"
             [placeholder]="i18n.t('wf.ask.placeholder')"
             [disabled]="asking()"
@@ -296,7 +296,7 @@ const CHECK_DELAY_MS = 300;
             (input)="ask.set($any($event.target).value)"
             (keydown.control.enter)="assist()"
           ></textarea>
-          <div class="flex items-center gap-3 px-3 pt-1 pb-2.5">
+          <div class="flex items-center gap-3 px-3 pt-1 pb-1.5">
             <span class="min-w-0 flex-1 truncate text-xs" [class]="askHintClass()">
               {{ askHint() }}
             </span>

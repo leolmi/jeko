@@ -33,15 +33,14 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
   host: { class: 'flex flex-col bg-surface px-6 py-3' },
   template: `
     <div
-      class="flex min-h-0 flex-1 flex-col rounded-2xl border-2 bg-bg transition-colors"
+      class="relative flex min-h-0 flex-col rounded-2xl border-2 bg-bg transition-colors"
       [class]="tone().border"
       [class.opacity-60]="!project()"
     >
-      <div class="flex justify-end px-3 pt-2.5">
-        <jk-mode-badge [tone]="tone()" />
-      </div>
+      <!-- Nell'angolo: non ruba una riga al testo, che a destra le lascia spazio. -->
+      <jk-mode-badge class="absolute top-2 right-3" [tone]="tone()" [small]="true" />
       <textarea
-        class="block min-h-0 w-full flex-1 resize-none bg-transparent px-4 pt-1 text-sm leading-relaxed outline-none"
+        class="block min-h-[calc(1lh+0.75rem)] w-full resize-none bg-transparent pt-2.5 pr-32 pl-4 text-sm leading-relaxed outline-none [field-sizing:content]"
         [attr.aria-label]="i18n.t('composer.request')"
         [placeholder]="
           !project()
@@ -62,7 +61,7 @@ export const MODES: RunMode[] = ['headless', 'checkpoint', 'interactive'];
         (input)="setDraft($any($event.target).value)"
         (keydown.control.enter)="submit()"
       ></textarea>
-      <div class="flex flex-wrap items-center gap-3 px-3 pt-1 pb-2.5">
+      <div class="flex flex-wrap items-center gap-3 px-3 pt-1 pb-1.5">
         <!-- Continuando un task, modalità, workflow e modello sono quelli del task: si vedono soltanto. -->
         <jk-segmented
           [label]="i18n.t('composer.mode')"

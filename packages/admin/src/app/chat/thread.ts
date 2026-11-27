@@ -106,7 +106,7 @@ import { UsageBar } from './usage-bar';
       }
 
       <div #scroller class="flex-1 overflow-y-auto">
-        <ol class="mx-auto flex max-w-3xl flex-col gap-3 px-6 py-8">
+        <ol class="flex flex-col gap-3 px-6 py-8">
           @for (item of timeline(); track item.key) {
             <li>
               @switch (item.kind) {

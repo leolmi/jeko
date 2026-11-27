@@ -22,7 +22,8 @@ import { Sidebar } from './sidebar';
       <section class="min-h-0 flex-1">
         <router-outlet />
       </section>
-      <jk-task-composer class="h-[30%] min-h-44 shrink-0 border-t border-line" />
+      <!-- Bassa finché il testo è corto; cresce col contenuto fino all'altezza massima. -->
+      <jk-task-composer class="max-h-[max(30%,11rem)] min-h-0 shrink-0 border-t border-line" />
     </div>
   `,
 })
